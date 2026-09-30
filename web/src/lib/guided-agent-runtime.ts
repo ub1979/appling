@@ -22,6 +22,22 @@ export interface GuidedWorkerRuntime extends GuidedUsageSnapshot {
   toolCount: number;
 }
 
+/**
+ * Events that carry a task's full brief (goal + context) and so may name the
+ * specialist doing it. Per-step progress ("running pytest", "reading
+ * requirements.md") must not re-label a running worker: guessing from those
+ * fragments flipped every development task to "Quality assurance".
+ */
+const GUIDED_RELABEL_EVENTS = new Set([
+  "tool.start",
+  "subagent.spawn_requested",
+  "subagent.start",
+]);
+
+export function guidedEventMayRelabel(type: string): boolean {
+  return GUIDED_RELABEL_EVENTS.has(type);
+}
+
 export interface GuidedRuntimeEventPayload {
   api_calls?: unknown;
   cache_read_tokens?: unknown;

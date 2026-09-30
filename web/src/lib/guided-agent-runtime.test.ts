@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   formatGuidedTokens,
+  guidedEventMayRelabel,
   guidedUsageTotal,
   markGuidedWorkerStopping,
   normalizeGuidedUsage,
@@ -80,5 +81,30 @@ describe("guided agent runtime", () => {
     expect(formatGuidedTokens(950)).toBe("950");
     expect(formatGuidedTokens(12_500)).toBe("12.5K");
     expect(formatGuidedTokens(2_550_000)).toBe("2.55M");
+  });
+
+  it("names a worker from its brief, not from each progress step", () => {
+    for (const type of ["tool.start", "subagent.spawn_requested", "subagent.start"]) {
+      expect(guidedEventMayRelabel(type)).toBe(true);
+    }
+    for (const type of ["subagent.tool", "subagent.progress", "subagent.thinking", "tool.progress"]) {
+      expect(guidedEventMayRelabel(type)).toBe(false);
+    }
+  });
+
+  it("keeps a worker's label when a later event carries none", () => {
+    const started = updateGuidedWorkers(
+      [],
+      "subagent.start",
+      { subagent_id: "a", goal: "Build it", display_label: "Development" },
+      1,
+    );
+    const progressed = updateGuidedWorkers(
+      started,
+      "subagent.progress",
+      { subagent_id: "a", text: "running pytest", display_label: undefined },
+      2,
+    );
+    expect(progressed[0].label).toBe("Development");
   });
 });

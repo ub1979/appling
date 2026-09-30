@@ -32,6 +32,16 @@ describe("guidedRequirementsTurnDirective", () => {
     expect(directive).toMatch(/already approved/i);
     expect(directive).toMatch(/must not reactivate Requirements/i);
   });
+
+  it("defers to the project's own record when the chat has no approval", () => {
+    // A lost or reset transcript leaves the browser thinking requirements are
+    // unfinished; the project's files must still win in both of those states.
+    for (const current of [null, "req-engineer"]) {
+      const directive = guidedRequirementsTurnDirective({ completed: [], current });
+      expect(directive).toMatch(/files outrank this chat/i);
+      expect(directive).toMatch(/do not restart the interview/i);
+    }
+  });
 });
 
 describe("unavailableGuidedModelAssignments", () => {

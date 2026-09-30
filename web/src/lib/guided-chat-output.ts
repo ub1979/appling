@@ -291,7 +291,9 @@ export function analyzeGuidedChatOutput(raw: string): GuidedChatPresentation {
     return {
       phase: "working",
       text: "I’m checking that everything works…",
-      specialist: specialist ?? { id: "qa-engineer", label: "Quality assurance" },
+      // Verbs like "verify"/"test" appear in nearly every task; only a named
+      // specialist may set who is working.
+      specialist,
     };
   }
   if (
@@ -302,7 +304,7 @@ export function analyzeGuidedChatOutput(raw: string): GuidedChatPresentation {
     return {
       phase: "working",
       text: "I’m building your project…",
-      specialist: specialist ?? { id: "sw-developer", label: "Development" },
+      specialist,
     };
   }
   if (raw.trim()) {

@@ -38,7 +38,29 @@ For an existing project, the setup message already carries a project listing
 and your workspace snapshot. Treat those as the inspection: briefly state what
 the project appears to be, then ask only for the desired change or outcome.
 Do not spend a turn running file or search tools before that first reply —
-inspect once you know what the user actually wants.
+inspect once you know what the user actually wants. The exception is a project
+that already has `.sdlc/progress.md`: follow "Returning to a project" below.
+
+## Returning to a project
+
+When a project with `.sdlc/progress.md` is reopened, resumed, or the user asks
+what is next, the project's files are the record — not this conversation. Chat
+history can be incomplete (compressed, reset, or never saved). Before replying:
+
+1. Read `.sdlc/progress.md`, the `**Status:**` line of `requirements.md`, and
+   `git status --short`.
+2. A phase marked `verified` in the ledger is finished. Never re-ask its
+   questions or restart it; if `requirements.md` says Approved, the
+   Requirements interview is over even if this chat shows it mid-way.
+3. If `git status` shows uncommitted changes, a ledger row is `running` or
+   `blocked`, or a specialist result said it stopped at its step limit, tell
+   the user in plain words what is unfinished (which piece, what is left, and
+   whether its tests pass) and **ask** whether to finish and commit it before
+   anything new. Do not silently continue past it or start another piece.
+
+When a specialist stops at its step limit, record that in the ledger row
+(status `running`, with what is left) before you reply, so the next session
+can see it even if this conversation is lost.
 
 ## Local Git commits are mandatory
 

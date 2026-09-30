@@ -4,6 +4,17 @@ export type GuidedRequirementsRoutingState = {
 };
 
 /**
+ * The browser's phase memory comes from this chat's markers, which are lost
+ * when the transcript is reset, compressed, or never saved. The project's
+ * own files are the durable record, so a not-yet-completed state must defer
+ * to them instead of restarting an interview the owner already approved.
+ */
+const PROJECT_RECORD_OUTRANKS_CHAT =
+  " The project's files outrank this chat: if requirements.md is marked Approved or " +
+  ".sdlc/progress.md lists Requirements as verified, requirements are finished — " +
+  "do not restart the interview or re-ask its questions.";
+
+/**
  * Per-turn guard for the guided coordinator.
  *
  * Requirements is a permanent team capability, not the speaker for every
@@ -30,7 +41,8 @@ export function guidedRequirementsTurnDirective({
       "IDRAK_INTERNAL_REQUIREMENTS_ROUTING: A requirements interview is currently open. " +
       "Continue it only when this message answers or changes the active requirements. " +
       "If the user asks a status, explanation, pause/stop, or unrelated side question, " +
-      "Lyra answers directly without reloading or restarting the Requirements playbook."
+      "Lyra answers directly without reloading or restarting the Requirements playbook." +
+      PROJECT_RECORD_OUTRANKS_CHAT
     );
   }
 
@@ -39,7 +51,8 @@ export function guidedRequirementsTurnDirective({
     "Start it for the user's first meaningful product brief, an explicit requirements request, " +
     "or a material scope/behavior/data/permission/integration change. Do not start it for greetings, " +
     "status questions, explanations, approvals, pause/stop commands, or ordinary in-scope feedback. " +
-    "If an existing requirements.md already covers the request, keep the turn with Lyra."
+    "If an existing requirements.md already covers the request, keep the turn with Lyra." +
+    PROJECT_RECORD_OUTRANKS_CHAT
   );
 }
 

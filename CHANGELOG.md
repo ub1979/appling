@@ -27,6 +27,14 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 - **Recent project cards display properly again.** The letter badge was
   squeezed into a tall pill and long names and folder paths were cut off on
   the left; the card now shows a full-width banner and left-aligned text.
+- **Reopening a project picks up where it really left off.** Lyra now treats
+  the project's own files (progress ledger, approved requirements, Git state)
+  as the record instead of chat history, never re-asks questions from a
+  finished phase, and tells you about unfinished or unsaved work and asks
+  whether to finish it before starting something new.
+- **The activity panel names the right agent.** Development tasks that
+  mention testing were shown as "Quality assurance agent is working"; an
+  agent is now named once from its task, not re-guessed from each step.
 
 ## [0.19.7-a] - 2026-09-23 — Model switching and send fixes
 

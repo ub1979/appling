@@ -369,4 +369,21 @@ describe("cancellation notice", () => {
       "All good here.",
     );
   });
+
+  it("does not label a task Quality assurance just because it mentions testing", () => {
+    // Development briefs almost always say "testable" or "verify"; the panel
+    // used to show every such task as the Quality assurance agent.
+    for (const text of [
+      "Build a secure, testable YouTube authorization gate",
+      "subagent terminal: pytest -q && npm test",
+    ]) {
+      const presentation = analyzeGuidedChatOutput(text);
+      expect(presentation.text).toBe("I’m checking that everything works…");
+      expect(presentation.specialist).toBeNull();
+    }
+    expect(
+      analyzeGuidedChatOutput("Load ultimate-builder:qa-engineer and run the smoke test")
+        .specialist?.id,
+    ).toBe("qa-engineer");
+  });
 });

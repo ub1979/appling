@@ -56,6 +56,7 @@ import {
 import {
   EMPTY_GUIDED_USAGE,
   formatGuidedTokens,
+  guidedEventMayRelabel,
   guidedUsageTotal,
   markGuidedWorkerStopping,
   normalizeGuidedUsage,
@@ -2151,7 +2152,10 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
           ]
             .filter((value): value is string => typeof value === "string")
             .join(" ");
-          const detected = analyzeGuidedChatOutput(signal).specialist;
+          const mayRelabel = guidedEventMayRelabel(type);
+          const detected = mayRelabel
+            ? analyzeGuidedChatOutput(signal).specialist
+            : null;
           const selected =
             detected &&
             guidedSelectedSpecialistIdsRef.current.includes(detected.id)
@@ -2173,10 +2177,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
                   type,
                   {
                     ...payload,
-                    display_label:
-                      detected?.label ??
-                      payload?.display_label ??
-                      "Project agent",
+                    display_label: mayRelabel
+                      ? (detected?.label ??
+                        payload?.display_label ??
+                        "Project agent")
+                      : payload?.display_label,
                   },
                   Date.now(),
                 ),
