@@ -57,6 +57,10 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
   changed in a builder project is recorded in that project's own Git history
   as a clearly labelled checkpoint. Password and key files are never included,
   and Lyra's own code is never touched.
+- **New projects are created outside Lyra's folder.** The New project screen
+  now starts in `~/Lyra Projects` (created automatically), refuses to create a
+  new project inside Lyra's own folder, and the folder picker has a
+  "New folder" button. Existing projects there still open normally.
 - **Task planning is always part of the team.** Every project gets a task plan
   before development, with tasks sized to finish within one helper and
   labelled with the files they own, so independent tasks can run in parallel.

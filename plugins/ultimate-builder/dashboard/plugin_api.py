@@ -86,9 +86,21 @@ def _workspace_safety(path: str) -> dict[str, Any]:
         "path": str(candidate),
         "allowed": not protected,
         "protected": protected,
+        # New projects are created outside Lyra's folder; existing projects
+        # under my_projects stay openable (``allowed``) but new ones are not.
+        "inside_lyra": inside_checkout,
         "reason": reason,
-        "recommended_root": str(_LYRA_CHECKOUT / "my_projects"),
+        "recommended_root": str(_new_projects_root()),
     }
+
+
+def _new_projects_root() -> Path:
+    """Default parent folder for new projects: ``~/Lyra Projects``.
+
+    Deliberately outside the Lyra installation so a project's files, Git
+    history and dependencies never mix with Lyra's own source tree.
+    """
+    return Path.home() / "Lyra Projects"
 
 
 def _project(path: str) -> Path:
@@ -320,6 +332,17 @@ async def _fetch_preview_document(url: str) -> tuple[str, str]:
                 )
             return response.text, str(response.url)
     raise HTTPException(status_code=502, detail="Too many local preview redirects.")
+
+
+@router.post("/projects-root")
+def projects_root() -> dict[str, Any]:
+    """Return (creating it if missing) the default folder for new projects."""
+    root = _new_projects_root()
+    try:
+        root.mkdir(parents=True, exist_ok=True)
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"Could not create {root}: {exc}")
+    return {"path": str(root)}
 
 
 @router.get("/workspace-safety")

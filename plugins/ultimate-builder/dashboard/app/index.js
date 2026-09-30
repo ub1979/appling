@@ -233,6 +233,24 @@
     const [path, setPath] = useState(initialPath || "");
     const [error, setError] = useState("");
     const [loading, setLoading] = useState(true);
+    const [newFolderName, setNewFolderName] = useState(null);
+
+    const createFolder = async function () {
+      const name = String(newFolderName || "").trim();
+      if (!listing || !name) return;
+      if (!/^[^/\\]+$/.test(name) || name === "." || name === "..") {
+        setError("Use a simple folder name without slashes.");
+        return;
+      }
+      try {
+        const target = joinPath(listing.path, name);
+        await api.createDirectory(target);
+        setNewFolderName(null);
+        await load(target);
+      } catch (err) {
+        setError(err && err.message ? err.message : String(err));
+      }
+    };
 
     const load = useCallback(async function (nextPath) {
       setLoading(true);
@@ -287,8 +305,24 @@
               }, h("span", { className: "ub-folder-icon" }, "⌑"), h("span", null, entry.name)))
             : h("div", { className: "ub-picker-empty" }, "No folders inside this location."),
       ),
+      newFolderName !== null && h("div", { className: "ub-path-row" },
+        h(Input, {
+          value: newFolderName,
+          autoFocus: true,
+          placeholder: "New folder name",
+          onChange: (event) => setNewFolderName(event.target.value),
+          onKeyDown: (event) => {
+            if (event.key === "Enter") void createFolder();
+            if (event.key === "Escape") setNewFolderName(null);
+          },
+          "aria-label": "New folder name",
+        }),
+        h(Button, { outlined: true, onClick: () => void createFolder(), disabled: !String(newFolderName).trim() }, "Create"),
+        h(Button, { ghost: true, onClick: () => setNewFolderName(null) }, "Cancel"),
+      ),
       h("div", { className: "ub-picker-actions" },
         h("span", null, listing ? listing.path : ""),
+        h(Button, { outlined: true, onClick: () => setNewFolderName(""), disabled: !listing || newFolderName !== null }, "New folder"),
         h(Button, { onClick: () => listing && onSelect(listing.path), disabled: !listing }, "Choose this folder"),
       ),
     );
@@ -443,11 +477,17 @@
 
     useEffect(function () {
       let active = true;
-      api.getDefaultCwd()
-        .then((info) => api.listFiles(info && info.cwd).then(() => info.cwd))
-        .catch(() => api.listFiles().then((listing) => listing.path))
-        .then((cwd) => {
-          if (active && cwd) setParentPath(defaultProjectsRoot(cwd));
+      // New projects live in ~/Lyra Projects, outside Lyra's own folder; the
+      // server creates it on first use. Older servers fall back to the
+      // launch folder's my_projects.
+      SDK.fetchJSON("/api/plugins/ultimate-builder/projects-root", { method: "POST" })
+        .then((info) => info && info.path)
+        .catch(() => api.getDefaultCwd()
+          .then((info) => api.listFiles(info && info.cwd).then(() => info.cwd))
+          .catch(() => api.listFiles().then((listing) => listing.path))
+          .then((cwd) => cwd && defaultProjectsRoot(cwd)))
+        .then((root) => {
+          if (active && root) setParentPath(root);
         })
         .catch(() => {});
       return () => { active = false; };
@@ -579,6 +619,13 @@
             throw new Error("Use a simple project name without slashes.");
           }
           workspace = joinPath(parentPath.trim(), name);
+          const placement = await workspaceStatus(workspace);
+          if (placement && placement.inside_lyra) {
+            throw new Error(
+              "New projects are kept outside Lyra's own folder. Choose another location, for example "
+              + (placement.recommended_root || "Lyra Projects in your home folder") + ".",
+            );
+          }
           workspace = await requireSafeWorkspace(workspace);
           await api.createDirectory(workspace);
         } else {
