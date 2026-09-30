@@ -39,6 +39,12 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
   for a project with three verified phases, because it only remembered what
   this browser saw. It now also reads the project's own progress file when a
   project opens and after each reply.
+- **Refreshing during background work no longer opens the wrong chat.** A
+  refresh while a helper was running switched the page to the helper's own
+  conversation and started a second copy of Lyra on it, leaving Send stuck
+  behind "Lyra is still starting" and hiding the helper. Helper conversations
+  are no longer treated as a continuation of the main chat, and a reconnected
+  chat now redraws its screen so Send unlocks when Lyra is idle.
 
 ## [0.19.7-a] - 2026-09-23 — Model switching and send fixes
 

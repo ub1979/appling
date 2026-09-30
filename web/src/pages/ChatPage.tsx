@@ -128,6 +128,7 @@ import { ChatSessionList } from "@/components/ChatSessionList";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { useI18n } from "@/i18n";
 import { api, fetchJSON, type MessagingPlatform } from "@/lib/api";
+import { ptyRepaintFrames } from "@/lib/pty-repaint";
 import { latchChatActivation } from "@/lib/chat-activation";
 import { chatMessageCopyText } from "@/lib/chat-copy";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
@@ -3612,8 +3613,11 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       // Send the initial RESIZE immediately so Ink has *a* size to lay
       // out against on its first paint.  The double-rAF block above will
       // follow up with the authoritative measurement — at worst Ink
-      // reflows once after the PTY boots, which is imperceptible.
-      ws.send(`\x1b[RESIZE:${term.cols};${term.rows}]`);
+      // reflows once after the PTY boots, which is imperceptible. A
+      // one-row step first forces a reattached, idle TUI to repaint.
+      for (const frame of ptyRepaintFrames(term.cols, term.rows)) {
+        ws.send(frame);
+      }
       // One-shot: a ?learn=<text> param (set by the Skills page "Learn a
       // skill" panel) is typed into the composer as a /learn command once the
       // PTY is up. /learn resolves via command.dispatch → a normal agent turn,

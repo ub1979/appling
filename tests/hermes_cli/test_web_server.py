@@ -2343,6 +2343,30 @@ class TestWebServerEndpoints:
         assert worker_resp.status_code == 200
         assert worker_resp.json()["session_id"] == "worker-tip"
 
+    def test_latest_descendant_skips_delegated_subagent_children(self):
+        """A background delegation's session is a child of the chat but not
+        its continuation: refreshing mid-delegation must keep resuming the
+        chat (or its real continuation), never the running subagent."""
+        from hermes_state import SessionDB
+
+        db = SessionDB()
+        try:
+            db.create_session(session_id="chat-root", source="tui")
+            db.create_session(
+                session_id="chat-model-switch", source="tui",
+                parent_session_id="chat-root",
+            )
+            db.create_session(
+                session_id="helper-running", source="subagent",
+                parent_session_id="chat-model-switch",
+            )
+        finally:
+            db.close()
+
+        resp = self.client.get("/api/sessions/chat-root/latest-descendant")
+        assert resp.status_code == 200
+        assert resp.json()["session_id"] == "chat-model-switch"
+
     def test_latest_descendant_survives_parent_cycle(self):
         """Regression for the #39140 CTE salvage: a corrupted parent chain
         that loops (a -> b -> a) must terminate (UNION dedup) instead of

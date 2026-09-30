@@ -11606,6 +11606,11 @@ def _session_latest_descendant(session_id: str, db):
 
     /model may create child sessions. Dashboard refresh should continue the
     newest child instead of reopening the old parent.
+
+    Delegated subagent sessions are children too, but they are spawned while
+    the parent is live and are never its continuation. Following them made a
+    refresh during a background delegation resume the *subagent's* session in
+    a second TUI (and rewrite the chat URL to it), so they are skipped.
     """
     def row_get(row, key, index):
         if isinstance(row, dict):
@@ -11639,6 +11644,7 @@ def _session_latest_descendant(session_id: str, db):
                 SELECT s.id, s.parent_session_id, s.started_at
                 FROM sessions s
                 JOIN descendants d ON s.parent_session_id = d.id
+                WHERE COALESCE(s.source, '') != 'subagent'
             )
             SELECT id, parent_session_id, started_at FROM descendants
             """,
@@ -11651,7 +11657,11 @@ def _session_latest_descendant(session_id: str, db):
                 "started_at": row_get(row, "started_at", 2),
             })
     else:
-        rows = db.list_sessions_rich(limit=10000, offset=0, compact_rows=True)
+        rows = [
+            row
+            for row in db.list_sessions_rich(limit=10000, offset=0, compact_rows=True)
+            if row.get("source") != "subagent"
+        ]
 
     children = {}
     for row in rows:
