@@ -71,6 +71,7 @@ import {
   nextGuidedPhase,
   orderGuidedPhases,
   parseGuidedPhaseMarkers,
+  phasesFromProgressLedger,
   shouldAdvanceGuidedPhase,
   type GuidedPhaseStep,
 } from "@/lib/guided-phase-plan";
@@ -126,7 +127,7 @@ import { Markdown } from "@/components/Markdown";
 import { ChatSessionList } from "@/components/ChatSessionList";
 import { usePageHeader } from "@/contexts/usePageHeader";
 import { useI18n } from "@/i18n";
-import { api, type MessagingPlatform } from "@/lib/api";
+import { api, fetchJSON, type MessagingPlatform } from "@/lib/api";
 import { latchChatActivation } from "@/lib/chat-activation";
 import { chatMessageCopyText } from "@/lib/chat-copy";
 import { useModalBehavior } from "@/hooks/useModalBehavior";
@@ -1720,6 +1721,55 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
     setGuidedTeamRecommendationPending(false);
   }, [guided, guidedMessageWorkspace, workspaceParam]);
 
+  // The project's ledger (.sdlc/progress.md) is the durable phase record. The
+  // browser's copy is rebuilt from chat markers, so it is empty when a
+  // transcript was reset or never saved and the map read 0/N for a project
+  // with verified phases. Merge the ledger in on open and after each reply.
+  const syncGuidedPhasesFromProjectRef = useRef<() => void>(() => {});
+  useEffect(() => {
+    if (!guided || !workspaceParam) return;
+    let active = true;
+    const sync = () => {
+      void fetchJSON<{ progress?: string }>(
+        `/api/plugins/ultimate-builder/state?path=${encodeURIComponent(workspaceParam)}`,
+      )
+        .then((state) => {
+          if (!active) return;
+          const ledger = phasesFromProgressLedger(
+            state.progress ?? "",
+            GUIDED_SPECIALIST_LABELS,
+          );
+          const merged = Array.from(
+            new Set([...guidedPhasesCompletedRef.current, ...ledger.completed]),
+          );
+          if (merged.length !== guidedPhasesCompletedRef.current.length) {
+            guidedPhasesCompletedRef.current = merged;
+            setGuidedPhasesCompleted(merged);
+          }
+          const current = guidedPhaseCurrentRef.current;
+          const next =
+            current && !merged.includes(current)
+              ? current
+              : ledger.current && !merged.includes(ledger.current)
+                ? ledger.current
+                : null;
+          if (next !== current) {
+            guidedPhaseCurrentRef.current = next;
+            setGuidedPhaseCurrent(next);
+          }
+        })
+        .catch(() => {
+          // Non-fatal: the map keeps the browser's own phase memory.
+        });
+    };
+    syncGuidedPhasesFromProjectRef.current = sync;
+    sync();
+    return () => {
+      active = false;
+      syncGuidedPhasesFromProjectRef.current = () => {};
+    };
+  }, [guided, workspaceParam]);
+
   // Keep the preloaded skill set aligned with the project URL as the
   // persistent ChatPage moves between the launcher, model settings, and chat.
   useEffect(() => {
@@ -1738,6 +1788,8 @@ export default function ChatPage({ isActive = true }: { isActive?: boolean }) {
       content,
       GUIDED_SELECTABLE_SPECIALIST_IDS,
     );
+    // A reply may have updated the ledger (a phase verified or cut off).
+    syncGuidedPhasesFromProjectRef.current();
     const startedPhase = phases.started[phases.started.length - 1] ?? null;
     if (phases.completed.length) {
       const merged = Array.from(

@@ -205,3 +205,65 @@ export function shouldAdvanceGuidedPhase({
   if (completedInReply.includes(next)) return false;
   return !guidedPhaseAwaitsUser(reply);
 }
+
+/** Ledger phase names that differ from the specialist's display label. */
+const LEDGER_PHASE_ALIASES: Record<string, string> = {
+  qa: "qa-engineer",
+  "security audit": "security-auditor",
+  docs: "tech-writer",
+  deploy: "devops-engineer",
+};
+
+/**
+ * Phase state from the project's own `.sdlc/progress.md` ledger.
+ *
+ * The browser's phase memory is rebuilt from this chat's markers, so it is
+ * empty whenever the transcript is reset, compressed, or was never saved —
+ * the map then showed 0/N for a project whose ledger had phases verified.
+ * The ledger is the durable record: `verified` rows are done, and the first
+ * `running` (else `blocked`) row is the phase in progress.
+ */
+export function phasesFromProgressLedger(
+  markdown: string,
+  labels: Readonly<Record<string, string>>,
+): { completed: string[]; current: string | null } {
+  const byName = new Map<string, string>();
+  for (const [id, label] of Object.entries(labels)) {
+    byName.set(id.toLowerCase(), id);
+    byName.set(label.toLowerCase(), id);
+  }
+  for (const [name, id] of Object.entries(LEDGER_PHASE_ALIASES)) {
+    if (!byName.has(name)) byName.set(name, id);
+  }
+
+  const completed: string[] = [];
+  let running: string | null = null;
+  let blocked: string | null = null;
+  let inLedger = false;
+  for (const line of markdown.split(/\r?\n/)) {
+    if (/^#{1,6}\s/.test(line)) {
+      inLedger = /^#{1,6}\s+phase ledger\b/i.test(line);
+      continue;
+    }
+    if (!inLedger || !line.trim().startsWith("|")) continue;
+    const cells = line.split("|").slice(1, -1).map((cell) =>
+      cell.replace(/[`*_]/g, "").trim().toLowerCase(),
+    );
+    if (cells.length < 2 || /^:?-+:?$/.test(cells[0])) continue;
+    const id = byName.get(cells[0]);
+    if (!id) continue;
+    const status = cells[1];
+    if (status === "verified") {
+      if (!completed.includes(id)) completed.push(id);
+    } else if (status === "running") {
+      running ??= id;
+    } else if (status === "blocked") {
+      blocked ??= id;
+    }
+  }
+  const current = running ?? blocked;
+  return {
+    completed,
+    current: current && !completed.includes(current) ? current : null,
+  };
+}

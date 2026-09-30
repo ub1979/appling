@@ -6,6 +6,7 @@ import {
   guidedPhaseSummary,
   nextGuidedPhase,
   orderGuidedPhases,
+  phasesFromProgressLedger,
   parseGuidedPhaseMarkers,
   shouldAdvanceGuidedPhase,
 } from "./guided-phase-plan";
@@ -222,3 +223,52 @@ describe("shouldAdvanceGuidedPhase", () => {
     ).toBe(false);
   });
 });
+
+describe("phasesFromProgressLedger", () => {
+  const labels = {
+    "req-engineer": "Requirements",
+    researcher: "Research",
+    "sw-architect": "Architecture",
+    "sw-developer": "Development",
+    "qa-engineer": "Quality assurance",
+    "security-auditor": "Security",
+  };
+  const ledger = [
+    "# SDLC Progress",
+    "",
+    "## Phase ledger",
+    "| Phase | Status | Delegate/session | Artifact | Evidence |",
+    "|---|---|---|---|---|",
+    "| Requirements | verified | main | `requirements.md` | approved |",
+    "| Research | verified | x | `research-report.md` | ok |",
+    "| **Architecture** | verified | x | `plan.md` | ok |",
+    "| Development | running | dev | app | 70 tests pass |",
+    "| Security | pending | — | — | — |",
+    "| QA | pending | — | — | — |",
+    "",
+    "## Open findings",
+    "| ID | Severity | Source | State | Owner |",
+    "|---|---|---|---|---|",
+    "| Requirements | verified | not a phase row | x | y |",
+  ].join("\n");
+
+  it("reads verified phases and the running one from the ledger", () => {
+    expect(phasesFromProgressLedger(ledger, labels)).toEqual({
+      completed: ["req-engineer", "researcher", "sw-architect"],
+      current: "sw-developer",
+    });
+  });
+
+  it("is empty for a project without a ledger", () => {
+    expect(phasesFromProgressLedger("# Notes\n| a | b |", labels)).toEqual({
+      completed: [],
+      current: null,
+    });
+  });
+
+  it("falls back to a blocked phase and maps the QA alias", () => {
+    const text = "## Phase ledger\n| Phase | Status |\n|---|---|\n| QA | blocked |";
+    expect(phasesFromProgressLedger(text, labels).current).toBe("qa-engineer");
+  });
+});
+

@@ -35,6 +35,10 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 - **The activity panel names the right agent.** Development tasks that
   mention testing were shown as "Quality assurance agent is working"; an
   agent is now named once from its task, not re-guessed from each step.
+- **The Project map shows real progress after a lost chat.** It showed 0/6
+  for a project with three verified phases, because it only remembered what
+  this browser saw. It now also reads the project's own progress file when a
+  project opens and after each reply.
 
 ## [0.19.7-a] - 2026-09-23 — Model switching and send fixes
 
