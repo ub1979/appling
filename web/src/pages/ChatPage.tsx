@@ -800,9 +800,9 @@ function GuidedRuntimePanel({
       : "No workers";
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col p-3 text-xs">
-      <div className="flex items-center justify-between gap-2">
-        <span className="font-semibold uppercase tracking-[0.16em] text-text-secondary">
+    <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-x-hidden p-3 text-xs">
+      <div className="flex min-w-0 items-center justify-between gap-2">
+        <span className="min-w-0 truncate font-semibold uppercase tracking-[0.16em] text-text-secondary">
           Agent activity
         </span>
         <span
@@ -1147,7 +1147,7 @@ function GuidedRailSpecialistActivity({
           />
           <span className="guided-specialist-dot" />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <strong className="block truncate text-[11px] text-midground">
             {guidedAgentName(specialist.id, specialist.label)} is working
           </strong>
@@ -1174,7 +1174,7 @@ function GuidedRailSpecialistActivity({
           </span>
           {(mayBeStalled || (runningTool && toolElapsedSeconds >= 30)) && (
             <Button
-              className="mt-2 h-7 px-2 text-[10px]"
+              className="mt-2 h-auto min-h-7 max-w-full whitespace-normal px-2 text-left text-[10px]"
               ghost
               size="sm"
               onClick={onRetry}

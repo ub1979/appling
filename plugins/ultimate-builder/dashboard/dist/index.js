@@ -663,7 +663,7 @@
           ),
           h("div", { className: "ub-studio-nav-actions" },
             h("span", { className: "ub-studio-ready" }, h("i", null), "Ready"),
-            h("span", { className: "ub-version" }, "v0.19.7-a beta"),
+            h("span", { className: "ub-version" }, "v0.19.8-a beta"),
             textSizeControl(),
             themeToggle(),
             h("button", {

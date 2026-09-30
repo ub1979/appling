@@ -1000,6 +1000,37 @@ class TestDelegateObservability(unittest.TestCase):
             result = json.loads(delegate_task(goal="Test max iter", parent_agent=parent))
             self.assertEqual(result["results"][0]["exit_reason"], "max_iterations")
 
+    def test_step_limit_with_summary_is_flagged_as_cut_off(self):
+        """A child that ran out of steps but wrote a summary stays 'completed'
+        and carries a note saying it was cut off; a finished child does not."""
+        parent = _make_mock_parent(depth=0)
+
+        def run(completed):
+            with patch("run_agent.AIAgent") as MockAgent:
+                mock_child = MagicMock()
+                mock_child.model = "claude-sonnet-4-6"
+                mock_child.session_prompt_tokens = 0
+                mock_child.session_completion_tokens = 0
+                mock_child.run_conversation.return_value = {
+                    "final_response": "Implemented part of it.",
+                    "completed": completed,
+                    "interrupted": False,
+                    "api_calls": 50,
+                    "messages": [],
+                }
+                MockAgent.return_value = mock_child
+                return json.loads(
+                    delegate_task(goal="Test", parent_agent=parent)
+                )["results"][0]
+
+        cut_off = run(completed=False)
+        self.assertEqual(cut_off["status"], "completed")
+        self.assertEqual(cut_off["exit_reason"], "max_iterations")
+        self.assertIn("step limit", cut_off["note"])
+
+        finished = run(completed=True)
+        self.assertNotIn("note", finished)
+
     def test_empty_sentinel_marks_status_failed(self):
         """Regression: a child that returns the literal '(empty)' sentinel
         (emitted by run_agent.py when the LLM returns empty responses after

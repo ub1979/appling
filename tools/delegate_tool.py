@@ -2296,6 +2296,16 @@ def _run_single_child(
         }
         if status == "failed":
             entry["error"] = result.get("error", "Subagent did not produce a response.")
+        elif status == "completed" and exit_reason == "max_iterations":
+            # status stays "completed" (the summary is usable), but a child
+            # cut off by its step cap reads like a finished one unless this is
+            # spelled out — parents otherwise report "done" and the user only
+            # sees stop-start progress.
+            entry["note"] = (
+                f"Stopped at its step limit ({api_calls} steps) before it "
+                "finished. The summary may describe unfinished work; tell the "
+                "user it was cut off, then continue with a smaller follow-up task."
+            )
 
         # Cross-agent file-state reminder.  If this subagent wrote any
         # files the parent had already read, surface it so the parent

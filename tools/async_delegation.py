@@ -193,7 +193,36 @@ def _persist_dispatch(record: Dict[str, Any]) -> None:
              owner_started_at, json.dumps(task_payload),
              record.get("origin_session_id", "")),
         )
-    _prune_durable_records()
+    try:
+        _prune_durable_records()
+    except Exception as exc:  # noqa: BLE001 — housekeeping must not fail a committed dispatch
+        logger.warning("Async delegation history prune failed: %s", exc)
+
+
+def _persist_dispatch_or_release(delegation_id: str, record: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    """Persist a dispatch; on failure release its in-memory slot.
+
+    The capacity slot is claimed before the durable write. If the write fails
+    (e.g. a corrupted or unwritable state.db) and the record stayed in
+    ``_records`` as ``running``, no worker would ever finalize it and the slot
+    would leak for the life of the process — after N such failures every
+    later delegation is rejected as "at capacity". Returns a ``rejected``
+    result for the caller to hand back, or None when the write succeeded.
+    """
+    try:
+        _persist_dispatch(record)
+    except Exception as exc:  # noqa: BLE001
+        with _records_lock:
+            _records.pop(delegation_id, None)
+        logger.warning(
+            "Async delegation %s not dispatched: durable record write failed: %s",
+            delegation_id, exc,
+        )
+        return {
+            "status": "rejected",
+            "error": f"Could not record background delegation in state.db: {exc}",
+        }
+    return None
 
 
 def _delete_durable_delegation(delegation_id: str) -> None:
@@ -249,6 +278,22 @@ def _persist_completion(event: Dict[str, Any], result: Dict[str, Any]) -> None:
                WHERE delegation_id=?""",
             (event.get("status", "completed"), event.get("completed_at", now), now,
              json.dumps(event), json.dumps(result), event["delegation_id"]),
+        )
+
+
+def _persist_completion_best_effort(event: Dict[str, Any], result: Dict[str, Any]) -> None:
+    """Persist a completion without letting a DB failure lose the result.
+
+    Raising here would skip the in-memory queue publish (result silently lost)
+    and leave the record stuck in ``finalizing``.
+    """
+    try:
+        _persist_completion(event, result)
+    except Exception as exc:  # noqa: BLE001
+        logger.error(
+            "Async delegation %s: durable completion write failed (%s); "
+            "delivering in-process only, it will not survive a restart.",
+            event.get("delegation_id"), exc,
         )
 
 
@@ -645,7 +690,9 @@ def dispatch_async_delegation(
             }
         _records[delegation_id] = record
 
-    _persist_dispatch(record)
+    rejected = _persist_dispatch_or_release(delegation_id, record)
+    if rejected is not None:
+        return rejected
     executor = _get_executor(max_async_children)
 
     def _worker() -> None:
@@ -757,7 +804,7 @@ def _push_completion_event(
         "completed_at": completed_at,
         "exit_reason": result.get("exit_reason"),
     }
-    _persist_completion(evt, result)
+    _persist_completion_best_effort(evt, result)
     try:
         process_registry.completion_queue.put(evt)
     except Exception as exc:  # pragma: no cover
@@ -845,7 +892,9 @@ def dispatch_async_delegation_batch(
             }
         _records[delegation_id] = record
 
-    _persist_dispatch(record)
+    rejected = _persist_dispatch_or_release(delegation_id, record)
+    if rejected is not None:
+        return rejected
     executor = _get_executor(max_async_children)
 
     def _worker() -> None:
@@ -944,7 +993,7 @@ def _finalize_batch(
         "dispatched_at": dispatched_at,
         "completed_at": completed_at,
     }
-    _persist_completion(evt, combined)
+    _persist_completion_best_effort(evt, combined)
     try:
         process_registry.completion_queue.put(evt)
     except Exception as exc:  # pragma: no cover

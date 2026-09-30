@@ -9,6 +9,22 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+## [0.19.8-a] - 2026-09-30 — Background helper reliability
+
+### Fixed
+
+- **A damaged session database no longer forces every helper to block the
+  chat.** When saving a background helper's record failed, its slot was never
+  released; after three failures every later helper ran in the foreground for
+  the rest of the session. The slot is now freed and the helper runs in the
+  foreground only that once. A failed save when a helper finishes no longer
+  loses its result.
+- **A helper that runs out of steps now says so.** Its result keeps its
+  summary but carries a plain note that it was cut off, so the project chat
+  reports unfinished work instead of treating it as done.
+- **The Agent activity panel no longer cuts off on the right.** Long titles
+  end in "…" and the "Stop tool & retry" button wraps inside the panel.
+
 ## [0.19.7-a] - 2026-09-23 — Model switching and send fixes
 
 ### Fixed
