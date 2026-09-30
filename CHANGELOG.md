@@ -24,6 +24,9 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
   reports unfinished work instead of treating it as done.
 - **The Agent activity panel no longer cuts off on the right.** Long titles
   end in "…" and the "Stop tool & retry" button wraps inside the panel.
+- **Recent project cards display properly again.** The letter badge was
+  squeezed into a tall pill and long names and folder paths were cut off on
+  the left; the card now shows a full-width banner and left-aligned text.
 
 ## [0.19.7-a] - 2026-09-23 — Model switching and send fixes
 
