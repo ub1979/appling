@@ -46,6 +46,20 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
   are no longer treated as a continuation of the main chat, and a reconnected
   chat now redraws its screen so Send unlocks when Lyra is idle.
 
+### Changed
+
+- **A helper that runs out of steps now keeps going.** Instead of stopping
+  half-way, it gets up to two more full rounds on the same task
+  (`delegation.max_continuations`, default 2). Only a task that still cannot
+  finish is reported as cut off, with a note to split it.
+- **Helpers' work is saved automatically.** When any helper stops, whatever it
+  changed in a builder project is recorded in that project's own Git history
+  as a clearly labelled checkpoint. Password and key files are never included,
+  and Lyra's own code is never touched.
+- **Task planning is always part of the team.** Every project gets a task plan
+  before development, with tasks sized to finish within one helper and
+  labelled with the files they own, so independent tasks can run in parallel.
+
 ## [0.19.7-a] - 2026-09-23 — Model switching and send fixes
 
 ### Fixed

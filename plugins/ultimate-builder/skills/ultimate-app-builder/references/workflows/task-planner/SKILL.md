@@ -219,6 +219,8 @@ Rules: split anything larger than L into M/S tasks; each task completable in one
 - 3-15 tasks per epic (more → split the epic). Types: development, testing, infrastructure, documentation, design, research/spike.
 - Identify dependencies within and across epics; flag cross-epic blockers.
 - Right-size: the smallest unit with its own test cycle, one agent invocation. If you can't describe "done", it's too big or too vague.
+- Fit one helper: a task must be finishable by one developer helper within about 60 tool calls, including reading, testing, and committing. As a rule of thumb that is one user-visible behavior touching at most ~5 files. Anything bigger is split, even when the pieces feel small.
+- Name file ownership: list the files each task creates or changes. Tasks in the same wave must not share files, so they can run as parallel helpers.
 - UI tasks cite specific design-system values: "Input (40px height, 8px radius), Primary button (md), error color for validation"; "single column < 768px, two-column > 1024px".
 
 ### Task Interface Contracts (mandatory for every task)

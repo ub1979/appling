@@ -84,7 +84,29 @@ def _status_prompt(raw_args: str) -> str:
     )
 
 
+def _checkpoint_module():
+    """Load project_checkpoint.py by path (works whether or not the plugin
+    was imported as a package)."""
+    import importlib.util
+    import sys
+
+    name = "lyra_ultimate_builder_project_checkpoint"
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, _ROOT / "project_checkpoint.py")
+    module = importlib.util.module_from_spec(spec)
+    assert spec and spec.loader
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
 def register(ctx) -> None:
+    # Record every helper's work in the project's own Git history the moment
+    # it stops, so a cut-off or forgotten commit never loses work.
+    if hasattr(ctx, "register_hook"):
+        ctx.register_hook("subagent_stop", _checkpoint_module().on_subagent_stop)
+
     def start_build(raw_args: str) -> str:
         prompt = _command_prompt(raw_args)
         if prompt.startswith("Usage:") or prompt.startswith("Lyra protected"):

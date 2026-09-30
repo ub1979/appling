@@ -35,7 +35,7 @@
 
   // Requirements is always available (see the app-it playbook). Every path that sets the
   // team goes through this, so no template, Clear, or stray click can drop it.
-  const REQUIRED_SKILL_IDS = ["req-engineer"];
+  const REQUIRED_SKILL_IDS = ["req-engineer", "task-planner"];
   const withRequired = function (ids) {
     const next = new Set(ids);
     REQUIRED_SKILL_IDS.forEach((id) => next.add(id));

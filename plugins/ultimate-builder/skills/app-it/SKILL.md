@@ -77,6 +77,18 @@ commit. A local commit is mandatory even when the user has not asked for a
 remote push. Pushing to a remote remains a separate action and requires an
 explicit user request.
 
+After every specialist stops, Lyra records whatever it left as a
+`checkpoint: …` commit automatically, so work is never lost — but a checkpoint
+is not verification. When you verify a checkpointed piece, make a normal
+commit that says what now works. Never tell the user a piece is done while
+`git status --short` still lists changes.
+
+A specialist that runs out of steps is continued automatically on the same
+task (up to `delegation.max_continuations` extra rounds). If its result still
+carries a "Stopped at its step limit" note, the task was too big: record what
+is left in the ledger and split the rest into smaller tasks — do not report it
+as finished.
+
 ## Project Brain
 
 For an existing project, read `.sdlc/project-brain.md` before planning or
@@ -151,10 +163,11 @@ smart defaults”; honour those exactly as the playbook specifies and continue.
 Choose the smallest useful set from the registered Ultimate Builder skills.
 Explain each recommendation in one short line.
 
-`req-engineer` is always in the team: include it in every proposal and in every
-`[APP_IT_SKILLS_SET:...]` marker, whatever else you recommend. Do not present
-it as optional and do not ask whether to include it. The rest is a judgement
-call:
+`req-engineer` and `task-planner` are always in the team: include both in every
+proposal and in every `[APP_IT_SKILLS_SET:...]` marker, whatever else you
+recommend. Do not present them as optional and do not ask whether to include
+them. Task planning runs before any development: no developer is delegated
+work that is not a task in `task-graph.md`. The rest is a judgement call:
 
 - formal, testable behavior spec on top of requirements: `spec`;
 - markets, competitors, current standards, unfamiliar domains, or technical
@@ -197,13 +210,14 @@ agent.
 Emit exactly one machine-readable control marker with the recommendation:
 
 ```text
-[APP_IT_SKILLS_SET:req-engineer,sw-developer,qa-engineer]
+[APP_IT_SKILLS_SET:req-engineer,task-planner,sw-developer,qa-engineer]
 ```
 
 Use only registered specialist ids, comma-separated, with no prose inside the
-brackets. `req-engineer` must appear in every marker, so the smallest possible
-team is `[APP_IT_SKILLS_SET:req-engineer]`. The dashboard re-adds it if you
-omit it, but omitting it contradicts what you told the user. The dashboard
+brackets. `req-engineer` and `task-planner` must appear in every marker, so the
+smallest possible team is `[APP_IT_SKILLS_SET:req-engineer,task-planner]`. The
+dashboard re-adds them if you omit them, but omitting them contradicts what
+you told the user. The dashboard
 removes this marker from the visible response and opens the editable
 confirmation. Only the later `IDRAK_INTERNAL_SKILLS_UPDATE` changes project
 state.

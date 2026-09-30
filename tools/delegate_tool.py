@@ -29,7 +29,7 @@ from concurrent.futures import (
     ThreadPoolExecutor,
     TimeoutError as FuturesTimeoutError,
 )
-from typing import Any, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from toolsets import TOOLSETS
 
@@ -490,6 +490,89 @@ def _get_child_timeout() -> Optional[float]:
     return DEFAULT_CHILD_TIMEOUT
 
 
+_DEFAULT_MAX_CONTINUATIONS = 2
+_MAX_CONTINUATIONS_CEILING = 5
+
+
+def _get_max_continuations() -> int:
+    """Read delegation.max_continuations from config.
+
+    How many extra rounds a child that hit its step cap gets to finish the
+    same task (fresh ``delegation.max_iterations`` each round, same
+    conversation). Default 2; ``0`` disables continuation; capped at 5 so a
+    task that cannot converge still stops.
+    """
+    val = _load_config().get("max_continuations")
+    if val is None:
+        return _DEFAULT_MAX_CONTINUATIONS
+    try:
+        parsed = int(val)
+    except (TypeError, ValueError):
+        logger.warning(
+            "delegation.max_continuations=%r is not an integer; using default %d",
+            val, _DEFAULT_MAX_CONTINUATIONS,
+        )
+        return _DEFAULT_MAX_CONTINUATIONS
+    return max(0, min(parsed, _MAX_CONTINUATIONS_CEILING))
+
+
+def _child_needs_continuation(result: Any, child: Any) -> bool:
+    """True when a child stopped only because it ran out of steps."""
+    if not isinstance(result, dict):
+        return False
+    if result.get("completed") or result.get("interrupted"):
+        return False
+    if getattr(child, "_interrupt_requested", False) is True:
+        return False
+    return not (result.get("final_response") or "").strip() == "(empty)"
+
+
+_CONTINUATION_MESSAGE = (
+    "You stopped because you reached your step limit before finishing this "
+    "task. You now have a fresh step allowance. Continue from exactly where "
+    "you stopped: do not redo finished work or re-read files you already "
+    "know. Finish the task, verify it, save the work if your task says to, "
+    "then give your final summary."
+)
+
+
+def _run_child_to_completion(child: Any, run_turn: Callable[..., Dict[str, Any]],
+                             goal: str, max_continuations: int) -> Dict[str, Any]:
+    """Run a child; if it runs out of steps, continue the same conversation.
+
+    A child cut off by its step cap used to be reported as finished, leaving
+    half-built, uncommitted work for the parent to notice (or not). Each
+    continuation is a new turn on the child's own conversation (so its prompt
+    cache and knowledge of the work carry over) with a fresh iteration budget.
+    ``api_calls`` is summed across rounds and ``continuations`` records how
+    many were used.
+    """
+    from agent.iteration_budget import IterationBudget
+
+    result = run_turn(user_message=goal)
+    total_calls = int(result.get("api_calls", 0) or 0) if isinstance(result, dict) else 0
+    rounds = 0
+    while rounds < max_continuations and _child_needs_continuation(result, child):
+        rounds += 1
+        logger.info(
+            "Subagent hit its step limit; continuation %d of %d", rounds, max_continuations,
+        )
+        cap = getattr(child, "max_iterations", None) or getattr(
+            getattr(child, "iteration_budget", None), "max_total", 50
+        )
+        child.iteration_budget = IterationBudget(int(cap))
+        result = run_turn(
+            user_message=_CONTINUATION_MESSAGE,
+            conversation_history=result.get("messages") or [],
+        )
+        if isinstance(result, dict):
+            total_calls += int(result.get("api_calls", 0) or 0)
+    if isinstance(result, dict):
+        result["api_calls"] = total_calls
+        result["continuations"] = rounds
+    return result
+
+
 def _get_max_spawn_depth() -> int:
     """Read delegation.max_spawn_depth from config, floored at 1 (no ceiling).
 
@@ -787,6 +870,21 @@ def _resolve_workspace_hint(parent_agent) -> Optional[str]:
         if os.path.isabs(text) and os.path.isdir(text):
             return text
     return None
+
+
+def _hook_workspace(parent_agent) -> Optional[str]:
+    """The folder this conversation works in, for plugin hooks.
+
+    Multi-session gateways (the dashboard) pin each conversation's folder in a
+    context variable; the process-wide ``TERMINAL_CWD`` belongs to whichever
+    session launched the process, so prefer the pinned value.
+    """
+    try:
+        from agent.runtime_cwd import resolve_agent_cwd
+
+        return str(resolve_agent_cwd())
+    except Exception:
+        return _resolve_workspace_hint(parent_agent)
 
 
 def _strip_blocked_tools(toolsets: List[str]) -> List[str]:
@@ -2065,15 +2163,22 @@ def _run_single_child(
             except Exception as e:
                 logger.debug("Child text relay failed: %s", e)
 
+        _max_continuations = _get_max_continuations()
+
         def _run_with_thread_capture():
             _worker_thread_holder["t"] = threading.current_thread()
             from agent.delegation_context import delegated_child_context
 
             with delegated_child_context():
-                return child.run_conversation(
-                    user_message=goal,
-                    task_id=child_task_id,
-                    stream_callback=_relay_child_text,
+                return _run_child_to_completion(
+                    child,
+                    lambda **turn: child.run_conversation(
+                        task_id=child_task_id,
+                        stream_callback=_relay_child_text,
+                        **turn,
+                    ),
+                    goal,
+                    _max_continuations,
                 )
 
         _child_future = _timeout_executor.submit(_run_with_thread_capture)
@@ -2267,6 +2372,7 @@ def _run_single_child(
             "duration_seconds": duration,
             "model": _model if isinstance(_model, str) else None,
             "exit_reason": exit_reason,
+            "continuations": int(result.get("continuations", 0) or 0),
             "tokens": {
                 "input": (
                     _input_tokens if isinstance(_input_tokens, (int, float)) else 0
@@ -2302,9 +2408,11 @@ def _run_single_child(
             # spelled out — parents otherwise report "done" and the user only
             # sees stop-start progress.
             entry["note"] = (
-                f"Stopped at its step limit ({api_calls} steps) before it "
-                "finished. The summary may describe unfinished work; tell the "
-                "user it was cut off, then continue with a smaller follow-up task."
+                f"Stopped at its step limit ({api_calls} steps, including "
+                f"{entry['continuations']} automatic continuation round(s)) "
+                "before it finished. The summary may describe unfinished work; "
+                "tell the user it was cut off, record what is left, then split "
+                "the rest into smaller follow-up tasks."
             )
 
         # Cross-agent file-state reminder.  If this subagent wrote any
@@ -2966,6 +3074,13 @@ def delegate_task(
                     child_summary=entry.get("summary"),
                     child_status=entry.get("status"),
                     duration_ms=int((entry.get("duration_seconds") or 0) * 1000),
+                    # Where the child worked, and how it ended, so plugins can
+                    # act on the project (e.g. checkpoint its changes).
+                    workspace=_hook_workspace(parent_agent),
+                    child_exit_reason=entry.get("exit_reason"),
+                    child_goal=(task_list[_child_index].get("goal")
+                                if isinstance(_child_index, int)
+                                and 0 <= _child_index < len(task_list) else None),
                 )
             except Exception:
                 logger.debug("subagent_stop hook invocation failed", exc_info=True)

@@ -55,7 +55,7 @@ def test_every_offered_agent_has_a_playbook():
 
 def test_requirements_cannot_be_switched_off_at_launch():
     src = DASHBOARD.read_text(encoding="utf-8")
-    assert 'REQUIRED_SKILL_IDS = ["req-engineer"]' in src
+    assert 'REQUIRED_SKILL_IDS = ["req-engineer", "task-planner"]' in src
     # Every path that sets the team funnels through withRequired().
     assert "useState(withRequired([]))" in src
     assert "setSelected(withRequired(template.skills))" in src

@@ -1000,6 +1000,82 @@ class TestDelegateObservability(unittest.TestCase):
             result = json.loads(delegate_task(goal="Test max iter", parent_agent=parent))
             self.assertEqual(result["results"][0]["exit_reason"], "max_iterations")
 
+    def test_child_out_of_steps_continues_until_it_finishes(self):
+        """A child that runs out of steps is continued on its own conversation
+        with a fresh allowance, instead of being reported as finished."""
+        parent = _make_mock_parent(depth=0)
+        cut_off = {
+            "final_response": "Half done.", "completed": False,
+            "interrupted": False, "api_calls": 50,
+            "messages": [{"role": "user", "content": "goal"},
+                         {"role": "assistant", "content": "Half done."}],
+        }
+        finished = {
+            "final_response": "All done and committed.", "completed": True,
+            "interrupted": False, "api_calls": 12, "messages": [],
+        }
+        with patch("run_agent.AIAgent") as MockAgent:
+            mock_child = MagicMock()
+            mock_child.model = "claude-sonnet-4-6"
+            mock_child.max_iterations = 50
+            mock_child._interrupt_requested = False
+            mock_child.session_prompt_tokens = 0
+            mock_child.session_completion_tokens = 0
+            mock_child.run_conversation.side_effect = [cut_off, finished]
+            MockAgent.return_value = mock_child
+
+            entry = json.loads(delegate_task(goal="Build it", parent_agent=parent))["results"][0]
+
+        self.assertEqual(mock_child.run_conversation.call_count, 2)
+        second = mock_child.run_conversation.call_args_list[1].kwargs
+        self.assertIn("step limit", second["user_message"])
+        self.assertEqual(second["conversation_history"], cut_off["messages"])
+        self.assertEqual(mock_child.iteration_budget.remaining, 50)
+        self.assertEqual(entry["exit_reason"], "completed")
+        self.assertEqual(entry["summary"], "All done and committed.")
+        self.assertEqual(entry["api_calls"], 62)
+        self.assertEqual(entry["continuations"], 1)
+        self.assertNotIn("note", entry)
+
+    @patch("tools.delegate_tool._load_config")
+    def test_continuations_are_bounded_by_config(self, mock_cfg):
+        mock_cfg.return_value = {"max_continuations": 1}
+        parent = _make_mock_parent(depth=0)
+        with patch("run_agent.AIAgent") as MockAgent:
+            mock_child = MagicMock()
+            mock_child.model = "claude-sonnet-4-6"
+            mock_child.max_iterations = 50
+            mock_child._interrupt_requested = False
+            mock_child.session_prompt_tokens = 0
+            mock_child.session_completion_tokens = 0
+            mock_child.run_conversation.return_value = {
+                "final_response": "Still going.", "completed": False,
+                "interrupted": False, "api_calls": 50, "messages": [],
+            }
+            MockAgent.return_value = mock_child
+
+            entry = json.loads(delegate_task(goal="Huge", parent_agent=parent))["results"][0]
+
+        self.assertEqual(mock_child.run_conversation.call_count, 2)
+        self.assertEqual(entry["exit_reason"], "max_iterations")
+        self.assertEqual(entry["continuations"], 1)
+        self.assertIn("step limit", entry["note"])
+
+    def test_interrupted_child_is_not_continued(self):
+        parent = _make_mock_parent(depth=0)
+        with patch("run_agent.AIAgent") as MockAgent:
+            mock_child = MagicMock()
+            mock_child.model = "claude-sonnet-4-6"
+            mock_child.session_prompt_tokens = 0
+            mock_child.session_completion_tokens = 0
+            mock_child.run_conversation.return_value = {
+                "final_response": "", "completed": False,
+                "interrupted": True, "api_calls": 3, "messages": [],
+            }
+            MockAgent.return_value = mock_child
+            delegate_task(goal="Stop me", parent_agent=parent)
+        self.assertEqual(mock_child.run_conversation.call_count, 1)
+
     def test_step_limit_with_summary_is_flagged_as_cut_off(self):
         """A child that ran out of steps but wrote a summary stays 'completed'
         and carries a note saying it was cut off; a finished child does not."""

@@ -16,6 +16,7 @@ class Context:
         self.skills = []
         self.commands = []
         self.injected = []
+        self.hooks = []
 
     def register_skill(self, name, path, description=""):
         self.skills.append((name, path, description))
@@ -26,6 +27,9 @@ class Context:
     def inject_message(self, prompt):
         self.injected.append(prompt)
         return True
+
+    def register_hook(self, name, callback):
+        self.hooks.append((name, callback))
 
 
 def load_plugin():
@@ -167,3 +171,11 @@ def test_skills_define_chat_first_tool_recovery_and_website_research():
     assert "browser_navigate" in site_research
     assert "Never silently skip source research" in site_research
     assert "Never claim “the whole website was analysed.”" in site_research
+
+
+def test_registers_checkpoint_hook_for_finished_helpers():
+    module = load_plugin()
+    ctx = Context()
+    module.register(ctx)
+    assert [name for name, _ in ctx.hooks] == ["subagent_stop"]
+

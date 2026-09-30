@@ -2390,6 +2390,9 @@ DEFAULT_CONFIG = {
         "inherit_mcp_toolsets": True,
         "max_iterations": 50,  # per-subagent iteration cap (each subagent gets its own budget,
                                # independent of the parent's max_iterations)
+        # Extra rounds a subagent that hit max_iterations gets to finish the same
+        # task (fresh budget each round, same conversation). 0 disables; max 5.
+        "max_continuations": 2,
         # Subagent summaries return to the parent's context verbatim. A batch
         # fan-out (N children) returns N summaries at once, which can exceed
         # the parent's context window and trigger a compression/429 death

@@ -76,4 +76,14 @@ describe("withRequiredGuidedSpecialists", () => {
       ),
     ).toEqual(["req-engineer", "qa-engineer", "spec", "sw-developer"]);
   });
+
+  it("pins task planning so development always gets right-sized tasks", () => {
+    expect(isRequiredGuidedSpecialist("task-planner")).toBe(true);
+    expect(
+      withRequiredGuidedSpecialists(
+        ["sw-developer"],
+        ["req-engineer", "task-planner", "sw-developer"],
+      ),
+    ).toEqual(["req-engineer", "task-planner", "sw-developer"]);
+  });
 });

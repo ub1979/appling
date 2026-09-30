@@ -17,7 +17,14 @@
  */
 
 /** Ids that are always part of the team, in the order they should lead. */
-export const GUIDED_REQUIRED_SPECIALIST_IDS: readonly string[] = ["req-engineer"];
+export const GUIDED_REQUIRED_SPECIALIST_IDS: readonly string[] = [
+  "req-engineer",
+  // Task planning is pinned for the same reason: without a task graph, the
+  // coordinator handed developers whole features, and 6 of 11 helpers in one
+  // build ran out of steps mid-task. Planned tasks are sized to finish in one
+  // helper and name the files they own, so independent ones can run in parallel.
+  "task-planner",
+];
 
 export function isRequiredGuidedSpecialist(id: string): boolean {
   return GUIDED_REQUIRED_SPECIALIST_IDS.includes(id);
