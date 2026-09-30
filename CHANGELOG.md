@@ -45,6 +45,7 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
   behind "Lyra is still starting" and hiding the helper. Helper conversations
   are no longer treated as a continuation of the main chat, and a reconnected
   chat now redraws its screen so Send unlocks when Lyra is idle.
+- **An old tab that points at a helper's conversation reopens the main chat.**
 
 ### Changed
 

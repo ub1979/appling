@@ -11627,6 +11627,20 @@ def _session_latest_descendant(session_id: str, db):
     if not sid or not db.get_session(sid):
         return None, []
 
+    # A subagent session is never a chat to resume. An old tab or bookmark
+    # that names one (the pre-fix refresh rewrote ?resume= to the running
+    # helper) is sent back to the conversation that delegated it.
+    climbed = {sid}
+    while True:
+        row = db.get_session(sid) or {}
+        parent = row.get("parent_session_id")
+        if row.get("source") != "subagent" or not parent or parent in climbed:
+            break
+        if not db.get_session(parent):
+            break
+        climbed.add(parent)
+        sid = parent
+
     conn = (
         getattr(db, "conn", None)
         or getattr(db, "_conn", None)

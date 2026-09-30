@@ -2367,6 +2367,27 @@ class TestWebServerEndpoints:
         assert resp.status_code == 200
         assert resp.json()["session_id"] == "chat-model-switch"
 
+    def test_latest_descendant_redirects_a_subagent_id_to_its_chat(self):
+        """An old tab whose ?resume= names a delegated helper reopens the
+        conversation that delegated it, not the helper's transcript."""
+        from hermes_state import SessionDB
+
+        db = SessionDB()
+        try:
+            db.create_session(session_id="main-chat", source="tui")
+            db.create_session(
+                session_id="helper-a", source="subagent", parent_session_id="main-chat",
+            )
+            db.create_session(
+                session_id="helper-b", source="subagent", parent_session_id="helper-a",
+            )
+        finally:
+            db.close()
+
+        resp = self.client.get("/api/sessions/helper-b/latest-descendant")
+        assert resp.status_code == 200
+        assert resp.json()["session_id"] == "main-chat"
+
     def test_latest_descendant_survives_parent_cycle(self):
         """Regression for the #39140 CTE salvage: a corrupted parent chain
         that loops (a -> b -> a) must terminate (UNION dedup) instead of
