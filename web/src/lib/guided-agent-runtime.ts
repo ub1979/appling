@@ -23,13 +23,14 @@ export interface GuidedWorkerRuntime extends GuidedUsageSnapshot {
 }
 
 /**
- * Events that carry a task's full brief (goal + context) and so may name the
+ * Events that carry a helper's full brief (goal + context) and so may name the
  * specialist doing it. Per-step progress ("running pytest", "reading
  * requirements.md") must not re-label a running worker: guessing from those
- * fragments flipped every development task to "Quality assurance".
+ * fragments flipped every development task to "Quality assurance". Lyra's own
+ * tool calls (`tool.start`) are Lyra's work — checking requirements.md's status
+ * showed "Requirements agent is working" on a plain status question.
  */
 const GUIDED_RELABEL_EVENTS = new Set([
-  "tool.start",
   "subagent.spawn_requested",
   "subagent.start",
 ]);

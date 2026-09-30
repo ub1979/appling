@@ -83,11 +83,12 @@ describe("guided agent runtime", () => {
     expect(formatGuidedTokens(2_550_000)).toBe("2.55M");
   });
 
-  it("names a worker from its brief, not from each progress step", () => {
-    for (const type of ["tool.start", "subagent.spawn_requested", "subagent.start"]) {
+  it("names a helper from its brief, not from each step or from Lyra's own tools", () => {
+    for (const type of ["subagent.spawn_requested", "subagent.start"]) {
       expect(guidedEventMayRelabel(type)).toBe(true);
     }
-    for (const type of ["subagent.tool", "subagent.progress", "subagent.thinking", "tool.progress"]) {
+    // Lyra's own tool calls stay Lyra's, even when they touch requirements.md.
+    for (const type of ["tool.start", "subagent.tool", "subagent.progress", "subagent.thinking", "tool.progress"]) {
       expect(guidedEventMayRelabel(type)).toBe(false);
     }
   });
