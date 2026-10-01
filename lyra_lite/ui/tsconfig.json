@@ -9,7 +9,8 @@
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "skipLibCheck": true,
-    "types": ["vite/client"]
+    "types": ["vite/client", "node"],
+    "paths": { "@studio/*": ["./../../web/src/lib/*"] }
   },
-  "include": ["src"]
+  "include": ["src", "vite.config.ts"]
 }

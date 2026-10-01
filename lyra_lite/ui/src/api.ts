@@ -14,12 +14,22 @@ export interface ProjectSummary {
   root: string;
   running: boolean;
   inbox: number;
+  engine: string;
+  team: string[];
+  updated: number;
 }
 
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
   kind: "chat" | "system" | "auto";
+}
+
+export interface QueueItem {
+  id: string;
+  text: string;
+  kind: string;
+  display?: string;
 }
 
 export interface ProjectDetail {
@@ -31,10 +41,13 @@ export interface ProjectDetail {
   keep_going: boolean;
   engine: string;
   claude: { model?: string; base_url?: string };
+  team: string[];
+  style: string;
+  models: Record<string, string>;
   rules_outdated: boolean;
   watchdog: { gave_up?: boolean; count?: number };
-  queue: { id: string; text: string; kind: string }[];
-  turn: { id: string; text: string; kind: string } | null;
+  queue: QueueItem[];
+  turn: { id: string; text: string; kind: string; display?: string } | null;
   turn_start_offset: number;
   inbox: InboxItem[];
   helpers: { id: string; goal: string; started: number | null }[];
@@ -53,12 +66,42 @@ export interface ProjectMap {
   phases: MapPhase[];
   current_phase: string | null;
   updated: string | null;
+  markdown?: string;
 }
 
 export interface FolderListing {
   path: string;
   parent: string | null;
   folders: string[];
+}
+
+export interface Agent {
+  id: string;
+  label: string;
+  description: string;
+  required: boolean;
+}
+
+export interface StartStyle {
+  id: string;
+  name: string;
+  description: string;
+  accent: string;
+  team: string[];
+}
+
+export interface Catalog {
+  agents: Agent[];
+  styles: StartStyle[];
+  default_root: string;
+}
+
+export interface NewProject {
+  path: string;
+  create: boolean;
+  team: string[];
+  style: string;
+  brief: string;
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -74,11 +117,13 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 
 export const api = {
   projects: () => call<{ projects: ProjectSummary[]; default_root: string }>("GET", "/api/projects"),
-  addProject: (path: string, create: boolean) => call<ProjectDetail>("POST", "/api/projects", { path, create }),
+  catalog: () => call<Catalog>("GET", "/api/catalog"),
+  addProject: (body: NewProject) => call<ProjectDetail>("POST", "/api/projects", body),
   project: (id: string) => call<ProjectDetail>("GET", `/api/projects/${id}`),
   map: (id: string) => call<ProjectMap>("GET", `/api/projects/${id}/map`),
   send: (id: string, text: string) => call("POST", `/api/projects/${id}/messages`, { text }),
   answer: (id: string, item: string, answer: string) => call("POST", `/api/projects/${id}/inbox/${item}`, { answer }),
+  team: (id: string, team: string[]) => call("POST", `/api/projects/${id}/team`, { team }),
   settings: (id: string, body: Record<string, unknown>) => call("POST", `/api/projects/${id}/settings`, body),
   engines: () => call<{ engines: { id: string; label: string }[]; anthropic_key: boolean }>("GET", "/api/engines"),
   applyRules: (id: string) => call("POST", `/api/projects/${id}/apply-rules`),
@@ -91,3 +136,5 @@ export const api = {
 export function streamUrl(id: string, offset: number): string {
   return `/api/projects/${id}/stream?offset=${offset}&token=${encodeURIComponent(token())}`;
 }
+
+export const avatarUrl = (id: string): string => `/avatars/${id}.webp`;

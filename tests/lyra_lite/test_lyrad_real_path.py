@@ -432,3 +432,38 @@ def test_frozen_mid_turn_like_a_sleeping_laptop_then_finishes(env):
             assert daemon.get(f"/api/projects/{pid}").json()["running"] is False
         finally:
             daemon.stop()
+
+
+def test_new_project_sends_team_and_brief_and_team_changes_reach_lyra(env):
+    script = [text_step("Hi! I'm Lyra. Who is the calculator for?"), text_step("Team noted.")]
+    with FakeOpenAIServer(script) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            path = env["home"] / "Lyra Projects" / "Calc"
+            res = daemon.post("/api/projects", {"path": str(path), "create": True, "style": "mvp",
+                                                "team": ["sw-developer", "not-an-agent"],
+                                                "brief": "I want a scientific calculator"})
+            assert res.status_code == 200, res.text
+            pid = res.json()["id"]
+            assert res.json()["team"] == ["req-engineer", "task-planner", "sw-developer"]
+            start = _wait_event(path, lambda e: e["type"] == "turn_start")
+            assert start["text"].startswith("IDRAK_INTERNAL_SETUP_BEGIN")
+            assert '"sw-developer"' in start["text"] and "scientific calculator" in start["text"]
+            assert start["display"] == "I want a scientific calculator"
+            _wait_event(path, lambda e: e["type"] == "turn_end")
+
+            assert daemon.post(f"/api/projects/{pid}/team",
+                               {"team": ["req-engineer", "task-planner", "qa-engineer"]}).status_code == 200
+            team_turn = _wait_event(path, lambda e: e["type"] == "turn_start" and e["kind"] == "team")
+            assert "IDRAK_INTERNAL_SKILLS_UPDATE_BEGIN" in team_turn["text"]
+            _wait_event(path, lambda e: e["type"] == "turn_end" and e["turn"] == team_turn["turn"])
+
+            shown = daemon.get(f"/api/projects/{pid}").json()["messages"]
+            assert shown[0] == {"role": "user", "content": "I want a scientific calculator", "kind": "chat"}
+            assert shown[2]["kind"] == "auto" and "Quality assurance" in shown[2]["content"]
+            catalog = daemon.get("/api/catalog").json()
+            assert {a["id"] for a in catalog["agents"] if a["required"]} == {"req-engineer", "task-planner"}
+            assert httpx.get(f"{daemon.base}/avatars/req-engineer.webp", timeout=5).status_code == 200
+        finally:
+            daemon.stop()

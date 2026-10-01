@@ -114,12 +114,14 @@ class ProjectRunner:
 
     # -- public API ------------------------------------------------------
 
-    def submit(self, text: str, kind: str = "user") -> dict:
+    def submit(self, text: str, kind: str = "user", display: str | None = None) -> dict:
         text = (text or "").strip()
         if not text:
             raise ValueError("empty message")
         item = {"id": uuid.uuid4().hex[:10], "text": text, "kind": kind,
                 "queued": round(time.time(), 3)}
+        if display:
+            item["display"] = display
         with self._cond:
             state = self.store.state()
             queue = list(state.get("queue") or [])
@@ -133,7 +135,7 @@ class ProjectRunner:
                         + "\n\n---\n\n".join(held)
                         + "\n\n---\n\nThe owner's message:\n\n" + text
                     )
-                    item["display"] = text
+                    item["display"] = display or text
                 queue = []
                 self.store.update_state(paused=False)
                 self.store.append_event("resumed")
@@ -202,6 +204,9 @@ class ProjectRunner:
             "running": bool(state.get("running")),
             "paused": bool(state.get("paused")),
             "keep_going": bool(state.get("keep_going", True)),
+            "team": state.get("team") or [],
+            "style": state.get("style") or "app-it",
+            "models": state.get("models") or {},
             "watchdog": state.get("watchdog") or {},
             "has_engine": self._engine is not None,
             "rules_hash": state.get("rules_hash") or "",

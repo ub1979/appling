@@ -22,6 +22,7 @@ from typing import Any
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 
+from lyra_lite import agents
 from lyra_lite.runner import REPO_ROOT, ProjectRunner, project_key
 from lyra_lite.store import ProjectStore
 from lyra_lite.watchdog import NUDGE
@@ -30,6 +31,7 @@ logger = logging.getLogger(__name__)
 
 RULES_PATH = Path(__file__).resolve().parent / "rules" / "lyra.md"
 UI_DIST = Path(__file__).resolve().parent / "ui" / "dist"
+AVATARS = REPO_ROOT / "web" / "public" / "skill-avatars"
 DEFAULT_SKILLS = ["ultimate-builder:app-it"]
 ALLOWED_INSIDE_REPO = [REPO_ROOT / "my_projects"]
 
@@ -127,6 +129,10 @@ def display_messages(messages: list[dict]) -> list[dict]:
         if not text:
             continue
         kind = "chat"
+        internal = agents.describe_internal(text) if role == "user" else None
+        if internal is not None:
+            out.append(internal)
+            continue
         if role == "user" and text.startswith(HELD_PREFIX) and HELD_SPLIT in text:
             held, own = text.split(HELD_SPLIT, 1)
             out.append({"role": "user", "content": held.strip(), "kind": "system"})
@@ -212,7 +218,9 @@ class Lyra:
                 self.runners[pid] = runner
         return runner
 
-    def add_project(self, raw_path: str, *, create: bool) -> ProjectRunner:
+    def add_project(self, raw_path: str, *, create: bool, team: list[str] | None = None,
+                    style: str | None = None, brief: str = "",
+                    models: dict | None = None) -> ProjectRunner:
         path = Path(raw_path).expanduser().resolve(strict=False)
         reason = placement(path, creating=create and not path.exists())
         if reason:
@@ -227,6 +235,12 @@ class Lyra:
             subprocess.run(["git", "init", "-q"], cwd=path, check=False)
         runner = self._attach(path)
         self._save_registry()
+        if team is not None or brief or style:
+            chosen = agents.normalise_team(team)
+            runner.store.update_state(team=chosen, style=style or "app-it", models=models or {})
+            if not runner.store.messages() and not runner.snapshot()["running"]:
+                runner.submit(agents.setup_message(path, chosen, models, brief), kind="setup",
+                              display=brief.strip() or "Project opened")
         return runner
 
     def get(self, pid: str) -> ProjectRunner:
@@ -242,9 +256,15 @@ class Lyra:
         out = []
         for pid, runner in items:
             snap = runner.snapshot()
+            try:
+                updated = runner.store.events_path.stat().st_mtime
+            except OSError:
+                updated = 0.0
             out.append({"id": pid, "name": snap["name"], "root": snap["root"],
-                        "running": snap["running"], "inbox": len(snap["inbox"])})
-        return sorted(out, key=lambda p: p["name"].lower())
+                        "running": snap["running"] or bool(snap["helpers"]),
+                        "inbox": len(snap["inbox"]), "engine": snap["engine"],
+                        "team": snap["team"], "updated": updated})
+        return sorted(out, key=lambda p: -p["updated"])
 
     # -- helper results --------------------------------------------------
 
@@ -334,8 +354,34 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
 
     @app.post("/api/projects")
     def add_project(body: dict = Body(...)):
-        runner = lyra.add_project(str(body.get("path") or ""), create=bool(body.get("create")))
+        team = body.get("team")
+        runner = lyra.add_project(
+            str(body.get("path") or ""), create=bool(body.get("create")),
+            team=[str(t) for t in team] if isinstance(team, list) else None,
+            style=str(body.get("style") or "") or None,
+            brief=str(body.get("brief") or ""),
+            models=body.get("models") if isinstance(body.get("models"), dict) else None,
+        )
         return {"id": project_key(runner.root), **runner.snapshot()}
+
+    @app.get("/api/catalog")
+    def catalog():
+        return {
+            "agents": [{"id": i, "label": l, "description": d, "required": i in agents.REQUIRED}
+                       for i, l, d in agents.AGENTS],
+            "styles": agents.STYLES,
+            "default_root": str(projects_root()),
+        }
+
+    @app.post("/api/projects/{pid}/team")
+    def set_team(pid: str, body: dict = Body(...)):
+        runner = lyra.get(pid)
+        team = agents.normalise_team([str(t) for t in (body.get("team") or [])])
+        models = body.get("models") if isinstance(body.get("models"), dict) else runner.store.state().get("models") or {}
+        runner.store.update_state(team=team, models=models)
+        runner.submit(agents.team_message(team, models), kind="team",
+                      display="Team updated: " + ", ".join(agents.LABELS[t] for t in team))
+        return {"ok": True, "team": team}
 
     @app.get("/api/projects/{pid}")
     def project(pid: str):
@@ -412,10 +458,16 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
 
     @app.post("/api/projects/{pid}/new-chat")
     def new_chat(pid: str):
+        runner = lyra.get(pid)
         try:
-            return {"chat_id": lyra.get(pid).new_chat()}
+            chat_id = runner.new_chat()
         except RuntimeError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
+        state = runner.store.state()
+        if state.get("team"):
+            runner.submit(agents.setup_message(runner.root, state["team"], state.get("models"), ""),
+                          kind="setup", display="Project opened")
+        return {"chat_id": chat_id}
 
     @app.get("/api/projects/{pid}/stream")
     async def stream(pid: str, request: Request, offset: int | None = None):
@@ -473,6 +525,13 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         html = index.read_text(encoding="utf-8")
         tag = f"<script>window.__LYRA_TOKEN__={json.dumps(token)};</script>"
         return HTMLResponse(html.replace("</head>", f"{tag}</head>", 1))
+
+    @app.get("/avatars/{name}")
+    def avatar(name: str):
+        target = (AVATARS / name).resolve()
+        if target.is_file() and target.is_relative_to(AVATARS.resolve()) and target.suffix == ".webp":
+            return FileResponse(target, headers={"Cache-Control": "max-age=86400"})
+        raise HTTPException(status_code=404)
 
     @app.get("/")
     def root():

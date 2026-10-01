@@ -80,4 +80,5 @@ def read_map(root: Path) -> dict:
         "current_phase": current_phase,
         "updated": updated,
         "mtime": stat.st_mtime,
+        "markdown": text,
     }
