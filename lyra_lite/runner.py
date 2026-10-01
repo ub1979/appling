@@ -19,6 +19,7 @@ from typing import Any, Callable
 from lyra_lite import watchdog
 from lyra_lite.engines.base import Engine, TurnResult
 from lyra_lite.project_map import read_map
+from lyra_lite.settings import effective_engine
 from lyra_lite.store import ProjectStore
 
 logger = logging.getLogger(__name__)
@@ -94,6 +95,7 @@ class ProjectRunner:
         self._stop = False
         self._busy = False
         self._hooks = _Hooks(self)
+        self._reload_pending = False
         self._recover()
         self._thread = threading.Thread(
             target=self._loop, name=f"lyra-runner-{store.root.name}", daemon=True
@@ -215,7 +217,8 @@ class ProjectRunner:
             "turn": state.get("turn"),
             "turn_start_offset": int(state.get("turn_start_offset") or 0),
             "chat_id": state.get("chat_id"),
-            "engine": state.get("engine") or "hermes",
+            "engine": effective_engine(state),
+            "engine_override": bool(state.get("engine_override")),
             "claude": {k: v for k, v in (state.get("claude") or {}).items() if k != "auth_token"},
             "inbox": self.store.inbox(status="open"),
             "helpers": self.helpers(),
@@ -242,19 +245,24 @@ class ProjectRunner:
         self.store.update_state(keep_going=bool(on))
         self.store.append_event("setting", name="keep_going", value=bool(on))
 
-    def set_engine(self, name: str, claude: dict | None = None) -> None:
-        """Switch engine (or its model settings) between turns."""
+    def set_engine(self, name: str | None, claude: dict | None = None) -> None:
+        """Pick this project's own engine, or None to follow Lyra's default."""
         with self._cond:
             if self._busy or self.helpers():
                 raise RuntimeError("Lyra is busy; switch engines when it's idle")
-            changes: dict[str, Any] = {"engine": name}
+            changes: dict[str, Any] = {"engine": name, "engine_override": name is not None}
             if claude is not None:
                 # A blank token field means "keep the saved one".
                 merged = {**(self.store.state().get("claude") or {}), **claude}
                 changes["claude"] = {k: v for k, v in merged.items() if v != "" or k != "auth_token"}
             self.store.update_state(**changes)
             self._drop_engine()
-        self.store.append_event("setting", name="engine", value=name)
+        self.store.append_event("setting", name="engine", value=name or "default")
+
+    def request_reload(self) -> None:
+        """Lyra-wide settings changed: rebuild the engine before the next turn
+        (a running turn finishes on the settings it started with)."""
+        self._reload_pending = True
 
     def reload_engine(self) -> None:
         """Rebuild the engine (new rules) at the next turn; refuses while busy."""
@@ -398,7 +406,8 @@ class ProjectRunner:
 
     def _engine_for_chat(self) -> Engine:
         chat_id = str(self.store.state().get("chat_id") or "")
-        if self._engine is None or self._engine_chat != chat_id:
+        if self._engine is None or self._engine_chat != chat_id or self._reload_pending:
+            self._reload_pending = False
             self._drop_engine()
             self._engine = self._engine_factory(self.store, self.session_key())
             self._engine_chat = chat_id

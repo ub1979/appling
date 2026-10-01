@@ -11,7 +11,6 @@ import {
   type ProjectMap,
 } from "../api";
 import { Avatar, PrefButtons, TeamPicker } from "../components/common";
-import { SettingsDialog } from "../components/SettingsDialog";
 import { activeHelpers, applyEvent, emptyLive, type InboxItem, type LiveState, type LyraEvent } from "../live";
 import { go } from "../router";
 import {
@@ -75,7 +74,6 @@ export function Studio({ id }: { id: string }) {
   const [map, setMap] = useState<ProjectMap | null>(null);
   const [live, dispatch] = useReducer(liveReducer, undefined, emptyLive);
   const [problem, setProblem] = useState<string | null>(null);
-  const [showSettings, setShowSettings] = useState(false);
   const [showTeam, setShowTeam] = useState(false);
 
   const load = useCallback(async () => {
@@ -243,8 +241,8 @@ export function Studio({ id }: { id: string }) {
               ▶ Open app
             </button>
           )}
-          <button className="btn small" onClick={() => setShowSettings(true)} title="Engine and model">
-            {detail.engine === "claude" ? "Claude Code" : "Hermes"} ⚙
+          <button className="btn small" onClick={() => go(`/settings?project=${id}`)} title="Engine and model settings">
+            ⚙ {detail.engine === "claude" ? "Claude Code" : "Hermes"}
           </button>
           <button
             className="btn small"
@@ -407,18 +405,6 @@ export function Studio({ id }: { id: string }) {
         </aside>
       </div>
 
-      {showSettings && (
-        <SettingsDialog
-          detail={detail}
-          busy={busy || helpers.length > 0}
-          onClose={() => setShowSettings(false)}
-          onSave={async (body) => {
-            await api.settings(id, body);
-            await load();
-            setShowSettings(false);
-          }}
-        />
-      )}
       {showTeam && catalog && (
         <TeamDialog
           agents={agents}

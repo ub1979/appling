@@ -6,6 +6,7 @@ from __future__ import annotations
 import time
 
 import pytest
+import yaml
 
 pytest.importorskip("claude_agent_sdk")
 
@@ -149,5 +150,52 @@ def test_claude_engine_without_a_key_explains_what_to_do(env):
             assert end["status"] == "error"
             assert "ANTHROPIC_API_KEY" in end["error"] and "Ollama" in end["error"]
             time.sleep(0.5)
+        finally:
+            daemon.stop()
+
+
+def test_lyra_wide_engine_setting_moves_projects_unless_they_chose_their_own(env):
+    hermes_replies = [openai_text("Hermes here."), openai_text("Hermes again.")]
+    with FakeOpenAIServer(hermes_replies) as hermes_llm, FakeAnthropicServer([text_step("Claude here.")]) as claude:
+        _write_config(env["hermes_home"], hermes_llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            assert daemon.get("/api/settings").json()["engine"] == "hermes"
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "one"})
+            _wait_event(path, lambda e: e["type"] == "turn_end" and e["reply"] == "Hermes here.")
+
+            saved = daemon.post("/api/settings", {"engine": "claude", "claude": {
+                "base_url": claude.base_url, "auth_token": "fake", "model": "claude-fake"}}).json()
+            assert saved["engine"] == "claude" and saved["claude"]["has_token"] is True
+            assert "auth_token" not in saved["claude"]
+            assert daemon.get(f"/api/projects/{pid}").json()["engine"] == "claude"
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "two"})
+            _wait_event(path, lambda e: e["type"] == "turn_end" and e["reply"] == "Claude here.")
+
+            # This project picks Hermes for itself; Lyra's default stays Claude.
+            assert daemon.post(f"/api/projects/{pid}/settings", {"engine": "hermes"}).status_code == 200
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "three"})
+            _wait_event(path, lambda e: e["type"] == "turn_end" and e["reply"] == "Hermes again.")
+            assert daemon.get("/api/settings").json()["engine"] == "claude"
+            back = daemon.post(f"/api/projects/{pid}/settings", {"engine": "default"}).json()
+            assert back["engine"] == "claude" and back["engine_override"] is False
+
+            config = yaml.safe_load((env["hermes_home"] / "config.yaml").read_text())
+            assert config["lyra_lite"]["engine"] == "claude"
+            assert config["model"]["base_url"] == hermes_llm.base_url  # Hermes model untouched
+        finally:
+            daemon.stop()
+
+
+def test_model_list_and_choice_use_hermes_own_settings(env):
+    with FakeOpenAIServer([]) as hermes_llm:
+        _write_config(env["hermes_home"], hermes_llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            options = daemon.get("/api/settings/models").json()
+            assert isinstance(options["providers"], list)
+            assert daemon.get("/api/settings").json()["hermes"]["model"] == "fake-model"
+            assert daemon.post("/api/settings/model", {"provider": "", "model": ""}).status_code == 400
         finally:
             daemon.stop()

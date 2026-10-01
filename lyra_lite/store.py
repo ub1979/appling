@@ -87,7 +87,7 @@ class ProjectStore:
             "queue": [],
             "turn": None,
             "turn_start_offset": 0,
-            "engine": "hermes",
+            "engine": None,  # None: follow Lyra's default engine
             "rules_hash": "",
         }
 

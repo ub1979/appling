@@ -37,6 +37,7 @@ export function Home() {
         <div className="top-actions">
           {problem ? <span className="pill need">Can't reach Lyra</span> : <span className="status-dot">Ready</span>}
           <span className="version">Lyra Lite</span>
+          <button className="btn small" onClick={() => go("/settings")}>⚙ Settings</button>
           <PrefButtons />
         </div>
       </header>

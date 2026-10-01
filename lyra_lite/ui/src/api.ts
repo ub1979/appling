@@ -40,6 +40,7 @@ export interface ProjectDetail {
   paused: boolean;
   keep_going: boolean;
   engine: string;
+  engine_override: boolean;
   claude: { model?: string; base_url?: string };
   team: string[];
   style: string;
@@ -53,6 +54,19 @@ export interface ProjectDetail {
   inbox: InboxItem[];
   helpers: { id: string; goal: string; started: number | null }[];
   messages: ChatMessage[];
+}
+
+export interface AiSettings {
+  engine: string;
+  hermes: { provider: string; model: string };
+  claude: { model: string; base_url: string; has_token: boolean };
+  anthropic_key: boolean;
+}
+
+export interface ModelOptions {
+  providers: { slug: string; name: string; models: string[]; current: boolean }[];
+  provider: string | null;
+  model: string | null;
 }
 
 export interface MapPhase {
@@ -131,6 +145,11 @@ export const api = {
   answer: (id: string, item: string, answer: string) => call("POST", `/api/projects/${id}/inbox/${item}`, { answer }),
   team: (id: string, team: string[]) => call("POST", `/api/projects/${id}/team`, { team }),
   settings: (id: string, body: Record<string, unknown>) => call("POST", `/api/projects/${id}/settings`, body),
+  settingsGet: () => call<AiSettings>("GET", "/api/settings"),
+  settingsSave: (body: Record<string, unknown>) => call<AiSettings>("POST", "/api/settings", body),
+  modelOptions: (refresh = false) => call<ModelOptions>("GET", `/api/settings/models${refresh ? "?refresh=true" : ""}`),
+  modelSave: (provider: string, model: string, confirm: boolean) =>
+    call<{ ok: boolean; confirm_required?: boolean; message?: string }>("POST", "/api/settings/model", { provider, model, confirm }),
   engines: () => call<{ engines: { id: string; label: string }[]; anthropic_key: boolean }>("GET", "/api/engines"),
   applyRules: (id: string) => call("POST", `/api/projects/${id}/apply-rules`),
   stop: (id: string) => call("POST", `/api/projects/${id}/stop`),

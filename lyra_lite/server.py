@@ -83,15 +83,17 @@ def default_engine_factory(store: ProjectStore, session_key: str):
     text = rules_text()
     store.update_state(rules_hash=current_rules_hash())
     prompt = f"{text}\n\nProject folder: {store.root}\n"
+    from lyra_lite.settings import effective_claude, effective_engine
+
     state = store.state()
-    name = state.get("engine") or "hermes"
+    name = effective_engine(state)
     kwargs: dict[str, Any] = {"workspace": str(store.root), "session_key": session_key,
                               "system_prompt": prompt}
     if name == "hermes":
         kwargs["skills"] = DEFAULT_SKILLS
     else:
         kwargs["store"] = store
-        kwargs["settings"] = state.get(name) or {}
+        kwargs["settings"] = effective_claude(state)
     return make_engine(name, **kwargs)
 
 
@@ -421,8 +423,9 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         if "engine" in body or "claude" in body:
             from lyra_lite.engines import ENGINES
 
-            engine = str(body.get("engine") or runner.store.state().get("engine") or "hermes")
-            if engine not in ENGINES:
+            raw = body.get("engine", runner.store.state().get("engine") if runner.store.state().get("engine_override") else "default")
+            engine = None if raw in (None, "", "default") else str(raw)
+            if engine is not None and engine not in ENGINES:
                 raise HTTPException(status_code=400, detail="Unknown engine")
             claude = body.get("claude")
             if claude is not None and not isinstance(claude, dict):
@@ -435,6 +438,72 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             except RuntimeError as exc:
                 raise HTTPException(status_code=409, detail=str(exc))
         return {"ok": True, **runner.snapshot()}
+
+    # -- Lyra-wide AI settings ----------------------------------------------
+
+    def _settings_view() -> dict:
+        from lyra_lite import settings as st
+
+        claude = st.claude_defaults()
+        return {
+            "engine": st.default_engine(),
+            "hermes": st.hermes_model(),
+            "claude": {"model": claude.get("model", ""), "base_url": claude.get("base_url", ""),
+                       "has_token": bool(claude.get("auth_token"))},
+            "anthropic_key": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()),
+        }
+
+    def _apply_everywhere() -> None:
+        with lyra._lock:
+            runners = list(lyra.runners.values())
+        for runner in runners:
+            runner.request_reload()
+
+    @app.get("/api/settings")
+    def get_settings():
+        return _settings_view()
+
+    @app.get("/api/settings/models")
+    async def settings_models(refresh: bool = False):
+        from lyra_lite.settings import model_options
+
+        return await asyncio.to_thread(model_options, refresh)
+
+    @app.post("/api/settings")
+    def save_settings(body: dict = Body(...)):
+        from lyra_lite import settings as st
+
+        changes: dict[str, Any] = {}
+        if "engine" in body:
+            if body["engine"] not in st.ENGINES:
+                raise HTTPException(status_code=400, detail="Unknown engine")
+            changes["engine"] = body["engine"]
+        if isinstance(body.get("claude"), dict):
+            current = st.claude_defaults()
+            for key in ("model", "base_url", "auth_token"):
+                if key in body["claude"]:
+                    value = str(body["claude"][key] or "").strip()
+                    if key == "auth_token" and not value:
+                        continue  # blank token field keeps the saved one
+                    current[key] = value
+            changes["claude"] = {k: v for k, v in current.items() if v}
+        if changes:
+            st.save_section(changes)
+            _apply_everywhere()
+        return _settings_view()
+
+    @app.post("/api/settings/model")
+    async def save_model(body: dict = Body(...)):
+        from lyra_lite.settings import set_hermes_model
+
+        provider = str(body.get("provider") or "").strip()
+        model = str(body.get("model") or "").strip()
+        if not provider or not model:
+            raise HTTPException(status_code=400, detail="Choose a provider and a model")
+        result = await asyncio.to_thread(set_hermes_model, provider, model, bool(body.get("confirm")))
+        if result.get("ok"):
+            _apply_everywhere()
+        return result
 
     @app.get("/api/engines")
     def engines():
