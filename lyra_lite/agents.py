@@ -171,3 +171,29 @@ def describe_internal(text: str) -> dict | None:
         labels = team.get("enabled_specialist_labels") or []
         return {"role": "user", "content": "Team updated: " + ", ".join(map(str, labels)), "kind": "auto"}
     return None
+
+
+_GOAL_HINTS = {
+    "qa-engineer": r"\bqa\b|quality assurance",
+    "sw-developer": r"\bdevelop",
+    "task-planner": r"task[- ]planner|task planning",
+    "req-engineer": r"requirements",
+    "debugger": r"\bdebug",
+}
+
+
+def agent_for_goal(goal: str) -> str | None:
+    """Which team member a delegated goal is for ("Act as … sw-developer …")."""
+    import re
+
+    text = (goal or "").lower()
+    for agent_id in AGENT_IDS:
+        if agent_id in text:
+            return agent_id
+    for agent_id, label in LABELS.items():
+        if label.lower() in text:
+            return agent_id
+    for agent_id, pattern in _GOAL_HINTS.items():
+        if re.search(pattern, text):
+            return agent_id
+    return None

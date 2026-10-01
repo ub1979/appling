@@ -50,12 +50,15 @@ def read_map(root: Path) -> dict:
 
     phases: list[dict] = []
     current_phase = updated = None
-    in_ledger = False
+    in_ledger = in_table = False
     for line in text.splitlines():
         header = re.match(r"^#{1,6}\s+(.*)$", line)
         if header:
-            in_ledger = bool(re.match(r"phase ledger\b", header.group(1).strip(), re.I))
+            # "## Phase ledger" or a titled one like "# Calculator — phase ledger".
+            in_ledger = bool(re.search(r"(^|\W)phase ledger\b", header.group(1).strip(), re.I))
             continue
+        if not line.strip():
+            in_table = False
         meta = re.match(r"^(Current phase|Updated):\s*(.+)$", line.strip(), re.I)
         if meta:
             if meta.group(1).lower() == "updated":
@@ -63,10 +66,15 @@ def read_map(root: Path) -> dict:
             else:
                 current_phase = meta.group(2).strip()
             continue
-        if not in_ledger or not line.strip().startswith("|"):
+        if not line.strip().startswith("|"):
             continue
         cells = _cells(line)
-        if len(cells) < 2 or re.fullmatch(r":?-+:?", cells[0]) or cells[0].lower() == "phase":
+        if cells and cells[0].lower() == "phase":
+            in_table = True  # a "| Phase | Status |" table is a ledger anywhere
+            continue
+        if not (in_ledger or in_table):
+            continue
+        if len(cells) < 2 or re.fullmatch(r":?-+:?", cells[0]):
             continue
         phases.append({
             "name": cells[0],

@@ -229,6 +229,7 @@ describe("phasesFromProgressLedger", () => {
     "req-engineer": "Requirements",
     researcher: "Research",
     "sw-architect": "Architecture",
+    "task-planner": "Task planning",
     "sw-developer": "Development",
     "qa-engineer": "Quality assurance",
     "security-auditor": "Security",
@@ -257,6 +258,22 @@ describe("phasesFromProgressLedger", () => {
       completed: ["req-engineer", "researcher", "sw-architect"],
       current: "sw-developer",
     });
+  });
+
+  it("reads a titled ledger heading and a bare Phase table", () => {
+    const titled = [
+      "# Scientific calculator — phase ledger",
+      "",
+      "| Phase | Status | Evidence |",
+      "|---|---|---|",
+      "| Requirements | verified | approved |",
+      "| Task planning | verified | task-graph.md |",
+      "| Development | verified | 59 tests |",
+      "| QA | blocked | awaits a physical phone check |",
+    ].join("\n");
+    const expected = { completed: ["req-engineer", "task-planner", "sw-developer"], current: "qa-engineer" };
+    expect(phasesFromProgressLedger(titled, labels)).toEqual(expected);
+    expect(phasesFromProgressLedger(titled.replace(/^# .*$/m, "# Progress"), labels)).toEqual(expected);
   });
 
   it("is empty for a project without a ledger", () => {

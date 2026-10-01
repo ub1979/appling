@@ -349,9 +349,17 @@ class ClaudeEngine:
                            summary=_preview(msg.summary or "", 1200))
             elif isinstance(msg, ResultMessage):
                 result_text = msg.result
-                usage = {k: v for k, v in {
-                    "cost_usd": msg.total_cost_usd, "num_turns": msg.num_turns,
-                    "duration_ms": msg.duration_ms}.items() if v is not None}
+                raw = msg.usage or {}
+                usage = {
+                    "api_calls": int(msg.num_turns or 0),
+                    "input": int(raw.get("input_tokens") or 0),
+                    "cache_read": int(raw.get("cache_read_input_tokens") or 0),
+                    "cache_write": int(raw.get("cache_creation_input_tokens") or 0),
+                    "output": int(raw.get("output_tokens") or 0),
+                    "duration_ms": msg.duration_ms,
+                }
+                if msg.total_cost_usd is not None:
+                    usage["cost_usd"] = msg.total_cost_usd
                 interrupted = self._interrupted
                 if msg.is_error and not interrupted:
                     error = f"Claude engine: {msg.subtype}"

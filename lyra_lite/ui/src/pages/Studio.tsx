@@ -158,8 +158,14 @@ export function Studio({ id }: { id: string }) {
       if (ledger.current) current = ledger.current;
     }
     const ordered = orderGuidedPhases(Array.from(new Set([...team, ...started, ...completed])).filter((x) => ids.includes(x)));
-    return { ordered, completed, current };
-  }, [detail?.messages, live.turn?.reply, ids, agents, map?.markdown, team]);
+    // A current phase whose plan row is blocked is waiting (usually on the owner).
+    const currentAgent = agents.find((a) => a.id === current);
+    const waiting =
+      !!currentAgent &&
+      (map?.phases ?? []).some((row) => (row.state === "blocked" || row.state === "owner") && rowIsAgent(row.name, currentAgent));
+    return { ordered, completed, current, waiting };
+  }, [detail?.messages, live.turn?.reply, ids, agents, map?.markdown, map?.phases, team]);
+  const workingIds = new Set(helpers.map((h) => agentForGoal(h.goal, agents)).filter((x): x is string => !!x));
 
   const shown: Shown[] = useMemo(() => (detail?.messages ?? []).map((m) => shownMessage(m, ids)), [detail?.messages, ids]);
   const lastLyra = [...shown].map((s, i) => [s, i] as const).reverse().find(([s]) => s.role === "lyra");
@@ -267,15 +273,26 @@ export function Studio({ id }: { id: string }) {
               <button className="btn ghost small" onClick={() => setShowTeam(true)}>Change</button>
             </h3>
             {orderedTeamAgents(agents, team).map((a) => {
-              const working = (busy || helpers.length > 0) && phases.current === a.id;
+              const working = workingIds.has(a.id) || (busy && helpers.length === 0 && phases.current === a.id && !phases.waiting);
               const done = phases.completed.has(a.id);
-              const tool = working ? liveHelpers[0]?.lastTool : undefined;
+              const tool = working
+                ? liveHelpers.find((h) => agentForGoal(h.goal, agents) === a.id)?.lastTool ?? "Working"
+                : undefined;
+              const line = working
+                ? tool
+                : phases.current === a.id && phases.waiting
+                  ? "Waiting on you"
+                  : done
+                    ? "Done ✓"
+                    : phases.current === a.id
+                      ? "Up next"
+                      : "Not started yet";
               return (
                 <div key={a.id} className={`agent-row ${working ? "working" : ""}`} title={a.description}>
                   <Avatar id={a.id} size={36} />
                   <div className="who">
                     <b>{a.label}</b>
-                    <span>{working ? tool ?? "Working" : done ? "Done ✓" : "Ready"}</span>
+                    <span>{line}</span>
                   </div>
                 </div>
               );
@@ -319,12 +336,18 @@ export function Studio({ id }: { id: string }) {
             <h3>Project map</h3>
             <ol className="phase-list">
               {phases.ordered.map((pid, i) => {
-                const state = phases.completed.has(pid) ? "done" : phases.current === pid ? "now" : "pending";
+                const state = phases.completed.has(pid)
+                  ? "done"
+                  : phases.current === pid
+                    ? (phases.waiting ? "owner" : "now")
+                    : workingIds.has(pid)
+                      ? "now"
+                      : "pending";
                 return (
                   <li key={pid} className={`phase ${state}`}>
-                    <span className="dot">{state === "done" ? "✓" : i + 1}</span>
+                    <span className="dot">{state === "done" ? "✓" : state === "owner" ? "!" : i + 1}</span>
                     <span className="name">{labelOf(pid)}</span>
-                    <span className="state">{state === "done" ? "Done" : state === "now" ? "Now" : ""}</span>
+                    <span className="state">{state === "done" ? "Done" : state === "owner" ? "Needs you" : state === "now" ? "Now" : ""}</span>
                   </li>
                 );
               })}
@@ -343,6 +366,7 @@ export function Studio({ id }: { id: string }) {
               </details>
             )}
           </section>
+          <UsagePanel id={id} refresh={live.turnsEnded + live.helperChanges} agents={agents} />
           <section className="panel" style={{ flex: 1 }}>
             <h3>Activity</h3>
             {live.activity.length === 0 ? (
@@ -393,6 +417,93 @@ export function asksForApproval(reply: string): boolean {
   if (/approve\s*\/\s*change/i.test(tail)) return true;
   const lastSentence = tail.split(/(?<=[.!])\s+/).pop() ?? "";
   return /[?？]\s*$/.test(lastSentence) && /\bapprov/i.test(lastSentence);
+}
+
+function rowIsAgent(row: string, agent: Agent): boolean {
+  const r = row.toLowerCase();
+  return r.includes(agent.label.toLowerCase()) || r.includes(agent.id) || (agent.id === "qa-engineer" && /\bqa\b/.test(r));
+}
+
+const GOAL_HINTS: Record<string, RegExp> = {
+  "qa-engineer": /\bqa\b|quality assurance/i,
+  "sw-developer": /\bdevelop/i,
+  "task-planner": /task[- ]planner|task planning/i,
+  "req-engineer": /requirements/i,
+  debugger: /\bdebug/i,
+};
+
+/** Which team member a delegated goal is for — mirrors lyra_lite.agents.agent_for_goal. */
+export function agentForGoal(goal: string, agents: Agent[]): string | null {
+  const text = (goal || "").toLowerCase();
+  return (
+    agents.find((a) => text.includes(a.id))?.id ??
+    agents.find((a) => text.includes(a.label.toLowerCase()))?.id ??
+    Object.entries(GOAL_HINTS).find(([, re]) => re.test(text))?.[0] ??
+    null
+  );
+}
+
+interface UsageTotals {
+  api_calls: number;
+  input: number;
+  cache_read: number;
+  output: number;
+  prompt: number;
+  cached_pct: number;
+  cost_usd: number;
+}
+
+interface UsageReport {
+  lyra: UsageTotals;
+  agents: UsageTotals;
+  total: UsageTotals;
+  by_agent: (UsageTotals & { id: string; label: string })[];
+}
+
+export function tokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return String(n);
+}
+
+function UsagePanel({ id, refresh, agents }: { id: string; refresh: number; agents: Agent[] }) {
+  const [u, setU] = useState<UsageReport | null>(null);
+  useEffect(() => {
+    void api.usage(id).then((r) => setU(r as UsageReport)).catch(() => undefined);
+  }, [id, refresh]);
+  if (!u || !u.total.api_calls) return null;
+  if (!u.total.prompt) {
+    return (
+      <section className="panel">
+        <h3>Token use</h3>
+        <p className="tiny muted" style={{ margin: 0 }}>Token counts are recorded from the next step on.</p>
+      </section>
+    );
+  }
+  const row = (label: string, t: UsageTotals, avatar?: string) => (
+    <div className="usage-row" key={label}>
+      {avatar ? <Avatar id={avatar} size={22} /> : <span style={{ width: 22 }} />}
+      <span className="u-name">{label}</span>
+      <span title="model calls">{t.api_calls}×</span>
+      <span title="tokens sent (fresh + cached)">{tokens(t.prompt)}</span>
+      <span title="share served from cache" className="u-cache">{t.cached_pct}%</span>
+      <span title="tokens written">{tokens(t.output)}</span>
+    </div>
+  );
+  return (
+    <section className="panel">
+      <h3>Token use</h3>
+      <div className="usage-big">
+        <b>{tokens(u.total.prompt)}</b> read · <b>{u.total.cached_pct}%</b> from cache · <b>{tokens(u.total.output)}</b> written
+      </div>
+      <div className="usage-row head"><span style={{ width: 22 }} /><span className="u-name" /><span>calls</span><span>read</span><span>cache</span><span>out</span></div>
+      {row("Lyra", u.lyra, "app-it")}
+      {u.by_agent.map((a) => row(a.label, a, agents.some((x) => x.id === a.id) ? a.id : undefined))}
+      <div className="tiny muted" style={{ marginTop: 6 }}>
+        Fresh (not cached) input: {tokens(u.total.input)}{u.total.cost_usd ? ` · cost $${u.total.cost_usd.toFixed(2)}` : ""}
+      </div>
+    </section>
+  );
 }
 
 function orderedTeamAgents(agents: Agent[], team: string[]): Agent[] {

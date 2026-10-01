@@ -263,16 +263,27 @@ export function phasesFromProgressLedger(
   let running: string | null = null;
   let blocked: string | null = null;
   let inLedger = false;
+  let inPhaseTable = false;
   for (const line of markdown.split(/\r?\n/)) {
     if (/^#{1,6}\s/.test(line)) {
-      inLedger = /^#{1,6}\s+phase ledger\b/i.test(line);
+      // "## Phase ledger" or a titled one like "# Calculator — phase ledger".
+      inLedger = /^#{1,6}\s+(?:.*\W)?phase ledger\b/i.test(line);
       continue;
     }
-    if (!inLedger || !line.trim().startsWith("|")) continue;
+    if (!line.trim().startsWith("|")) {
+      if (!line.trim()) inPhaseTable = false;
+      continue;
+    }
     const cells = line.split("|").slice(1, -1).map((cell) =>
       cell.replace(/[`*_]/g, "").trim().toLowerCase(),
     );
-    if (cells.length < 2 || /^:?-+:?$/.test(cells[0]) || cells[0] === "phase") continue;
+    // A table headed "| Phase | Status |" is a ledger wherever it appears.
+    if (cells[0] === "phase") {
+      inPhaseTable = true;
+      continue;
+    }
+    if (!inLedger && !inPhaseTable) continue;
+    if (cells.length < 2 || /^:?-+:?$/.test(cells[0])) continue;
     const ids = Array.from(new Set(terms.filter((t) => t.pattern.test(cells[0])).map((t) => t.id)));
     if (!ids.length) continue;
     const state = ledgerState(cells[1]);

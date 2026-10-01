@@ -49,3 +49,12 @@ def test_unfinished_qualifier_wins_over_done_words():
 
 def test_missing_ledger_is_an_empty_map(tmp_path: Path):
     assert read_map(tmp_path) == {"exists": False, "phases": [], "current_phase": None, "updated": None}
+
+
+def test_titled_ledger_heading_and_bare_phase_table_are_read(tmp_path: Path):
+    (tmp_path / ".sdlc").mkdir()
+    body = "| Phase | Status | Evidence |\n|---|---|---|\n| Task planning | verified | x |\n| QA | blocked | phone check |\n"
+    for heading in ("# Scientific calculator — phase ledger\n\n", "# Progress\n\n"):
+        (tmp_path / ".sdlc" / "progress.md").write_text(heading + body + "\n## Planned wave/task ledger\n| Wave | Rows |\n|---|---|\n| 1 | T-001 verified |\n")
+        rows = [(p["name"], p["state"]) for p in read_map(tmp_path)["phases"]]
+        assert rows == [("Task planning", "done"), ("QA", "blocked")], heading

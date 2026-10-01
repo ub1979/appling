@@ -52,6 +52,35 @@ def _preview(value: Any, limit: int = _PREVIEW_CHARS) -> str:
     return text if len(text) <= limit else text[: limit - 1] + "…"
 
 
+_COUNTERS = {
+    "api_calls": "session_api_calls",
+    "input": "session_input_tokens",          # fresh (uncached) input
+    "cache_read": "session_cache_read_tokens",
+    "cache_write": "session_cache_write_tokens",
+    "output": "session_output_tokens",
+    "reasoning": "session_reasoning_tokens",
+}
+
+
+def _counters(agent) -> dict:
+    return {k: int(getattr(agent, attr, 0) or 0) for k, attr in _COUNTERS.items()}
+
+
+def _helper_usage(kwargs: dict) -> dict:
+    """Token use a finished helper reports (its input figure is the full prompt)."""
+    prompt = int(kwargs.get("input_tokens") or 0)
+    cache_read = int(kwargs.get("cache_read_tokens") or 0)
+    cache_write = int(kwargs.get("cache_write_tokens") or 0)
+    return {
+        "api_calls": int(kwargs.get("api_calls") or 0),
+        "input": max(0, prompt - cache_read - cache_write),
+        "cache_read": cache_read,
+        "cache_write": cache_write,
+        "output": int(kwargs.get("output_tokens") or 0),
+        "reasoning": int(kwargs.get("reasoning_tokens") or 0),
+    }
+
+
 def _helper_fields(kwargs: dict) -> dict:
     keep = (
         "goal", "task_count", "task_index", "subagent_id", "parent_id",
@@ -171,6 +200,8 @@ class HermesEngine:
             fields["preview"] = _preview(preview, 200)
         if name and event_type == "subagent.tool":
             fields["tool"] = str(name)
+        if event_type == "subagent.complete":
+            fields["usage"] = _helper_usage(kwargs)
         self._emit("helper", event=event_type.removeprefix("subagent."), **fields)
 
     def _on_status(self, kind, text=None) -> None:
@@ -293,6 +324,8 @@ class HermesEngine:
                 if isinstance(delta, str) and delta:
                     hooks.emit("delta", text=delta)
 
+            before = _counters(agent)
+
             result = agent.run_conversation(
                 text,
                 conversation_history=list(history),
@@ -314,11 +347,10 @@ class HermesEngine:
 
         result = result if isinstance(result, dict) else {}
         messages = result.get("messages")
-        usage = {
-            k: result.get(k)
-            for k in ("api_calls", "input_tokens", "output_tokens", "estimated_cost_usd")
-            if result.get(k) is not None
-        }
+        after = _counters(agent)
+        usage = {k: max(0, after[k] - before.get(k, 0)) for k in after}
+        if not usage["api_calls"] and result.get("api_calls"):
+            usage["api_calls"] = int(result["api_calls"])
         return TurnResult(
             reply=str(result.get("final_response") or ""),
             messages=messages if isinstance(messages, list) else list(history),

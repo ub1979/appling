@@ -120,6 +120,7 @@ export const api = {
   catalog: () => call<Catalog>("GET", "/api/catalog"),
   addProject: (body: NewProject) => call<ProjectDetail>("POST", "/api/projects", body),
   project: (id: string) => call<ProjectDetail>("GET", `/api/projects/${id}`),
+  usage: (id: string) => call<unknown>("GET", `/api/projects/${id}/usage`),
   map: (id: string) => call<ProjectMap>("GET", `/api/projects/${id}/map`),
   send: (id: string, text: string) => call("POST", `/api/projects/${id}/messages`, { text }),
   answer: (id: string, item: string, answer: string) => call("POST", `/api/projects/${id}/inbox/${item}`, { answer }),

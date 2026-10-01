@@ -430,6 +430,12 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             raise HTTPException(status_code=409, detail=str(exc))
         return {"ok": True}
 
+    @app.get("/api/projects/{pid}/usage")
+    def usage(pid: str):
+        from lyra_lite.usage import summarise_usage
+
+        return summarise_usage(lyra.get(pid).store)
+
     @app.get("/api/projects/{pid}/map")
     def project_map(pid: str):
         from lyra_lite.project_map import read_map
