@@ -83,6 +83,10 @@ def placement(path: Path, *, creating: bool) -> str | None:
     return None
 
 
+HELD_PREFIX = "While Lyra was stopped, these reports arrived:"
+HELD_SPLIT = "The owner's message:"
+
+
 def display_messages(messages: list[dict]) -> list[dict]:
     """The chat as the owner sees it: user and assistant text only."""
     out: list[dict] = []
@@ -99,7 +103,11 @@ def display_messages(messages: list[dict]) -> list[dict]:
         if not text:
             continue
         kind = "chat"
-        if role == "user" and text.startswith("["):
+        if role == "user" and text.startswith(HELD_PREFIX) and HELD_SPLIT in text:
+            held, own = text.split(HELD_SPLIT, 1)
+            out.append({"role": "user", "content": held.strip(), "kind": "system"})
+            text = own.strip()
+        elif role == "user" and text.startswith("["):
             kind = "system"
         out.append({"role": role, "content": text, "kind": kind})
     return out
@@ -208,10 +216,19 @@ class Lyra:
             claim_event_delivery,
             complete_event_delivery,
             release_event_delivery,
+            restore_undelivered_completions,
         )
         from tools.process_registry import format_process_notification, process_registry
 
         queue = process_registry.completion_queue
+        try:
+            # Helpers that finished (or died) while Lyra was down report now.
+            restored = restore_undelivered_completions(queue)
+            if restored:
+                logger.info("lyra-lite: restored %d undelivered helper result(s)", restored)
+        except Exception:
+            logger.warning("lyra-lite: could not restore helper results", exc_info=True)
+
         while not self._stop.is_set():
             try:
                 evt = queue.get(timeout=1)
@@ -219,9 +236,10 @@ class Lyra:
                 continue
             runner = self._owner(str(evt.get("session_key") or ""))
             if runner is None:
-                # Not ours (yet); hand it back and back off.
-                queue.put(evt)
-                time.sleep(1)
+                # Another app's (or an old chat's) result: leave it pending in
+                # the durable store for its own owner instead of adopting it.
+                logger.info("lyra-lite: ignoring helper result for %r",
+                            evt.get("session_key"))
                 continue
             claim = claim_event_delivery(evt, "lyra-lite")
             if claim is None:
@@ -229,6 +247,10 @@ class Lyra:
             try:
                 text = format_process_notification(evt)
                 if text:
+                    runner.store.append_event(
+                        "helper", event="reported", subagent_id=str(evt.get("delegation_id") or ""),
+                        goal=str(evt.get("goal") or "")[:300], status=str(evt.get("status") or ""),
+                    )
                     runner.submit(text, kind="helper_done")
                 complete_event_delivery(evt, claim)
             except Exception:
@@ -276,6 +298,12 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         runner = lyra.get(pid)
         return {"id": pid, **runner.snapshot(),
                 "messages": display_messages(runner.store.messages())}
+
+    @app.get("/api/projects/{pid}/map")
+    def project_map(pid: str):
+        from lyra_lite.project_map import read_map
+
+        return read_map(lyra.get(pid).root)
 
     @app.post("/api/projects/{pid}/messages")
     def send(pid: str, body: dict = Body(...)):

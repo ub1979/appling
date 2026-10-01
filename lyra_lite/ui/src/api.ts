@@ -1,3 +1,5 @@
+import type { InboxItem } from "./live";
+
 declare global {
   interface Window {
     __LYRA_TOKEN__?: string;
@@ -25,11 +27,27 @@ export interface ProjectDetail {
   name: string;
   root: string;
   running: boolean;
+  paused: boolean;
   queue: { id: string; text: string; kind: string }[];
   turn: { id: string; text: string; kind: string } | null;
   turn_start_offset: number;
-  inbox: import("./live").InboxItem[];
+  inbox: InboxItem[];
+  helpers: { id: string; goal: string; started: number | null }[];
   messages: ChatMessage[];
+}
+
+export interface MapPhase {
+  name: string;
+  status: string;
+  state: "done" | "running" | "owner" | "blocked" | "pending";
+  note: string;
+}
+
+export interface ProjectMap {
+  exists: boolean;
+  phases: MapPhase[];
+  current_phase: string | null;
+  updated: string | null;
 }
 
 export interface FolderListing {
@@ -53,6 +71,7 @@ export const api = {
   projects: () => call<{ projects: ProjectSummary[]; default_root: string }>("GET", "/api/projects"),
   addProject: (path: string, create: boolean) => call<ProjectDetail>("POST", "/api/projects", { path, create }),
   project: (id: string) => call<ProjectDetail>("GET", `/api/projects/${id}`),
+  map: (id: string) => call<ProjectMap>("GET", `/api/projects/${id}/map`),
   send: (id: string, text: string) => call("POST", `/api/projects/${id}/messages`, { text }),
   answer: (id: string, item: string, answer: string) => call("POST", `/api/projects/${id}/inbox/${item}`, { answer }),
   stop: (id: string) => call("POST", `/api/projects/${id}/stop`),

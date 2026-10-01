@@ -42,6 +42,8 @@ export interface LiveState {
   activity: ActivityItem[];
   helpers: Record<string, Helper>;
   turnsEnded: number;
+  helperChanges: number;
+  paused: boolean;
   lastProblem: string | null;
 }
 
@@ -58,6 +60,8 @@ export const emptyLive = (): LiveState => ({
   activity: [],
   helpers: {},
   turnsEnded: 0,
+  helperChanges: 0,
+  paused: false,
   lastProblem: null,
 });
 
@@ -104,7 +108,7 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
       return {
         ...state,
         queued: state.queued.filter((q) => q.id !== id),
-        turn: { id, text: str(evt.text), kind: str(evt.kind) || "user", reply: "" },
+        turn: { id, text: str(evt.display) || str(evt.text), kind: str(evt.kind) || "user", reply: "" },
         lastProblem: null,
       };
     }
@@ -131,6 +135,10 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
       if (state.inbox.some((i) => i.id === item.id)) return state;
       return { ...state, inbox: [...state.inbox, item] };
     }
+    case "stop_requested":
+      return { ...state, paused: true, queued: evt.cleared_queue ? [] : state.queued };
+    case "resumed":
+      return { ...state, paused: false, queued: [] };
     case "inbox_closed":
       return { ...state, inbox: state.inbox.filter((i) => i.id !== evt.id) };
     case "turn_end": {
@@ -166,6 +174,13 @@ function applyHelper(state: LiveState, evt: LyraEvent): LiveState {
   const kind = str(evt.event);
   let helper: Helper = prev ?? { id, goal, running: true };
   let activity = state.activity;
+  if (kind === "reported") {
+    return {
+      ...state,
+      helperChanges: state.helperChanges + 1,
+      activity: addActivity(state, { key: `h-rep-${id}-${evt.ts}`, ts: evt.ts, text: "An agent's report arrived", detail: goal, tone: "helper" }),
+    };
+  }
   if (kind === "start" || kind === "spawn_requested") {
     helper = { ...helper, goal, running: true };
     if (!prev) {
@@ -186,7 +201,8 @@ function applyHelper(state: LiveState, evt: LyraEvent): LiveState {
   } else {
     return state;
   }
-  return { ...state, helpers: { ...state.helpers, [id]: helper }, activity };
+  const changed = kind === "tool" ? 0 : 1;
+  return { ...state, helpers: { ...state.helpers, [id]: helper }, activity, helperChanges: state.helperChanges + changed };
 }
 
 export function activeHelpers(state: LiveState): Helper[] {

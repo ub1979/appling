@@ -42,6 +42,16 @@ describe("applyEvent", () => {
     expect(finished.activity.at(-1)?.tone).toBe("done");
   });
 
+  it("signals a refresh whenever an agent starts, ends or reports", () => {
+    const s = feed([
+      { type: "helper", event: "start", subagent_id: "a", goal: "g" },
+      { type: "helper", event: "tool", subagent_id: "a", tool: "patch" },
+      { type: "helper", event: "reported", subagent_id: "d1", goal: "g", status: "completed" },
+    ]);
+    expect(s.helperChanges).toBe(2);
+    expect(s.activity.at(-1)?.text).toMatch(/report arrived/);
+  });
+
   it("reports a crashed turn as a problem", () => {
     const s = feed([
       { type: "turn_start", turn: "t", text: "go", kind: "user" },

@@ -2,7 +2,10 @@
 
 Requests that carry ``tools`` (the main agent loop) consume the next scripted
 step; tool-less side requests (titles, summaries) get a short canned reply so
-they never eat the script. Every request body is recorded for assertions.
+they never eat the script. A request whose first user message contains one of
+``side_scripts``' markers (e.g. a helper's goal) consumes that script
+instead, so a parent and its helpers can run concurrently. Every request
+body is recorded for assertions.
 """
 
 from __future__ import annotations
@@ -23,8 +26,10 @@ def tool_step(name: str, arguments: dict, call_id: str = "call_1") -> dict:
 
 
 class FakeOpenAIServer:
-    def __init__(self, script: list[dict], *, step_delay: float = 0.0):
+    def __init__(self, script: list[dict], *, step_delay: float = 0.0,
+                 side_scripts: dict[str, list[dict]] | None = None):
         self.script = list(script)
+        self.side_scripts = {k: list(v) for k, v in (side_scripts or {}).items()}
         self.step_delay = step_delay
         self.requests: list[dict] = []
         self._lock = threading.Lock()
@@ -46,6 +51,10 @@ class FakeOpenAIServer:
             self.requests.append(body)
             if not body.get("tools"):
                 return text_step("ok")
+            first = _first_user_text(body)
+            for marker, steps in self.side_scripts.items():
+                if marker in first:
+                    return steps.pop(0) if steps else text_step("(side script exhausted)")
             if self.script:
                 return self.script.pop(0)
             return text_step("(script exhausted)")
@@ -81,6 +90,8 @@ class FakeOpenAIServer:
                 step = server.next_step(body)
                 if server.step_delay and body.get("tools"):
                     time.sleep(server.step_delay)
+                if step.get("delay"):
+                    time.sleep(step["delay"])
                 if body.get("stream"):
                     self._stream(step)
                 else:
@@ -105,6 +116,15 @@ class FakeOpenAIServer:
                 self.wfile.flush()
 
         return Handler
+
+
+def _first_user_text(body: dict) -> str:
+    """A helper's conversation starts with its goal; the parent's with the owner."""
+    for msg in body.get("messages") or []:
+        if msg.get("role") == "user":
+            content = msg.get("content")
+            return content if isinstance(content, str) else json.dumps(content)
+    return ""
 
 
 def _base(delta: dict, finish: str | None) -> dict:

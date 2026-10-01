@@ -1,7 +1,16 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { api, streamUrl, type ChatMessage, type FolderListing, type ProjectDetail, type ProjectSummary } from "./api";
+import {
+  api,
+  streamUrl,
+  type ChatMessage,
+  type FolderListing,
+  type MapPhase,
+  type ProjectDetail,
+  type ProjectMap,
+  type ProjectSummary,
+} from "./api";
 import { activeHelpers, applyEvent, emptyLive, type InboxItem, type LiveState, type LyraEvent } from "./live";
 
 const SELECTED_KEY = "lyra-lite:selected";
@@ -109,7 +118,7 @@ interface ResetAction {
 function liveReducer(state: LiveState, action: LyraEvent | ResetAction): LiveState {
   if (action.type === "reset" && "detail" in action) {
     const { detail } = action as ResetAction;
-    return { ...emptyLive(), inbox: detail.inbox, queued: detail.queue };
+    return { ...emptyLive(), inbox: detail.inbox, queued: detail.queue, paused: detail.paused };
   }
   return applyEvent(state, action as LyraEvent);
 }
@@ -153,9 +162,32 @@ function ProjectView({ id, onChange }: { id: string; onChange: () => void }) {
     }
   }, [live.turnsEnded, load, onChange]);
 
-  const helpers = activeHelpers(live);
+  // Lyra's own record of running agents is the truth; live events only add
+  // what each one is doing right now.
+  useEffect(() => {
+    if (live.helperChanges > 0) void load();
+  }, [live.helperChanges, load]);
+
+  const [map, setMap] = useState<ProjectMap | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const fetchMap = () => void api.map(id).then((m) => alive && setMap(m)).catch(() => undefined);
+    fetchMap();
+    const timer = window.setInterval(fetchMap, 15000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [id, live.turnsEnded, live.helperChanges]);
+
+  const liveHelpers = activeHelpers(live);
+  const helpers = detail?.helpers ?? [];
+  const lastToolFor = (goal: string) =>
+    liveHelpers.find((h) => h.goal && (goal.startsWith(h.goal.slice(0, 40)) || h.goal.startsWith(goal.slice(0, 40))))?.lastTool;
   const status = live.inbox.length
     ? { text: "Waiting for you", tone: "need" }
+    : live.paused && !live.turn && helpers.length === 0
+      ? { text: "Stopped — send a message to continue", tone: "idle" }
     : live.turn
       ? { text: "Working…", tone: "busy" }
       : helpers.length
@@ -183,12 +215,12 @@ function ProjectView({ id, onChange }: { id: string; onChange: () => void }) {
           </div>
           <div className="bar-actions">
             <span className={`pill ${status.tone}`}>{status.text}</span>
-            {(live.turn || live.queued.length > 0) && (
+            {(live.turn || live.queued.length > 0 || helpers.length > 0) && (
               <button onClick={() => void run(() => api.stop(id))}>Stop</button>
             )}
             <button
               className="ghost"
-              disabled={!!live.turn}
+              disabled={!!live.turn || helpers.length > 0}
               title="Start a fresh conversation. The project files stay as they are."
               onClick={() => void run(async () => {
                 await api.newChat(id);
@@ -211,17 +243,55 @@ function ProjectView({ id, onChange }: { id: string; onChange: () => void }) {
             {helpers.map((h) => (
               <div key={h.id} className="helper">
                 <div>{h.goal}</div>
-                {h.lastTool && <div className="muted small">{h.lastTool}</div>}
+                <div className="muted small">
+                  {lastToolFor(h.goal) ?? "Working"}
+                  {h.started ? ` · since ${new Date(h.started * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}` : ""}
+                </div>
               </div>
             ))}
           </section>
         )}
+        <ProjectMapPanel map={map} />
         <section className="panel grow">
           <h3>Activity</h3>
           <Activity live={live} />
         </section>
       </aside>
     </div>
+  );
+}
+
+const PHASE_LOOK: Record<MapPhase["state"], { mark: string; words: string }> = {
+  done: { mark: "✓", words: "Done" },
+  running: { mark: "●", words: "In progress" },
+  owner: { mark: "!", words: "Needs you" },
+  blocked: { mark: "■", words: "Blocked" },
+  pending: { mark: "○", words: "Not started" },
+};
+
+function ProjectMapPanel({ map }: { map: ProjectMap | null }) {
+  if (!map) return null;
+  return (
+    <section className="panel">
+      <h3>Project map</h3>
+      {!map.exists || map.phases.length === 0 ? (
+        <p className="muted small">The map appears once Lyra starts planning this project.</p>
+      ) : (
+        <>
+          {map.current_phase && <div className="small current-phase">Now: {map.current_phase}</div>}
+          <ol className="phases">
+            {map.phases.map((p, i) => (
+              <li key={`${i}-${p.name}`} className={`phase ${p.state}`} title={p.status}>
+                <span className="mark">{PHASE_LOOK[p.state].mark}</span>
+                <span className="phase-name">{p.name}</span>
+                <span className="phase-state">{PHASE_LOOK[p.state].words}</span>
+              </li>
+            ))}
+          </ol>
+          {map.updated && <div className="muted small">Updated {map.updated}</div>}
+        </>
+      )}
+    </section>
   );
 }
 

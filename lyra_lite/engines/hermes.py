@@ -253,7 +253,6 @@ class HermesEngine:
             register_gateway_notify,
             reset_current_session_key,
             set_current_session_key,
-            unregister_gateway_notify,
         )
         from tools.skills_tool import set_secret_capture_callback
         from tools.terminal_tool import (
@@ -284,6 +283,11 @@ class HermesEngine:
                 if self._agent is None:
                     self._agent = self._build_agent()
                 agent = self._agent
+            # A Stop pressed between turns must not cancel this new turn.
+            try:
+                agent.clear_interrupt()
+            except Exception:
+                pass
 
             def _stream(delta):
                 if isinstance(delta, str) and delta:
@@ -300,16 +304,13 @@ class HermesEngine:
             return TurnResult(reply="", messages=list(history), completed=False,
                               error=f"{type(exc).__name__}: {exc}")
         finally:
-            unregister_gateway_notify(key)
+            # The approval route and self._hooks stay in place: background
+            # helpers started this turn keep reporting and asking after it.
             try:
                 clear_session_vars(session_tokens)
             except Exception:
                 pass
             reset_current_session_key(approval_token)
-            with _ACTIVE_LOCK:
-                if _ACTIVE.get(key) is self:
-                    _ACTIVE.pop(key, None)
-            self._hooks = None
 
         result = result if isinstance(result, dict) else {}
         messages = result.get("messages")
@@ -335,8 +336,38 @@ class HermesEngine:
             except Exception:
                 logger.debug("lyra-lite interrupt failed", exc_info=True)
 
+    def stop_helpers(self) -> int:
+        from tools.async_delegation import interrupt_for_session
+
+        return interrupt_for_session(session_key=self.session_key, reason="owner_stop")
+
+    def helpers(self) -> list[dict]:
+        """Background helpers this chat started that are still running."""
+        from tools.async_delegation import list_async_delegations
+
+        out = []
+        for rec in list_async_delegations():
+            if rec.get("session_key") != self.session_key or rec.get("status") != "running":
+                continue
+            out.append({
+                "id": str(rec.get("delegation_id") or ""),
+                "goal": _preview(rec.get("goal") or "", 300),
+                "started": rec.get("dispatched_at"),
+            })
+        return out
+
     def close(self) -> None:
         self.interrupt()
+        try:
+            from tools.approval import unregister_gateway_notify
+
+            unregister_gateway_notify(self.session_key)
+        except Exception:
+            pass
+        with _ACTIVE_LOCK:
+            if _ACTIVE.get(self.session_key) is self:
+                _ACTIVE.pop(self.session_key, None)
+        self._hooks = None
         agent, self._agent = self._agent, None
         if agent is not None:
             try:

@@ -149,3 +149,19 @@ pre { background: var(--code); padding: 8px 10px; border-radius: 8px; overflow-x
   .bar { flex-wrap: wrap; }
   .bar-actions { flex-wrap: wrap; }
 }
+
+.current-phase { margin-bottom: 6px; }
+.phases { list-style: none; margin: 0 0 6px; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.phase { display: grid; grid-template-columns: 16px 1fr auto; gap: 6px; align-items: baseline; }
+.phase .mark { text-align: center; font-weight: 700; }
+.phase-name { min-width: 0; overflow-wrap: anywhere; }
+.phase-state { color: var(--muted); white-space: nowrap; font-size: 12px; }
+.phase.done .mark { color: var(--done); }
+.phase.running .mark, .phase.running .phase-state { color: var(--busy); }
+.phase.owner .mark, .phase.owner .phase-state { color: var(--need); }
+.phase.blocked .mark, .phase.blocked .phase-state { color: var(--danger); }
+.phase.pending .mark { color: var(--muted); }
+.helper, .activity li { overflow-wrap: anywhere; min-width: 0; }
+.helper > div:first-child, .activity .muted {
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
+}

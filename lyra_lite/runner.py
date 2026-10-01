@@ -62,9 +62,13 @@ def checkpoint(workspace: Path, **kwargs) -> str | None:
 
 
 class _Hooks:
-    def __init__(self, runner: "ProjectRunner", turn_id: str):
+    """The runner's side of the pipe. Lives as long as the runner, because
+    background helpers keep reporting after the turn that started them ends;
+    ``turn_id`` is None between turns."""
+
+    def __init__(self, runner: "ProjectRunner"):
         self.runner = runner
-        self.turn_id = turn_id
+        self.turn_id: str | None = None
 
     def emit(self, type_: str, **data: Any) -> None:
         self.runner.store.append_event(type_, turn=self.turn_id, **data)
@@ -87,6 +91,7 @@ class ProjectRunner:
         self._cond = threading.Condition()
         self._stop = False
         self._busy = False
+        self._hooks = _Hooks(self)
         self._recover()
         self._thread = threading.Thread(
             target=self._loop, name=f"lyra-runner-{store.root.name}", daemon=True
@@ -114,7 +119,22 @@ class ProjectRunner:
         item = {"id": uuid.uuid4().hex[:10], "text": text, "kind": kind,
                 "queued": round(time.time(), 3)}
         with self._cond:
-            queue = list(self.store.state().get("queue") or [])
+            state = self.store.state()
+            queue = list(state.get("queue") or [])
+            if state.get("paused") and kind == "user":
+                # The owner is back after Stop: fold anything that arrived in
+                # the meantime into this one turn instead of replaying it.
+                held = [q["text"] for q in queue]
+                if held:
+                    item["text"] = (
+                        "While Lyra was stopped, these reports arrived:\n\n"
+                        + "\n\n---\n\n".join(held)
+                        + "\n\n---\n\nThe owner's message:\n\n" + text
+                    )
+                    item["display"] = text
+                queue = []
+                self.store.update_state(paused=False)
+                self.store.append_event("resumed")
             queue.append(item)
             self.store.update_state(queue=queue)
             self.store.append_event("queued", item=item)
@@ -138,17 +158,30 @@ class ProjectRunner:
 
     def stop_turn(self, clear_queue: bool = True) -> None:
         with self._cond:
+            changes: dict[str, Any] = {"paused": True}
             if clear_queue:
-                self.store.update_state(queue=[])
+                changes["queue"] = []
+            self.store.update_state(**changes)
             engine = self._engine
+            busy = self._busy
+        stopped = 0
         if engine is not None:
-            engine.interrupt()
-        self.store.append_event("stop_requested", cleared_queue=clear_queue)
+            if busy:
+                engine.interrupt()
+            stop_helpers = getattr(engine, "stop_helpers", None)
+            if stop_helpers is not None:
+                try:
+                    stopped = int(stop_helpers() or 0)
+                except Exception:
+                    logger.warning("lyra-lite: stopping helpers failed", exc_info=True)
+        self.store.append_event("stop_requested", cleared_queue=clear_queue, helpers_stopped=stopped)
 
     def new_chat(self) -> str:
         with self._cond:
             if self._busy:
                 raise RuntimeError("Lyra is busy; stop the current turn first")
+            if self.helpers():
+                raise RuntimeError("Agents are still working; press Stop first")
             self._drop_engine()
             chat_id = self.store.archive_chat()
         self.store.append_event("chat_started", chat_id=chat_id)
@@ -160,14 +193,26 @@ class ProjectRunner:
             "root": str(self.root),
             "name": self.root.name,
             "running": bool(state.get("running")),
+            "paused": bool(state.get("paused")),
             "queue": state.get("queue") or [],
             "turn": state.get("turn"),
             "turn_start_offset": int(state.get("turn_start_offset") or 0),
             "chat_id": state.get("chat_id"),
             "engine": state.get("engine") or "hermes",
             "inbox": self.store.inbox(status="open"),
+            "helpers": self.helpers(),
             "events_size": self.store.events_size(),
         }
+
+    def helpers(self) -> list[dict]:
+        engine = self._engine
+        lister = getattr(engine, "helpers", None)
+        if lister is None:
+            return []
+        try:
+            return list(lister())
+        except Exception:
+            return []
 
     def shutdown(self) -> None:
         with self._cond:
@@ -242,14 +287,16 @@ class ProjectRunner:
     def _loop(self) -> None:
         while True:
             with self._cond:
-                while not self._stop and not (self.store.state().get("queue") or []):
+                while not self._stop and (
+                    self.store.state().get("paused") or not (self.store.state().get("queue") or [])
+                ):
                     self._cond.wait(timeout=5)
                 if self._stop:
                     return
                 queue = list(self.store.state().get("queue") or [])
                 item = queue.pop(0)
                 turn = {"id": item["id"], "text": item["text"], "kind": item.get("kind", "user"),
-                        "started": round(time.time(), 3)}
+                        "display": item.get("display"), "started": round(time.time(), 3)}
                 offset = self.store.events_size()
                 self.store.update_state(queue=queue, running=True, turn=turn,
                                         turn_start_offset=offset)
@@ -266,11 +313,16 @@ class ProjectRunner:
 
     def _run_turn(self, turn: dict) -> None:
         turn_id = turn["id"]
-        self.store.append_event("turn_start", turn=turn_id, kind=turn["kind"], text=turn["text"])
-        hooks = _Hooks(self, turn_id)
+        self.store.append_event("turn_start", turn=turn_id, kind=turn["kind"], text=turn["text"],
+                                display=turn.get("display"))
+        hooks = self._hooks
+        hooks.turn_id = turn_id
         engine = self._engine_for_chat()
         history = self.store.messages()
-        result: TurnResult = engine.run_turn(turn["text"], history, hooks)
+        try:
+            result: TurnResult = engine.run_turn(turn["text"], history, hooks)
+        finally:
+            hooks.turn_id = None
         if result.messages and len(result.messages) >= len(history):
             self.store.save_messages(result.messages)
         self._expire_turn_inbox(turn_id)

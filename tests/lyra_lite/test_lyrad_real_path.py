@@ -251,3 +251,116 @@ def test_new_projects_are_refused_inside_lyra(env):
             assert httpx.get(f"{daemon.base}/api/projects", timeout=5).status_code == 401
         finally:
             daemon.stop()
+
+
+def test_background_helper_reports_back_as_a_new_turn(env):
+    def run(path: Path):
+        target = path / "hello.txt"
+        script = [
+            tool_step("delegate_task", {"goal": f"HELPER-1 write the word hello into {target}",
+                                        "background": True}),
+            text_step("An agent is on it."),
+            text_step("The agent finished: hello.txt is ready."),
+        ]
+        helper = [tool_step("write_file", {"path": str(target), "content": "hello"}, "call_h1"),
+                  text_step("Wrote hello.txt")]
+        return script, {"HELPER-1": helper}
+
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            (path / ".sdlc").mkdir()
+            (path / ".sdlc" / "progress.md").write_text("# Progress\n")
+            llm.script, llm.side_scripts = run(path)
+
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "please make hello.txt"})
+            report = _wait_event(path, lambda e: e["type"] == "turn_start" and e["kind"] == "helper_done", 120)
+            end = _wait_event(path, lambda e: e["type"] == "turn_end" and e["turn"] == report["turn"], 60)
+
+            assert (path / "hello.txt").read_text() == "hello"
+            assert end["reply"] == "The agent finished: hello.txt is ready."
+            kinds = {e.get("event") for e in _events(path) if e["type"] == "helper"}
+            assert {"start", "complete"} <= kinds, kinds
+            log = subprocess.run(["git", "log", "--format=%s"], cwd=path, capture_output=True,
+                                 text=True).stdout
+            assert "checkpoint" in log.lower()
+
+            project = daemon.get(f"/api/projects/{pid}").json()
+            assert project["helpers"] == []
+            assert project["messages"][-1]["content"] == "The agent finished: hello.txt is ready."
+        finally:
+            daemon.stop()
+
+
+def test_helper_cut_off_by_a_restart_is_still_reported(env):
+    script = [
+        tool_step("delegate_task", {"goal": "HELPER-2 slow job", "background": True}),
+        text_step("An agent is on it."),
+        text_step("That agent was cut off; I will redo its job."),
+    ]
+    hang = {**text_step("too late"), "delay": 60}
+    with FakeOpenAIServer(script, side_scripts={"HELPER-2": [hang]}) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        pid, path = _new_project(daemon, env)
+        try:
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "start the slow job"})
+            _wait_event(path, lambda e: e["type"] == "turn_end")
+            _wait_event(path, lambda e: e["type"] == "helper" and e.get("event") in {"start", "spawn_requested"})
+            assert daemon.get(f"/api/projects/{pid}").json()["helpers"], "helper should be listed as running"
+        finally:
+            daemon.kill()
+
+        daemon = Daemon(env).start()
+        try:
+            report = _wait_event(path, lambda e: e["type"] == "turn_start" and e["kind"] == "helper_done", 60)
+            assert "unknown" in report["text"].lower() or "exited" in report["text"].lower(), report["text"]
+            end = _wait_event(path, lambda e: e["type"] == "turn_end" and e["turn"] == report["turn"], 60)
+            assert end["reply"] == "That agent was cut off; I will redo its job."
+        finally:
+            daemon.stop()
+
+
+def test_stop_also_stops_background_helpers(env):
+    script = [
+        tool_step("delegate_task", {"goal": "HELPER-3 long job", "background": True}),
+        text_step("An agent is on it."),
+        text_step("Stopped as you asked."),
+    ]
+    slow = [{**tool_step("terminal", {"command": "sleep 2"}, "c3"), "delay": 3}] * 20
+    with FakeOpenAIServer(script, side_scripts={"HELPER-3": slow}) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "start the long job"})
+            _wait_event(path, lambda e: e["type"] == "turn_end")
+            _wait_event(path, lambda e: e["type"] == "helper" and e.get("event") in {"start", "spawn_requested"})
+
+            assert daemon.post(f"/api/projects/{pid}/stop", {}).status_code == 200
+            stop = _wait_event(path, lambda e: e["type"] == "stop_requested")
+            assert stop["helpers_stopped"] == 1
+
+            deadline = time.time() + 45
+            while daemon.get(f"/api/projects/{pid}").json()["helpers"] and time.time() < deadline:
+                time.sleep(0.5)
+            assert daemon.get(f"/api/projects/{pid}").json()["helpers"] == []
+
+            # The stopped helper's report is held, not acted on...
+            _wait_event(path, lambda e: e["type"] == "queued" and e["item"]["kind"] == "helper_done")
+            time.sleep(2)
+            assert sum(e["type"] == "turn_start" for e in _events(path)) == 1
+            assert daemon.get(f"/api/projects/{pid}").json()["paused"] is True
+
+            # ...until the owner writes again; then it rides along in one turn.
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "ok, carry on later"})
+            turn = _wait_event(path, lambda e: e["type"] == "turn_start" and e.get("display") == "ok, carry on later")
+            assert "HELPER-3" in turn["text"]
+            _wait_event(path, lambda e: e["type"] == "turn_end" and e["turn"] == turn["turn"])
+            shown = daemon.get(f"/api/projects/{pid}").json()["messages"]
+            assert shown[-2] == {"role": "user", "content": "ok, carry on later", "kind": "chat"}, shown[-3:]
+            assert shown[-3]["kind"] == "system"
+        finally:
+            daemon.stop()
