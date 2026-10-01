@@ -19,7 +19,7 @@ export interface ProjectSummary {
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
-  kind: "chat" | "system";
+  kind: "chat" | "system" | "auto";
 }
 
 export interface ProjectDetail {
@@ -28,6 +28,9 @@ export interface ProjectDetail {
   root: string;
   running: boolean;
   paused: boolean;
+  keep_going: boolean;
+  rules_outdated: boolean;
+  watchdog: { gave_up?: boolean; count?: number };
   queue: { id: string; text: string; kind: string }[];
   turn: { id: string; text: string; kind: string } | null;
   turn_start_offset: number;
@@ -74,6 +77,8 @@ export const api = {
   map: (id: string) => call<ProjectMap>("GET", `/api/projects/${id}/map`),
   send: (id: string, text: string) => call("POST", `/api/projects/${id}/messages`, { text }),
   answer: (id: string, item: string, answer: string) => call("POST", `/api/projects/${id}/inbox/${item}`, { answer }),
+  settings: (id: string, body: Record<string, unknown>) => call("POST", `/api/projects/${id}/settings`, body),
+  applyRules: (id: string) => call("POST", `/api/projects/${id}/apply-rules`),
   stop: (id: string) => call("POST", `/api/projects/${id}/stop`),
   newChat: (id: string) => call("POST", `/api/projects/${id}/new-chat`),
   folders: (path?: string) =>

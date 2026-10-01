@@ -48,8 +48,8 @@ def env(tmp_path, monkeypatch):
     return {"home": home, "hermes_home": hermes_home}
 
 
-def _write_config(hermes_home: Path, base_url: str) -> None:
-    config = {
+def _write_config(hermes_home: Path, base_url: str, **extra) -> None:
+    config = {**extra,
         "model": {"default": "fake-model", "provider": "custom",
                   "base_url": base_url, "api_key": "fake-key"},
         "approvals": {"mode": "manual", "timeout": 60},
@@ -362,5 +362,73 @@ def test_stop_also_stops_background_helpers(env):
             shown = daemon.get(f"/api/projects/{pid}").json()["messages"]
             assert shown[-2] == {"role": "user", "content": "ok, carry on later", "kind": "chat"}, shown[-3:]
             assert shown[-3]["kind"] == "system"
+        finally:
+            daemon.stop()
+
+
+def test_watchdog_keeps_going_until_the_owner_is_needed(env):
+    script = [
+        text_step("Built wave 1."),
+        text_step("Built wave 2."),
+        text_step("## What I need from you\n1. Approve the preview."),
+        text_step("should never be used"),
+    ]
+    with FakeOpenAIServer(script) as llm:
+        _write_config(env["hermes_home"], llm.base_url,
+                      lyra_lite={"watchdog": {"check_seconds": 0.5, "idle_minutes": 0}})
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            (path / ".sdlc").mkdir()
+            (path / ".sdlc" / "progress.md").write_text(
+                "## Phase ledger\n| Phase | Status |\n|---|---|\n| Remaining development | running |\n")
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "build the app"})
+            _wait_event(path, lambda e: e["type"] == "turn_end"
+                        and "What I need from you" in (e.get("reply") or ""), 60)
+            time.sleep(3)
+            starts = [e for e in _events(path) if e["type"] == "turn_start"]
+            assert [e["kind"] for e in starts] == ["user", "watchdog", "watchdog"]
+            assert len(llm.main_requests()) == 3
+        finally:
+            daemon.stop()
+
+
+def test_changed_rules_are_offered_and_applied(env):
+    with FakeOpenAIServer([text_step("Hello.")]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "hi"})
+            _wait_event(path, lambda e: e["type"] == "turn_end")
+            assert daemon.get(f"/api/projects/{pid}").json()["rules_outdated"] is False
+
+            state_file = path / ".lyra" / "state.json"
+            state = json.loads(state_file.read_text())
+            state["rules_hash"] = "older-rules"
+            state_file.write_text(json.dumps(state))
+            assert daemon.get(f"/api/projects/{pid}").json()["rules_outdated"] is True
+
+            assert daemon.post(f"/api/projects/{pid}/apply-rules", {}).status_code == 200
+            assert daemon.get(f"/api/projects/{pid}").json()["rules_outdated"] is False
+        finally:
+            daemon.stop()
+
+
+def test_frozen_mid_turn_like_a_sleeping_laptop_then_finishes(env):
+    script = [{**text_step("Finished after the nap."), "delay": 2}]
+    with FakeOpenAIServer(script) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "do the thing"})
+            _wait_event(path, lambda e: e["type"] == "turn_start")
+            daemon.proc.send_signal(signal.SIGSTOP)
+            time.sleep(6)
+            daemon.proc.send_signal(signal.SIGCONT)
+            end = _wait_event(path, lambda e: e["type"] == "turn_end", 60)
+            assert end["status"] == "done" and end["reply"] == "Finished after the nap."
+            assert daemon.get(f"/api/projects/{pid}").json()["running"] is False
         finally:
             daemon.stop()

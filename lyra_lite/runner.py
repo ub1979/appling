@@ -16,7 +16,9 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable
 
+from lyra_lite import watchdog
 from lyra_lite.engines.base import Engine, TurnResult
+from lyra_lite.project_map import read_map
 from lyra_lite.store import ProjectStore
 
 logger = logging.getLogger(__name__)
@@ -136,7 +138,12 @@ class ProjectRunner:
                 self.store.update_state(paused=False)
                 self.store.append_event("resumed")
             queue.append(item)
-            self.store.update_state(queue=queue)
+            changes: dict[str, Any] = {"queue": queue}
+            if kind == "user":
+                wd = dict(state.get("watchdog") or {})
+                wd.update(no_progress=0, gave_up=False, last_mark=None)
+                changes["watchdog"] = wd
+            self.store.update_state(**changes)
             self.store.append_event("queued", item=item)
             self._cond.notify_all()
         return item
@@ -194,6 +201,10 @@ class ProjectRunner:
             "name": self.root.name,
             "running": bool(state.get("running")),
             "paused": bool(state.get("paused")),
+            "keep_going": bool(state.get("keep_going", True)),
+            "watchdog": state.get("watchdog") or {},
+            "has_engine": self._engine is not None,
+            "rules_hash": state.get("rules_hash") or "",
             "queue": state.get("queue") or [],
             "turn": state.get("turn"),
             "turn_start_offset": int(state.get("turn_start_offset") or 0),
@@ -219,6 +230,66 @@ class ProjectRunner:
             self._stop = True
             self._cond.notify_all()
         self._drop_engine()
+
+    def set_keep_going(self, on: bool) -> None:
+        self.store.update_state(keep_going=bool(on))
+        self.store.append_event("setting", name="keep_going", value=bool(on))
+
+    def reload_engine(self) -> None:
+        """Rebuild the engine (new rules) at the next turn; refuses while busy."""
+        with self._cond:
+            if self._busy or self.helpers():
+                raise RuntimeError("Lyra is busy; try again when it's idle")
+            self._drop_engine()
+        self.store.append_event("rules_applied")
+
+    def watchdog_tick(self, settings: dict | None = None, now: float | None = None) -> str:
+        """Nudge an idle project with unfinished work. Returns the reason."""
+        now = time.time() if now is None else now
+        cfg = {**watchdog.DEFAULTS, **(settings or {})}
+        with self._cond:
+            state = self.store.state()
+            wd = dict(state.get("watchdog") or {})
+            if wd.get("day") != watchdog.today():
+                wd.update(day=watchdog.today(), count=0)
+            facts = watchdog.Facts(
+                now=now,
+                keep_going=bool(state.get("keep_going", True)),
+                paused=bool(state.get("paused")),
+                busy=self._busy,
+                queued=len(state.get("queue") or []),
+                helpers=len(self.helpers()),
+                open_inbox=len(self.store.inbox(status="open")),
+                ledger_running=any(p["state"] == "running" for p in read_map(self.root)["phases"]),
+                last_reply=str(state.get("last_reply") or ""),
+                last_turn_end=state.get("last_turn_end"),
+                progress_mark="",
+                nudges_today=int(wd.get("count") or 0),
+                no_progress=int(wd.get("no_progress") or 0),
+                last_mark=wd.get("last_mark"),
+                gave_up=bool(wd.get("gave_up")),
+            )
+            go, reason = watchdog.decide(facts, cfg)
+            if not go:
+                return reason
+            mark = watchdog.progress_mark(self.root)
+            if facts.last_mark is not None and mark == facts.last_mark:
+                wd["no_progress"] = facts.no_progress + 1
+                if wd["no_progress"] >= cfg["max_no_progress"]:
+                    wd["gave_up"] = True
+                    self.store.update_state(watchdog=wd)
+                    self.store.append_event(
+                        "watchdog", action="gave_up",
+                        text="Lyra stopped nudging itself: the last nudges made no progress.",
+                    )
+                    return "gave up: no progress"
+            else:
+                wd["no_progress"] = 0
+            wd.update(count=int(wd.get("count") or 0) + 1, last_mark=mark, last=now)
+            self.store.update_state(watchdog=wd)
+            self.store.append_event("watchdog", action="nudge", reason=reason)
+        self.submit(watchdog.NUDGE, kind="watchdog")
+        return reason
 
     # -- inbox internals -------------------------------------------------
 
@@ -324,7 +395,17 @@ class ProjectRunner:
         finally:
             hooks.turn_id = None
         if result.messages and len(result.messages) >= len(history):
-            self.store.save_messages(result.messages)
+            try:
+                self.store.save_messages(result.messages)
+            except Exception as exc:
+                logger.exception("lyra-lite: could not save the conversation")
+                self.store.append_event(
+                    "problem", kind="save_failed",
+                    text=f"This conversation could not be saved ({type(exc).__name__}: {exc}). "
+                    "The project files are safe; check free disk space.",
+                )
+        self.store.update_state(last_turn_end=round(time.time(), 3),
+                                last_reply=(result.reply or "")[-1000:])
         self._expire_turn_inbox(turn_id)
         status = "error" if result.error else "interrupted" if result.interrupted else (
             "done" if result.completed else "incomplete")

@@ -135,6 +135,19 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
       if (state.inbox.some((i) => i.id === item.id)) return state;
       return { ...state, inbox: [...state.inbox, item] };
     }
+    case "problem":
+      return { ...state, lastProblem: str(evt.text) || "Something went wrong." };
+    case "watchdog":
+      return {
+        ...state,
+        activity: addActivity(state, {
+          key: `wd-${evt.ts}`,
+          ts: evt.ts,
+          text: evt.action === "gave_up" ? "Stopped nudging itself (no progress)" : "Kept going on its own",
+          detail: str(evt.text),
+          tone: evt.action === "gave_up" ? "problem" : "helper",
+        }),
+      };
     case "stop_requested":
       return { ...state, paused: true, queued: evt.cleared_queue ? [] : state.queued };
     case "resumed":

@@ -16,6 +16,14 @@ A small, file-first shell around Lyra's agent engines. Start it with
   turn, and helpers cut off by a restart are still reported, with the outcome
   marked unknown. **Stop** stops Lyra and its helpers and pauses the project;
   your next message resumes it, with any held reports attached.
+- **Keep going:** when the plan still has an unfinished step, nothing is
+  running, and nothing waits for the owner, Lyra nudges itself after 10 quiet
+  minutes. It is limited to 8 nudges a day, and it gives up after 2 nudges
+  that change nothing. Switch it per project in the header. Settings live
+  under `lyra_lite.watchdog` in `config.yaml` (`enabled`, `idle_minutes`,
+  `daily_cap`, `max_no_progress`).
+- **Rules notice:** when `rules/lyra.md` or the app-it playbook changes, open
+  chats offer "Use the new rules".
 - **The project map** is read straight from `.sdlc/progress.md` (the phase
   ledger the builder skills keep), so it can't disagree with the files.
 - **Engines plug in** through `lyra_lite/engines/base.py`. `HermesEngine` uses

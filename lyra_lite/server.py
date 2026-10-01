@@ -24,6 +24,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 
 from lyra_lite.runner import REPO_ROOT, ProjectRunner, project_key
 from lyra_lite.store import ProjectStore
+from lyra_lite.watchdog import NUDGE
 
 logger = logging.getLogger(__name__)
 
@@ -50,15 +51,35 @@ def rules_text() -> str:
         return ""
 
 
-def rules_hash(text: str) -> str:
-    return hashlib.sha1(text.encode("utf-8")).hexdigest()[:12]
+APP_IT_SKILL = REPO_ROOT / "plugins" / "ultimate-builder" / "skills" / "app-it" / "SKILL.md"
+
+
+def current_rules_hash() -> str:
+    """Changes when Lyra's rules or the app-it playbook change."""
+    digest = hashlib.sha1(rules_text().encode("utf-8"))
+    try:
+        digest.update(APP_IT_SKILL.read_bytes())
+    except OSError:
+        pass
+    return digest.hexdigest()[:12]
+
+
+def lyra_settings() -> dict:
+    """The ``lyra_lite:`` section of config.yaml (optional)."""
+    try:
+        from hermes_cli.config import load_config
+
+        section = (load_config() or {}).get("lyra_lite") or {}
+        return section if isinstance(section, dict) else {}
+    except Exception:
+        return {}
 
 
 def default_engine_factory(store: ProjectStore, session_key: str):
     from lyra_lite.engines import make_engine
 
     text = rules_text()
-    store.update_state(rules_hash=rules_hash(text))
+    store.update_state(rules_hash=current_rules_hash())
     prompt = f"{text}\n\nProject folder: {store.root}\n"
     return make_engine(
         store.state().get("engine") or "hermes",
@@ -107,6 +128,9 @@ def display_messages(messages: list[dict]) -> list[dict]:
             held, own = text.split(HELD_SPLIT, 1)
             out.append({"role": "user", "content": held.strip(), "kind": "system"})
             text = own.strip()
+        elif role == "user" and text == NUDGE:
+            out.append({"role": "user", "content": "Lyra kept going on its own.", "kind": "auto"})
+            continue
         elif role == "user" and text.startswith("["):
             kind = "system"
         out.append({"role": role, "content": text, "kind": kind})
@@ -151,6 +175,23 @@ class Lyra:
         self._poller = threading.Thread(target=self._poll_completions,
                                         name="lyra-completions", daemon=True)
         self._poller.start()
+        threading.Thread(target=self._watchdog_loop, name="lyra-watchdog", daemon=True).start()
+
+    def _watchdog_loop(self) -> None:
+        while True:
+            settings = lyra_settings().get("watchdog") or {}
+            if self._stop.wait(float(settings.get("check_seconds") or 30)):
+                return
+            if settings.get("enabled") is False:
+                continue
+            with self._lock:
+                runners = list(self.runners.values())
+            for runner in runners:
+                try:
+                    runner.watchdog_tick(settings)
+                except Exception:
+                    logger.warning("lyra-lite: watchdog check failed for %s", runner.root,
+                                   exc_info=True)
 
     def shutdown(self) -> None:
         self._stop.set()
@@ -296,8 +337,26 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     @app.get("/api/projects/{pid}")
     def project(pid: str):
         runner = lyra.get(pid)
-        return {"id": pid, **runner.snapshot(),
-                "messages": display_messages(runner.store.messages())}
+        snap = runner.snapshot()
+        snap["rules_outdated"] = bool(
+            snap["has_engine"] and snap["rules_hash"] and snap["rules_hash"] != current_rules_hash()
+        )
+        return {"id": pid, **snap, "messages": display_messages(runner.store.messages())}
+
+    @app.post("/api/projects/{pid}/settings")
+    def settings(pid: str, body: dict = Body(...)):
+        runner = lyra.get(pid)
+        if "keep_going" in body:
+            runner.set_keep_going(bool(body["keep_going"]))
+        return {"ok": True, **runner.snapshot()}
+
+    @app.post("/api/projects/{pid}/apply-rules")
+    def apply_rules(pid: str):
+        try:
+            lyra.get(pid).reload_engine()
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
+        return {"ok": True}
 
     @app.get("/api/projects/{pid}/map")
     def project_map(pid: str):

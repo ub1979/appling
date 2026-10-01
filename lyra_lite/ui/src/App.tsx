@@ -214,6 +214,15 @@ function ProjectView({ id, onChange }: { id: string; onChange: () => void }) {
             <div className="muted small path"><bdi>{detail.root}</bdi></div>
           </div>
           <div className="bar-actions">
+            <label className="toggle" title="When work is left and nothing is waiting for you, Lyra continues by itself after 10 quiet minutes.">
+              <input type="checkbox" checked={detail.keep_going}
+                onChange={(e) => {
+                  const on = e.target.checked;
+                  setDetail({ ...detail, keep_going: on });
+                  void run(async () => { await api.settings(id, { keep_going: on }); await load(); });
+                }} />
+              Keep going on its own
+            </label>
             <span className={`pill ${status.tone}`}>{status.text}</span>
             {(live.turn || live.queued.length > 0 || helpers.length > 0) && (
               <button onClick={() => void run(() => api.stop(id))}>Stop</button>
@@ -231,6 +240,15 @@ function ProjectView({ id, onChange }: { id: string; onChange: () => void }) {
             </button>
           </div>
         </header>
+        {detail.rules_outdated && (
+          <div className="notice banner">
+            Lyra's rules were updated since this chat started.
+            <button className="small-btn" disabled={!!live.turn || helpers.length > 0}
+              onClick={() => void run(async () => { await api.applyRules(id); await load(); })}>
+              Use the new rules
+            </button>
+          </div>
+        )}
         <Chat messages={detail.messages} live={live} />
         {(problem || live.lastProblem) && <div className="problem banner">{problem ?? live.lastProblem}</div>}
         <Composer busy={!!live.turn} onSend={(text) => run(() => api.send(id, text))} />
@@ -311,7 +329,8 @@ function Chat({ messages, live }: { messages: ChatMessage[]; live: LiveState }) 
         <Bubble key={i} role={m.role} kind={m.kind} text={m.content} />
       ))}
       {turn && turn.kind === "user" && <Bubble role="user" kind="chat" text={turn.text} />}
-      {turn && turn.kind !== "user" && <Bubble role="user" kind="system" text={turn.text} />}
+      {turn && turn.kind === "watchdog" && <Bubble role="user" kind="auto" text="Lyra kept going on its own." />}
+      {turn && turn.kind !== "user" && turn.kind !== "watchdog" && <Bubble role="user" kind="system" text={turn.text} />}
       {turn && <Bubble role="assistant" kind="chat" text={turn.reply} streaming />}
       {live.queued.map((q) => (
         <div key={q.id} className="queued">
@@ -325,6 +344,7 @@ function Chat({ messages, live }: { messages: ChatMessage[]; live: LiveState }) 
 }
 
 function Bubble({ role, kind, text, streaming }: { role: string; kind: string; text: string; streaming?: boolean }) {
+  if (kind === "auto") return <div className="auto-note">↻ {text}</div>;
   if (kind === "system") {
     return (
       <details className="system-note">
