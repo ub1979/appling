@@ -59,7 +59,7 @@ export interface ProjectDetail {
 export interface AiSettings {
   engine: string;
   hermes: { provider: string; model: string };
-  claude: { model: string; base_url: string; has_token: boolean };
+  claude: { model: string; base_url: string; route: string; has_token: boolean };
   anthropic_key: boolean;
 }
 
@@ -150,6 +150,7 @@ export const api = {
   modelOptions: (refresh = false) => call<ModelOptions>("GET", `/api/settings/models${refresh ? "?refresh=true" : ""}`),
   modelSave: (provider: string, model: string, confirm: boolean) =>
     call<{ ok: boolean; confirm_required?: boolean; message?: string }>("POST", "/api/settings/model", { provider, model, confirm }),
+  claudeCli: () => call<{ found: boolean; logged_in: boolean; method?: string; plan?: string }>("GET", "/api/settings/claude-cli"),
   engines: () => call<{ engines: { id: string; label: string }[]; anthropic_key: boolean }>("GET", "/api/engines"),
   applyRules: (id: string) => call("POST", `/api/projects/${id}/apply-rules`),
   stop: (id: string) => call("POST", `/api/projects/${id}/stop`),

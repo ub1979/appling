@@ -37,7 +37,7 @@ def default_engine() -> str:
 
 def claude_defaults() -> dict:
     claude = _section().get("claude") or {}
-    return {k: str(v) for k, v in claude.items() if k in {"model", "base_url", "auth_token"} and v} \
+    return {k: str(v) for k, v in claude.items() if k in {"model", "base_url", "auth_token", "route"} and v} \
         if isinstance(claude, dict) else {}
 
 

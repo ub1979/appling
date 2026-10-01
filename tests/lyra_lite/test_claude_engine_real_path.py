@@ -144,11 +144,12 @@ def test_claude_engine_without_a_key_explains_what_to_do(env):
         daemon.start()
         try:
             pid, path = _new_project(daemon, env)
+            assert daemon.post("/api/settings", {"claude": {"route": "api"}}).json()["claude"]["route"] == "api"
             assert daemon.post(f"/api/projects/{pid}/settings", {"engine": "claude"}).status_code == 200
             daemon.post(f"/api/projects/{pid}/messages", {"text": "hello"})
             end = _wait_event(path, lambda e: e["type"] == "turn_end", 60)
             assert end["status"] == "error"
-            assert "ANTHROPIC_API_KEY" in end["error"] and "Ollama" in end["error"]
+            assert "ANTHROPIC_API_KEY" in end["error"] and "Your Claude plan" in end["error"]
             time.sleep(0.5)
         finally:
             daemon.stop()

@@ -24,6 +24,47 @@ from lyra_lite.engines.base import TurnHooks, TurnResult
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "claude-opus-5-5"
+OLLAMA_URL = "http://localhost:11434"
+ROUTES = ("subscription", "ollama", "api", "custom")
+
+
+def claude_route(settings: dict) -> str:
+    route = str(settings.get("route") or "")
+    if route in ROUTES:
+        return route
+    return "custom" if settings.get("base_url") else "subscription"
+
+
+def find_claude_cli() -> str | None:
+    import shutil
+
+    found = shutil.which("claude")
+    if found:
+        return found
+    for candidate in (Path.home() / ".local" / "bin" / "claude", Path("/opt/homebrew/bin/claude")):
+        if candidate.exists():
+            return str(candidate)
+    return None
+
+
+def claude_cli_status() -> dict:
+    """Is the owner's Claude program installed and signed in to a plan?"""
+    import json as _json
+    import subprocess
+
+    path = find_claude_cli()
+    if not path:
+        return {"found": False, "logged_in": False}
+    env = {k: v for k, v in os.environ.items()
+           if k not in {"ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL"}}
+    try:
+        out = subprocess.run([path, "auth", "status", "--json"], capture_output=True, text=True,
+                             timeout=20, env=env).stdout
+        data = _json.loads(out or "{}")
+    except Exception:
+        return {"found": True, "logged_in": False}
+    return {"found": True, "logged_in": bool(data.get("loggedIn")),
+            "method": data.get("authMethod"), "plan": data.get("subscriptionType")}
 APPROVAL_TIMEOUT_S = 30 * 60
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILLS_ROOT = REPO_ROOT / "plugins" / "ultimate-builder" / "skills"
@@ -142,17 +183,36 @@ class ClaudeEngine:
         return asyncio.run_coroutine_threadsafe(coro, loop).result(timeout)
 
     def _env(self) -> dict[str, str]:
+        """Environment for the Claude Code program, by route.
+
+        subscription — the owner's own `claude` program and its sign-in (their
+                       Claude plan), exactly as when they run Claude Code;
+                       API keys are blanked so billing can't switch silently.
+        ollama       — Ollama's Anthropic-compatible address on this computer.
+        api          — an Anthropic API key (pay per use).
+        custom       — another Anthropic-compatible address and token.
+        """
+        env = {"DISABLE_TELEMETRY": "1", "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1"}
+        route = claude_route(self.settings)
+        if route == "subscription":
+            if not find_claude_cli():
+                raise RuntimeError(
+                    "Claude Code isn't installed on this Mac. Install it from "
+                    "https://claude.com/claude-code, sign in once with `claude`, then try again — "
+                    "or pick Ollama or an API key in AI settings.")
+            env.update({"ANTHROPIC_API_KEY": "", "ANTHROPIC_AUTH_TOKEN": "", "ANTHROPIC_BASE_URL": ""})
+            return env
+        # Every other route uses Lyra's own Claude config folder, so the owner's
+        # personal Claude sign-in is never used by accident.
         from hermes_constants import get_hermes_home
 
         config_dir = get_hermes_home() / "lyra-lite" / "claude-config"
         config_dir.mkdir(parents=True, exist_ok=True)
-        env = {
-            "CLAUDE_CONFIG_DIR": str(config_dir),
-            "DISABLE_TELEMETRY": "1",
-            "CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC": "1",
-        }
-        base_url = str(self.settings.get("base_url") or "").strip()
-        if base_url:
+        env["CLAUDE_CONFIG_DIR"] = str(config_dir)
+        if route in {"ollama", "custom"}:
+            base_url = str(self.settings.get("base_url") or "").strip() or (OLLAMA_URL if route == "ollama" else "")
+            if not base_url:
+                raise RuntimeError("Add the model address in AI settings.")
             env["ANTHROPIC_BASE_URL"] = base_url
             env["ANTHROPIC_AUTH_TOKEN"] = str(self.settings.get("auth_token") or "ollama")
             env["ANTHROPIC_API_KEY"] = ""
@@ -160,10 +220,8 @@ class ClaudeEngine:
         key = os.environ.get("ANTHROPIC_API_KEY", "").strip()
         if not key:
             raise RuntimeError(
-                "The Claude engine needs an Anthropic API key (add ANTHROPIC_API_KEY with "
-                "`hermes setup` or to ~/.hermes/.env), or a custom model address such as "
-                "Ollama in this project's engine settings."
-            )
+                "No Anthropic API key found (ANTHROPIC_API_KEY in ~/.hermes/.env). "
+                "To use your Claude plan instead, choose 'Your Claude plan' in AI settings.")
         env["ANTHROPIC_API_KEY"] = key
         return env
 
@@ -174,7 +232,9 @@ class ClaudeEngine:
         resume = state.get("claude_session") if state.get("claude_chat") == state.get("chat_id") else None
         options = ClaudeAgentOptions(
             cwd=self.workspace,
-            model=str(self.settings.get("model") or DEFAULT_MODEL),
+            # On the owner's plan, no model means the Claude program's own default.
+            model=str(self.settings.get("model") or "") or (
+                None if claude_route(self.settings) == "subscription" else DEFAULT_MODEL),
             permission_mode="acceptEdits",
             system_prompt={"type": "preset", "preset": "claude_code",
                            "append": self.system_prompt + engine_notes()},
@@ -185,6 +245,7 @@ class ClaudeEngine:
             hooks={"PreToolUse": [HookMatcher(matcher="Agent|Task", hooks=[_foreground_agents])]},
             resume=resume or None,
             env=self._env(),
+            cli_path=find_claude_cli() if claude_route(self.settings) == "subscription" else None,
         )
         client = ClaudeSDKClient(options)
         await client.connect()
@@ -358,7 +419,9 @@ class ClaudeEngine:
                     "output": int(raw.get("output_tokens") or 0),
                     "duration_ms": msg.duration_ms,
                 }
-                if msg.total_cost_usd is not None:
+                # On the owner's plan this figure is only what the API would have
+                # charged, not a bill — don't show it as a cost.
+                if msg.total_cost_usd is not None and claude_route(self.settings) != "subscription":
                     usage["cost_usd"] = msg.total_cost_usd
                 interrupted = self._interrupted
                 if msg.is_error and not interrupted:

@@ -12,7 +12,7 @@ const ENGINE_CARDS = [
   {
     id: "claude",
     name: "Claude Code",
-    text: "Anthropic's agent runs the work itself. Needs an Anthropic API key (pay per use) or an Ollama address — not a subscription.",
+    text: "Anthropic's agent runs the work itself — on your Claude plan, through Ollama, or with an API key.",
   },
 ];
 
@@ -128,7 +128,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
           ) : (
             <ClaudeModel
               settings={settings}
-              suggestions={options?.providers.find((p) => p.slug === "anthropic")?.models ?? []}
+              options={options}
               onSave={(claude) => run(async () => setSettings(await api.settingsSave({ claude })), "Claude Code settings saved.")}
             />
           )}
@@ -235,51 +235,91 @@ function HermesModel({
   );
 }
 
+const CLAUDE_ROUTES = [
+  { id: "subscription", name: "Your Claude plan", text: "Uses the Claude program on this Mac with your own sign-in — like using Claude Code yourself.", slug: "claude-cli" },
+  { id: "ollama", name: "Ollama", text: "Models running through Ollama on this computer. Free.", slug: "ollama-local" },
+  { id: "api", name: "Anthropic API key", text: "Pay per use with an API key.", slug: "anthropic" },
+];
+
 function ClaudeModel({
   settings,
-  suggestions,
+  options,
   onSave,
 }: {
   settings: AiSettings;
-  suggestions: string[];
+  options: ModelOptions | null;
   onSave: (claude: Record<string, string>) => Promise<void>;
 }) {
+  const [route, setRoute] = useState(settings.claude.route === "custom" ? "ollama" : settings.claude.route || "subscription");
   const [model, setModel] = useState(settings.claude.model);
-  const [baseUrl, setBaseUrl] = useState(settings.claude.base_url);
-  const [token, setToken] = useState("");
+  const [baseUrl, setBaseUrl] = useState(settings.claude.base_url || "http://localhost:11434");
+  const [cli, setCli] = useState<{ found: boolean; logged_in: boolean; plan?: string } | null>(null);
+  useEffect(() => {
+    void api.claudeCli().then(setCli).catch(() => setCli(null));
+  }, []);
+  const routeInfo = CLAUDE_ROUTES.find((r) => r.id === route) ?? CLAUDE_ROUTES[0];
+  const models = options?.providers.find((p) => p.slug === routeInfo.slug)?.models ?? [];
+
+  const pick = (id: string) => {
+    setRoute(id);
+    setModel("");
+  };
+
   return (
     <section className="card card-pad">
-      <h2 style={{ fontSize: 20 }}>Claude Code model</h2>
-      <p className="small muted" style={{ margin: "6px 0 0" }}>
-        Want to use your <b>Claude subscription</b> or <b>Codex</b> instead? Choose <b>Hermes</b> above, then pick
-        <b> Claude Code CLI</b> or <b>OpenAI Codex</b> as the model. This engine can only use an Anthropic API key or
-        an Anthropic-compatible address such as Ollama.
-      </p>
-      <div className="stack" style={{ marginTop: 14 }}>
-        <label>
-          <span className="field-label">Model</span>
-          <input className="input" list="claude-models" value={model} placeholder="claude-opus-5-5 (or an Ollama model, e.g. qwen3-coder)" onChange={(e) => setModel(e.target.value)} />
-          <datalist id="claude-models">{suggestions.map((m) => <option key={m} value={m} />)}</datalist>
-        </label>
-        <label>
-          <span className="field-label">Model address — leave empty to use your Anthropic API key</span>
-          <input className="input" value={baseUrl} placeholder="e.g. http://localhost:11434 for Ollama" onChange={(e) => setBaseUrl(e.target.value)} />
-        </label>
-        {baseUrl && (
-          <label>
-            <span className="field-label">Access token for that address {settings.claude.has_token ? "(saved — leave empty to keep it)" : "(Ollama: leave empty)"}</span>
-            <input className="input" type="password" value={token} onChange={(e) => setToken(e.target.value)} />
-          </label>
-        )}
-        {!baseUrl && (
-          <p className={`small ${settings.anthropic_key ? "muted" : "problem"}`} style={{ margin: 0 }}>
-            {settings.anthropic_key
-              ? "✓ Anthropic API key found. Claude Code is billed per use by Anthropic."
-              : "No Anthropic API key found. Add ANTHROPIC_API_KEY to ~/.hermes/.env (or run `hermes setup`) and restart Lyra — or use a model address such as Ollama."}
+      <h2 style={{ fontSize: 20 }}>Claude Code: where the model runs</h2>
+      <div className="profile-grid" style={{ marginTop: 14 }}>
+        {CLAUDE_ROUTES.map((r) => (
+          <button key={r.id} type="button" className={`profile-card ${route === r.id ? "on" : ""}`} onClick={() => pick(r.id)}>
+            <span className="radio" />
+            <b>{r.name}</b>
+            <span>{r.text}</span>
+          </button>
+        ))}
+      </div>
+
+      <div className="stack" style={{ marginTop: 16 }}>
+        {route === "subscription" && (
+          <p className={`small ${cli?.logged_in ? "muted" : "problem"}`} style={{ margin: 0 }}>
+            {cli === null
+              ? "Checking the Claude program…"
+              : cli.logged_in
+                ? `✓ Signed in to Claude${cli.plan ? ` (${cli.plan} plan)` : ""}. Work counts toward your plan's usage limits.`
+                : cli.found
+                  ? "The Claude program is installed but not signed in. Open Terminal, run `claude`, sign in once, then come back."
+                  : "The Claude program isn't installed. Install Claude Code from claude.com/claude-code and sign in once."}
           </p>
         )}
+        {route === "ollama" && (
+          <label>
+            <span className="field-label">Ollama address</span>
+            <input className="input" value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} />
+          </label>
+        )}
+        {route === "api" && (
+          <p className={`small ${settings.anthropic_key ? "muted" : "problem"}`} style={{ margin: 0 }}>
+            {settings.anthropic_key
+              ? "✓ Anthropic API key found. Billed per use by Anthropic."
+              : "No Anthropic API key found. Add ANTHROPIC_API_KEY to ~/.hermes/.env and restart Lyra."}
+          </p>
+        )}
+        <label>
+          <span className="field-label">Model</span>
+          <select className="input" value={model} onChange={(e) => setModel(e.target.value)}>
+            <option value="">{route === "subscription" ? "Claude's default for your plan" : "Choose a model…"}</option>
+            {model && !models.includes(model) && <option value={model}>{model}</option>}
+            {models.map((m) => <option key={m} value={m}>{m}</option>)}
+          </select>
+        </label>
+        {route === "ollama" && models.length === 0 && (
+          <p className="small muted" style={{ margin: 0 }}>No Ollama models found. Open the Ollama app, then use ↻ Refresh in the Hermes model list.</p>
+        )}
         <div>
-          <button className="btn primary" onClick={() => void onSave({ model, base_url: baseUrl, ...(token ? { auth_token: token } : {}) })}>
+          <button
+            className="btn primary"
+            disabled={route !== "subscription" && !model}
+            onClick={() => void onSave({ route, model, base_url: route === "ollama" ? baseUrl : "" })}
+          >
             Save
           </button>
         </div>

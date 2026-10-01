@@ -435,7 +435,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             try:
                 runner.set_engine(engine, claude={
                     k: str(v).strip() for k, v in (claude or {}).items()
-                    if k in {"model", "base_url", "auth_token"}
+                    if k in {"model", "base_url", "auth_token", "route"}
                 } if claude is not None else None)
             except RuntimeError as exc:
                 raise HTTPException(status_code=409, detail=str(exc))
@@ -446,12 +446,14 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     def _settings_view() -> dict:
         from lyra_lite import settings as st
 
+        from lyra_lite.engines.claude import claude_route
+
         claude = st.claude_defaults()
         return {
             "engine": st.default_engine(),
             "hermes": st.hermes_model(),
             "claude": {"model": claude.get("model", ""), "base_url": claude.get("base_url", ""),
-                       "has_token": bool(claude.get("auth_token"))},
+                       "route": claude_route(claude), "has_token": bool(claude.get("auth_token"))},
             "anthropic_key": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()),
         }
 
@@ -482,7 +484,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             changes["engine"] = body["engine"]
         if isinstance(body.get("claude"), dict):
             current = st.claude_defaults()
-            for key in ("model", "base_url", "auth_token"):
+            for key in ("model", "base_url", "auth_token", "route"):
                 if key in body["claude"]:
                     value = str(body["claude"][key] or "").strip()
                     if key == "auth_token" and not value:
@@ -493,6 +495,12 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             st.save_section(changes)
             _apply_everywhere()
         return _settings_view()
+
+    @app.get("/api/settings/claude-cli")
+    async def claude_cli():
+        from lyra_lite.engines.claude import claude_cli_status
+
+        return await asyncio.to_thread(claude_cli_status)
 
     @app.post("/api/settings/model")
     async def save_model(body: dict = Body(...)):
