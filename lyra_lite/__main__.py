@@ -67,7 +67,9 @@ def main() -> None:
     token = args.token or _stable_token()
     app = create_app(token=token)
     url = f"http://{args.host}:{args.port}/"
-    print(f"Lyra Lite is running at {url}", flush=True)
+    from lyra_lite import VERSION_LABEL
+
+    print(f"Lyra Lite {VERSION_LABEL} is running at {url}", flush=True)
     if not args.no_open:
         webbrowser.open(url)
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")

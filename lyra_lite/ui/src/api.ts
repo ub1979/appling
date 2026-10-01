@@ -134,7 +134,7 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
 }
 
 export const api = {
-  projects: () => call<{ projects: ProjectSummary[]; default_root: string }>("GET", "/api/projects"),
+  projects: () => call<{ projects: ProjectSummary[]; default_root: string; version?: string }>("GET", "/api/projects"),
   catalog: () => call<Catalog>("GET", "/api/catalog"),
   addProject: (body: NewProject) => call<ProjectDetail>("POST", "/api/projects", body),
   project: (id: string) => call<ProjectDetail>("GET", `/api/projects/${id}`),

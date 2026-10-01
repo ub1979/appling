@@ -9,6 +9,29 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Lyra Lite v0.01 beta — 2026-10-01
+
+A new, lighter Lyra (`./lyra.sh`, <http://127.0.0.1:9200/>) beside the Studio.
+Same projects, linked models and builder playbooks; new plumbing.
+
+- **Files are the truth.** Each project keeps `.lyra/` (activity log,
+  conversation, append-only transcript, inbox, state). Refresh, sleep or a
+  restart lose nothing; long chats are never cut by summarising.
+- **No hidden terminal.** The engine runs directly; the screen follows a live
+  feed. Studio look: start page, project set-up with your own team and a
+  build size (Personal / Reusable / Production), project studio with team,
+  map, token use and activity, round icon buttons.
+- **Engines:** Hermes (any linked subscription — Codex, Claude Code CLI,
+  Ollama, Copilot …) or Claude Code (Anthropic API key or Ollama), chosen in
+  the AI settings, per project if wanted.
+- **Lighter Lyra:** she coordinates without a shell; agents build, test and
+  commit; parallel tasks; short handoffs and a Project Brain; plans and QA
+  sized to the project.
+- **Never stuck or silent:** keep-going watchdog, Stop that really stops,
+  approvals for agents' risky commands, ready banner, Open app, notifications.
+- **Fixed in Hermes:** a helper's flagged command no longer gets parked
+  unseen — the approval now reaches the owner (single and parallel helpers).
+
 ## [0.19.8-a] - 2026-09-30 — Background helper reliability
 
 ### Fixed

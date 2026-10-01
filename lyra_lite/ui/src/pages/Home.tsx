@@ -17,11 +17,13 @@ export function Home() {
   const [projects, setProjects] = useState<ProjectSummary[] | null>(null);
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
+  const [version, setVersion] = useState("");
 
   useEffect(() => {
     const load = () =>
       api.projects().then((d) => {
         setProjects(d.projects);
+        setVersion(d.version ?? "");
         setProblem(null);
       }).catch((e) => setProblem(e instanceof Error ? e.message : String(e)));
     void load();
@@ -36,7 +38,7 @@ export function Home() {
         <Brand sub="Your software workspace" />
         <div className="top-actions">
           {problem ? <span className="pill need">Can't reach Lyra</span> : <span className="status-dot">Ready</span>}
-          <span className="version">Lyra Lite</span>
+          <span className="version">Lyra Lite {version}</span>
           <PrefButtons onAi={() => go("/settings")} />
         </div>
       </header>

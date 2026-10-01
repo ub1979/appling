@@ -372,7 +372,9 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
 
     @app.get("/api/projects")
     def list_projects():
-        return {"projects": lyra.list(), "default_root": str(projects_root())}
+        from lyra_lite import VERSION_LABEL
+
+        return {"projects": lyra.list(), "default_root": str(projects_root()), "version": VERSION_LABEL}
 
     @app.post("/api/projects")
     def add_project(body: dict = Body(...)):
