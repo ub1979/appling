@@ -7,14 +7,22 @@ const ENGINE_CARDS = [
   {
     id: "hermes",
     name: "Hermes",
-    text: "Lyra's own engine. Works with any model you've linked — Codex, Ollama, Copilot, Claude and more.",
+    text: "Lyra's own engine. Works with any model you've linked — your Codex or Claude subscription, Ollama, Copilot and more.",
   },
   {
     id: "claude",
     name: "Claude Code",
-    text: "Anthropic's coding agent. Needs an Anthropic API key, or a model address such as Ollama.",
+    text: "Anthropic's agent runs the work itself. Needs an Anthropic API key (pay per use) or an Ollama address — not a subscription.",
   },
 ];
+
+// Plain-language billing hints for the providers people mix up.
+const PROVIDER_HINTS: Record<string, string> = {
+  "claude-cli": "your Claude subscription",
+  "openai-codex": "your ChatGPT/Codex subscription",
+  anthropic: "Anthropic API key, pay per use",
+  "ollama-local": "models on this computer",
+};
 
 export function Settings({ projectId }: { projectId: string | null }) {
   const [settings, setSettings] = useState<AiSettings | null>(null);
@@ -208,7 +216,7 @@ function HermesModel({
               setModel(providers.find((p) => p.slug === e.target.value)?.models[0] ?? "");
             }}>
               {!providers.some((p) => p.slug === provider) && <option value={provider}>{provider || "Choose…"}</option>}
-              {providers.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}
+              {providers.map((p) => <option key={p.slug} value={p.slug}>{PROVIDER_HINTS[p.slug] ? `${p.name} — ${PROVIDER_HINTS[p.slug]}` : p.name}</option>)}
             </select>
           </label>
           <label>
@@ -242,6 +250,11 @@ function ClaudeModel({
   return (
     <section className="card card-pad">
       <h2 style={{ fontSize: 20 }}>Claude Code model</h2>
+      <p className="small muted" style={{ margin: "6px 0 0" }}>
+        Want to use your <b>Claude subscription</b> or <b>Codex</b> instead? Choose <b>Hermes</b> above, then pick
+        <b> Claude Code CLI</b> or <b>OpenAI Codex</b> as the model. This engine can only use an Anthropic API key or
+        an Anthropic-compatible address such as Ollama.
+      </p>
       <div className="stack" style={{ marginTop: 14 }}>
         <label>
           <span className="field-label">Model</span>
