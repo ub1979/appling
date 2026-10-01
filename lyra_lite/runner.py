@@ -1,0 +1,284 @@
+"""One worker per project: runs queued turns in order and records them to files.
+
+Messages, helper completions and (later) watchdog nudges all arrive the same
+way — appended to the persisted queue in ``state.json`` — so anything can
+drive Lyra without touching a live connection.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import importlib.util
+import logging
+import threading
+import time
+import uuid
+from pathlib import Path
+from typing import Any, Callable
+
+from lyra_lite.engines.base import Engine, TurnResult
+from lyra_lite.store import ProjectStore
+
+logger = logging.getLogger(__name__)
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+RESTART_NOTE = (
+    "(Lyra was restarted before finishing this reply. Work done so far is in "
+    "the project files: check git status and .sdlc/progress.md before continuing.)"
+)
+
+EngineFactory = Callable[[ProjectStore, str], Engine]
+
+
+def project_key(root: Path) -> str:
+    return hashlib.sha1(str(root).encode("utf-8")).hexdigest()[:10]
+
+
+def _load_checkpoint():
+    path = REPO_ROOT / "plugins" / "ultimate-builder" / "project_checkpoint.py"
+    try:
+        spec = importlib.util.spec_from_file_location("lyra_lite_project_checkpoint", path)
+        module = importlib.util.module_from_spec(spec)
+        assert spec.loader is not None
+        spec.loader.exec_module(module)
+        return module.checkpoint_project
+    except Exception:
+        logger.warning("lyra-lite: checkpoint module unavailable", exc_info=True)
+        return None
+
+
+_checkpoint_project = None
+
+
+def checkpoint(workspace: Path, **kwargs) -> str | None:
+    global _checkpoint_project
+    if _checkpoint_project is None:
+        _checkpoint_project = _load_checkpoint() or (lambda *_a, **_k: None)
+    try:
+        return _checkpoint_project(str(workspace), **kwargs)
+    except Exception:
+        logger.warning("lyra-lite: checkpoint failed", exc_info=True)
+        return None
+
+
+class _Hooks:
+    def __init__(self, runner: "ProjectRunner", turn_id: str):
+        self.runner = runner
+        self.turn_id = turn_id
+
+    def emit(self, type_: str, **data: Any) -> None:
+        self.runner.store.append_event(type_, turn=self.turn_id, **data)
+
+    def ask(self, kind: str, on_answer: Callable[[Any], None], **fields: Any) -> str:
+        return self.runner._open_inbox(kind, on_answer, turn=self.turn_id, **fields)
+
+    def expire(self, item_id: str) -> None:
+        self.runner._close_inbox(item_id, "expired")
+
+
+class ProjectRunner:
+    def __init__(self, store: ProjectStore, engine_factory: EngineFactory):
+        self.store = store.init()
+        self.key_prefix = f"lyra-{project_key(store.root)}"
+        self._engine_factory = engine_factory
+        self._engine: Engine | None = None
+        self._engine_chat: str | None = None
+        self._waiters: dict[str, Callable[[Any], None]] = {}
+        self._cond = threading.Condition()
+        self._stop = False
+        self._busy = False
+        self._recover()
+        self._thread = threading.Thread(
+            target=self._loop, name=f"lyra-runner-{store.root.name}", daemon=True
+        )
+        self._thread.start()
+
+    # -- identity --------------------------------------------------------
+
+    @property
+    def root(self) -> Path:
+        return self.store.root
+
+    def session_key(self) -> str:
+        return f"{self.key_prefix}-{self.store.state().get('chat_id')}"
+
+    def owns_session_key(self, key: str) -> bool:
+        return bool(key) and key.startswith(self.key_prefix + "-")
+
+    # -- public API ------------------------------------------------------
+
+    def submit(self, text: str, kind: str = "user") -> dict:
+        text = (text or "").strip()
+        if not text:
+            raise ValueError("empty message")
+        item = {"id": uuid.uuid4().hex[:10], "text": text, "kind": kind,
+                "queued": round(time.time(), 3)}
+        with self._cond:
+            queue = list(self.store.state().get("queue") or [])
+            queue.append(item)
+            self.store.update_state(queue=queue)
+            self.store.append_event("queued", item=item)
+            self._cond.notify_all()
+        return item
+
+    def answer(self, item_id: str, value: Any) -> bool:
+        with self._cond:
+            waiter = self._waiters.pop(item_id, None)
+        if waiter is None:
+            self._close_inbox(item_id, "expired")
+            return False
+        shown = "(hidden)" if (self.store.inbox_item(item_id) or {}).get("kind") == "secret" else value
+        self.store.close_inbox(item_id, "answered", answer=value)
+        self.store.append_event("inbox_closed", id=item_id, status="answered", answer=shown)
+        try:
+            waiter(value)
+        except Exception:
+            logger.warning("lyra-lite: inbox answer handler failed", exc_info=True)
+        return True
+
+    def stop_turn(self, clear_queue: bool = True) -> None:
+        with self._cond:
+            if clear_queue:
+                self.store.update_state(queue=[])
+            engine = self._engine
+        if engine is not None:
+            engine.interrupt()
+        self.store.append_event("stop_requested", cleared_queue=clear_queue)
+
+    def new_chat(self) -> str:
+        with self._cond:
+            if self._busy:
+                raise RuntimeError("Lyra is busy; stop the current turn first")
+            self._drop_engine()
+            chat_id = self.store.archive_chat()
+        self.store.append_event("chat_started", chat_id=chat_id)
+        return chat_id
+
+    def snapshot(self) -> dict:
+        state = self.store.state()
+        return {
+            "root": str(self.root),
+            "name": self.root.name,
+            "running": bool(state.get("running")),
+            "queue": state.get("queue") or [],
+            "turn": state.get("turn"),
+            "turn_start_offset": int(state.get("turn_start_offset") or 0),
+            "chat_id": state.get("chat_id"),
+            "engine": state.get("engine") or "hermes",
+            "inbox": self.store.inbox(status="open"),
+            "events_size": self.store.events_size(),
+        }
+
+    def shutdown(self) -> None:
+        with self._cond:
+            self._stop = True
+            self._cond.notify_all()
+        self._drop_engine()
+
+    # -- inbox internals -------------------------------------------------
+
+    def _open_inbox(self, kind: str, on_answer: Callable[[Any], None], **fields: Any) -> str:
+        item = self.store.add_inbox(kind, **fields)
+        with self._cond:
+            self._waiters[item["id"]] = on_answer
+        public = {k: v for k, v in item.items() if k != "answer"}
+        self.store.append_event("inbox", item=public)
+        return item["id"]
+
+    def _close_inbox(self, item_id: str, status: str) -> None:
+        with self._cond:
+            self._waiters.pop(item_id, None)
+        item = self.store.inbox_item(item_id)
+        if item and item.get("status") == "open":
+            self.store.close_inbox(item_id, status)
+            self.store.append_event("inbox_closed", id=item_id, status=status)
+
+    def _expire_turn_inbox(self, turn_id: str | None) -> None:
+        for item in self.store.inbox(status="open"):
+            if turn_id is None or item.get("turn") == turn_id:
+                self._close_inbox(item["id"], "expired")
+
+    # -- recovery --------------------------------------------------------
+
+    def _recover(self) -> None:
+        """Make the files consistent after a crash or restart."""
+        state = self.store.state()
+        self._expire_turn_inbox(None)
+        turn = state.get("turn")
+        if state.get("running") and isinstance(turn, dict):
+            messages = self.store.messages()
+            user_text = str(turn.get("text") or "")
+            if messages and messages[-1].get("role") == "user":
+                messages[-1] = {**messages[-1], "content": f"{messages[-1].get('content')}\n\n{user_text}"}
+            else:
+                messages.append({"role": "user", "content": user_text})
+            messages.append({"role": "assistant", "content": RESTART_NOTE})
+            self.store.save_messages(messages)
+            self.store.append_event("turn_end", turn=turn.get("id"), status="lost_on_restart",
+                                    reply=RESTART_NOTE)
+            checkpoint(self.root, role="lyra", status="interrupted",
+                       exit_reason="restart", goal=user_text[:200])
+        self.store.update_state(running=False, turn=None)
+
+    # -- worker ----------------------------------------------------------
+
+    def _drop_engine(self) -> None:
+        engine, self._engine = self._engine, None
+        self._engine_chat = None
+        if engine is not None:
+            try:
+                engine.close()
+            except Exception:
+                pass
+
+    def _engine_for_chat(self) -> Engine:
+        chat_id = str(self.store.state().get("chat_id") or "")
+        if self._engine is None or self._engine_chat != chat_id:
+            self._drop_engine()
+            self._engine = self._engine_factory(self.store, self.session_key())
+            self._engine_chat = chat_id
+        return self._engine
+
+    def _loop(self) -> None:
+        while True:
+            with self._cond:
+                while not self._stop and not (self.store.state().get("queue") or []):
+                    self._cond.wait(timeout=5)
+                if self._stop:
+                    return
+                queue = list(self.store.state().get("queue") or [])
+                item = queue.pop(0)
+                turn = {"id": item["id"], "text": item["text"], "kind": item.get("kind", "user"),
+                        "started": round(time.time(), 3)}
+                offset = self.store.events_size()
+                self.store.update_state(queue=queue, running=True, turn=turn,
+                                        turn_start_offset=offset)
+                self._busy = True
+            try:
+                self._run_turn(turn)
+            except Exception:
+                logger.exception("lyra-lite: turn crashed")
+                self.store.append_event("turn_end", turn=turn["id"], status="crashed")
+            finally:
+                with self._cond:
+                    self._busy = False
+                    self.store.update_state(running=False, turn=None)
+
+    def _run_turn(self, turn: dict) -> None:
+        turn_id = turn["id"]
+        self.store.append_event("turn_start", turn=turn_id, kind=turn["kind"], text=turn["text"])
+        hooks = _Hooks(self, turn_id)
+        engine = self._engine_for_chat()
+        history = self.store.messages()
+        result: TurnResult = engine.run_turn(turn["text"], history, hooks)
+        if result.messages and len(result.messages) >= len(history):
+            self.store.save_messages(result.messages)
+        self._expire_turn_inbox(turn_id)
+        status = "error" if result.error else "interrupted" if result.interrupted else (
+            "done" if result.completed else "incomplete")
+        sha = checkpoint(self.root, role="lyra", status=status,
+                         exit_reason=status, goal=turn["text"][:200])
+        self.store.append_event(
+            "turn_end", turn=turn_id, status=status, reply=result.reply,
+            error=result.error, usage=result.usage, checkpoint=sha,
+        )
