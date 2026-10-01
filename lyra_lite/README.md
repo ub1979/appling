@@ -26,8 +26,20 @@ A small, file-first shell around Lyra's agent engines. Start it with
   chats offer "Use the new rules".
 - **The project map** is read straight from `.sdlc/progress.md` (the phase
   ledger the builder skills keep), so it can't disagree with the files.
-- **Engines plug in** through `lyra_lite/engines/base.py`. `HermesEngine` uses
-  the same provider set-up as the Studio, so every linked subscription works.
+- **Engines plug in** through `lyra_lite/engines/base.py`. Pick one per project
+  with the ⚙ button:
+  - `HermesEngine` uses the same provider set-up as the Studio, so every linked
+    subscription works.
+  - `ClaudeEngine` runs the Claude Agent SDK (Claude Code). It needs
+    `pip install '.[lyra-claude]'`, plus an `ANTHROPIC_API_KEY` or an
+    Anthropic-compatible address such as Ollama.
+    - It has its own config folder, so it never uses a claude.ai login.
+    - Hermes' danger check guards its shell commands.
+    - It runs agents in the foreground.
+    - Its cron, scheduling and worktree tools are switched off.
+  - Switching engines keeps the chat.
+- **Compare runs** with `python -m lyra_lite.report <project> [<project>…]`.
+  See `HOW-TO-TEST.md`.
 - **Every turn is saved** to the project's Git with the same checkpoint the
   helpers use. Risky commands always wait in the inbox and are never
   auto-approved.

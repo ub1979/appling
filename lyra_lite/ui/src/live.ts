@@ -160,20 +160,15 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
         status === "error" || status === "crashed"
           ? str(evt.error) || "Lyra hit a problem and stopped this reply."
           : null;
-      return {
-        ...state,
-        turn: null,
-        turnsEnded: state.turnsEnded + 1,
-        lastProblem: problem,
-        activity: evt.checkpoint
-          ? addActivity(state, {
-              key: `ckpt-${evt.ts}`,
-              ts: evt.ts,
-              text: "Saved the work to the project history",
-              tone: "done",
-            })
-          : state.activity,
-      };
+      let next = state;
+      const cost = (evt.usage as { cost_usd?: number } | undefined)?.cost_usd;
+      if (typeof cost === "number" && cost >= 0.005) {
+        next = { ...next, activity: addActivity(next, { key: `cost-${evt.ts}`, ts: evt.ts, text: `This step cost $${cost.toFixed(2)}`, tone: "work" }) };
+      }
+      if (evt.checkpoint) {
+        next = { ...next, activity: addActivity(next, { key: `ckpt-${evt.ts}`, ts: evt.ts, text: "Saved the work to the project history", tone: "done" }) };
+      }
+      return { ...next, turn: null, turnsEnded: state.turnsEnded + 1, lastProblem: problem };
     }
     default:
       return state;

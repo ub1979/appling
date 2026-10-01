@@ -81,13 +81,16 @@ def default_engine_factory(store: ProjectStore, session_key: str):
     text = rules_text()
     store.update_state(rules_hash=current_rules_hash())
     prompt = f"{text}\n\nProject folder: {store.root}\n"
-    return make_engine(
-        store.state().get("engine") or "hermes",
-        workspace=str(store.root),
-        session_key=session_key,
-        system_prompt=prompt,
-        skills=DEFAULT_SKILLS,
-    )
+    state = store.state()
+    name = state.get("engine") or "hermes"
+    kwargs: dict[str, Any] = {"workspace": str(store.root), "session_key": session_key,
+                              "system_prompt": prompt}
+    if name == "hermes":
+        kwargs["skills"] = DEFAULT_SKILLS
+    else:
+        kwargs["store"] = store
+        kwargs["settings"] = state.get(name) or {}
+    return make_engine(name, **kwargs)
 
 
 def placement(path: Path, *, creating: bool) -> str | None:
@@ -348,7 +351,30 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         runner = lyra.get(pid)
         if "keep_going" in body:
             runner.set_keep_going(bool(body["keep_going"]))
+        if "engine" in body or "claude" in body:
+            from lyra_lite.engines import ENGINES
+
+            engine = str(body.get("engine") or runner.store.state().get("engine") or "hermes")
+            if engine not in ENGINES:
+                raise HTTPException(status_code=400, detail="Unknown engine")
+            claude = body.get("claude")
+            if claude is not None and not isinstance(claude, dict):
+                raise HTTPException(status_code=400, detail="Bad Claude settings")
+            try:
+                runner.set_engine(engine, claude={
+                    k: str(v).strip() for k, v in (claude or {}).items()
+                    if k in {"model", "base_url", "auth_token"}
+                } if claude is not None else None)
+            except RuntimeError as exc:
+                raise HTTPException(status_code=409, detail=str(exc))
         return {"ok": True, **runner.snapshot()}
+
+    @app.get("/api/engines")
+    def engines():
+        from lyra_lite.engines import ENGINES
+
+        return {"engines": [{"id": k, "label": v} for k, v in ENGINES.items()],
+                "anthropic_key": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())}
 
     @app.post("/api/projects/{pid}/apply-rules")
     def apply_rules(pid: str):

@@ -210,6 +210,7 @@ class ProjectRunner:
             "turn_start_offset": int(state.get("turn_start_offset") or 0),
             "chat_id": state.get("chat_id"),
             "engine": state.get("engine") or "hermes",
+            "claude": {k: v for k, v in (state.get("claude") or {}).items() if k != "auth_token"},
             "inbox": self.store.inbox(status="open"),
             "helpers": self.helpers(),
             "events_size": self.store.events_size(),
@@ -234,6 +235,20 @@ class ProjectRunner:
     def set_keep_going(self, on: bool) -> None:
         self.store.update_state(keep_going=bool(on))
         self.store.append_event("setting", name="keep_going", value=bool(on))
+
+    def set_engine(self, name: str, claude: dict | None = None) -> None:
+        """Switch engine (or its model settings) between turns."""
+        with self._cond:
+            if self._busy or self.helpers():
+                raise RuntimeError("Lyra is busy; switch engines when it's idle")
+            changes: dict[str, Any] = {"engine": name}
+            if claude is not None:
+                # A blank token field means "keep the saved one".
+                merged = {**(self.store.state().get("claude") or {}), **claude}
+                changes["claude"] = {k: v for k, v in merged.items() if v != "" or k != "auth_token"}
+            self.store.update_state(**changes)
+            self._drop_engine()
+        self.store.append_event("setting", name="engine", value=name)
 
     def reload_engine(self) -> None:
         """Rebuild the engine (new rules) at the next turn; refuses while busy."""

@@ -29,6 +29,8 @@ export interface ProjectDetail {
   running: boolean;
   paused: boolean;
   keep_going: boolean;
+  engine: string;
+  claude: { model?: string; base_url?: string };
   rules_outdated: boolean;
   watchdog: { gave_up?: boolean; count?: number };
   queue: { id: string; text: string; kind: string }[];
@@ -78,6 +80,7 @@ export const api = {
   send: (id: string, text: string) => call("POST", `/api/projects/${id}/messages`, { text }),
   answer: (id: string, item: string, answer: string) => call("POST", `/api/projects/${id}/inbox/${item}`, { answer }),
   settings: (id: string, body: Record<string, unknown>) => call("POST", `/api/projects/${id}/settings`, body),
+  engines: () => call<{ engines: { id: string; label: string }[]; anthropic_key: boolean }>("GET", "/api/engines"),
   applyRules: (id: string) => call("POST", `/api/projects/${id}/apply-rules`),
   stop: (id: string) => call("POST", `/api/projects/${id}/stop`),
   newChat: (id: string) => call("POST", `/api/projects/${id}/new-chat`),

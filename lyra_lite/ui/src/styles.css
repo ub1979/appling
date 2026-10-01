@@ -170,3 +170,7 @@ pre { background: var(--code); padding: 8px 10px; border-radius: 8px; overflow-x
 .notice { color: var(--need); background: var(--need-bg); display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .toggle { display: inline-flex; gap: 6px; align-items: center; font-size: 13px; color: var(--muted); cursor: pointer; white-space: nowrap; }
 .toggle input { width: auto; }
+
+.radio { display: flex; gap: 8px; align-items: flex-start; cursor: pointer; }
+.radio input { width: auto; margin-top: 4px; }
+.settings-box { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 10px; }

@@ -169,6 +169,7 @@ function ProjectView({ id, onChange }: { id: string; onChange: () => void }) {
   }, [live.helperChanges, load]);
 
   const [map, setMap] = useState<ProjectMap | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
   useEffect(() => {
     let alive = true;
     const fetchMap = () => void api.map(id).then((m) => alive && setMap(m)).catch(() => undefined);
@@ -227,6 +228,9 @@ function ProjectView({ id, onChange }: { id: string; onChange: () => void }) {
             {(live.turn || live.queued.length > 0 || helpers.length > 0) && (
               <button onClick={() => void run(() => api.stop(id))}>Stop</button>
             )}
+            <button className="ghost" onClick={() => setShowSettings(true)} title="Engine and model">
+              {detail.engine === "claude" ? "Claude Code" : "Hermes"} ⚙
+            </button>
             <button
               className="ghost"
               disabled={!!live.turn || helpers.length > 0}
@@ -253,6 +257,18 @@ function ProjectView({ id, onChange }: { id: string; onChange: () => void }) {
         {(problem || live.lastProblem) && <div className="problem banner">{problem ?? live.lastProblem}</div>}
         <Composer busy={!!live.turn} onSend={(text) => run(() => api.send(id, text))} />
       </section>
+      {showSettings && (
+        <SettingsDialog
+          detail={detail}
+          busy={!!live.turn || helpers.length > 0}
+          onClose={() => setShowSettings(false)}
+          onSave={async (body) => {
+            await api.settings(id, body);
+            await load();
+            setShowSettings(false);
+          }}
+        />
+      )}
       <aside className="side-col">
         <Inbox items={live.inbox} onAnswer={(item, answer) => run(() => api.answer(id, item, answer))} />
         {helpers.length > 0 && (
@@ -481,6 +497,89 @@ function Activity({ live }: { live: LiveState }) {
         </li>
       ))}
     </ul>
+  );
+}
+
+function SettingsDialog({
+  detail,
+  busy,
+  onClose,
+  onSave,
+}: {
+  detail: ProjectDetail;
+  busy: boolean;
+  onClose: () => void;
+  onSave: (body: Record<string, unknown>) => Promise<void>;
+}) {
+  const [engine, setEngine] = useState(detail.engine || "hermes");
+  const [model, setModel] = useState(detail.claude?.model ?? "");
+  const [baseUrl, setBaseUrl] = useState(detail.claude?.base_url ?? "");
+  const [token, setToken] = useState("");
+  const [hasKey, setHasKey] = useState<boolean | null>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  useEffect(() => {
+    void api.engines().then((e) => setHasKey(e.anthropic_key)).catch(() => setHasKey(null));
+  }, []);
+
+  const save = async () => {
+    try {
+      const body: Record<string, unknown> = { engine };
+      if (engine === "claude") {
+        body.claude = { model, base_url: baseUrl, ...(token ? { auth_token: token } : {}) };
+      }
+      await onSave(body);
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="dialog" onClick={(e) => e.stopPropagation()}>
+        <h2>Engine for this project</h2>
+        <label className="radio">
+          <input type="radio" checked={engine === "hermes"} onChange={() => setEngine("hermes")} />
+          <span>
+            <b>Hermes</b>
+            <span className="muted small"> — uses the model you linked in Lyra (Codex, Ollama, Copilot, Claude, …)</span>
+          </span>
+        </label>
+        <label className="radio">
+          <input type="radio" checked={engine === "claude"} onChange={() => setEngine("claude")} />
+          <span>
+            <b>Claude Code</b>
+            <span className="muted small"> — Anthropic's agent. Needs an Anthropic API key, or a model address such as Ollama.</span>
+          </span>
+        </label>
+        {engine === "claude" && (
+          <div className="settings-box">
+            <label className="small muted">Model</label>
+            <input value={model} placeholder="claude-opus-5-5 (or an Ollama model, e.g. qwen3-coder)" onChange={(e) => setModel(e.target.value)} />
+            <label className="small muted">Model address (leave empty to use your Anthropic API key)</label>
+            <input value={baseUrl} placeholder="e.g. http://localhost:11434 for Ollama" onChange={(e) => setBaseUrl(e.target.value)} />
+            {baseUrl && (
+              <>
+                <label className="small muted">Access token for that address (Ollama: leave empty)</label>
+                <input type="password" value={token} onChange={(e) => setToken(e.target.value)} />
+              </>
+            )}
+            {!baseUrl && hasKey === false && (
+              <p className="problem small">
+                No Anthropic API key found. Add ANTHROPIC_API_KEY to ~/.hermes/.env (or run <code>hermes setup</code>), then restart Lyra.
+              </p>
+            )}
+            <p className="muted small">Switching engines keeps this chat: the new engine reads the conversation so far.</p>
+          </div>
+        )}
+        {busy && <p className="muted small">Lyra is working — you can switch when it's idle.</p>}
+        {problem && <p className="problem small">{problem}</p>}
+        <div className="dialog-actions">
+          <button className="ghost" onClick={onClose}>Cancel</button>
+          <button className="primary" disabled={busy} onClick={() => void save()}>Save</button>
+        </div>
+      </div>
+    </div>
   );
 }
 
