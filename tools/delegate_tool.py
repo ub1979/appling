@@ -2896,7 +2896,11 @@ def delegate_task(
             with DaemonThreadPoolExecutor(max_workers=max_children) as executor:
                 futures = {}
                 for i, t, child in children:
+                    # One context copy per child (a Context cannot be entered
+                    # by two threads at once): keeps the session key so each
+                    # child's flagged commands reach the session's approvals.
                     future = executor.submit(
+                        contextvars.copy_context().run,
                         _run_single_child,
                         task_index=i,
                         goal=t["goal"],

@@ -177,12 +177,15 @@ def test_reply_streams_over_sse_and_is_saved(env):
             daemon.stop()
 
 
-def test_agents_risky_command_waits_in_inbox_and_runs_in_project_folder(env):
+@pytest.mark.parametrize("batch", [False, True], ids=["single", "parallel-batch"])
+def test_agents_risky_command_waits_in_inbox_and_runs_in_project_folder(env, batch):
     command = "python3 -c 'open(\"approved.txt\",\"w\").write(\"yes\")'"
-    parent = [tool_step("delegate_task", {"goal": "HELPER-AP run the setup script", "background": True}),
-              text_step("An agent is on it."), text_step("Done.")]
+    call = ({"tasks": [{"goal": "HELPER-AP run the setup script"}, {"goal": "HELPER-OK say hello"}], "background": True}
+            if batch else {"goal": "HELPER-AP run the setup script", "background": True})
+    parent = [tool_step("delegate_task", call), text_step("An agent is on it."), text_step("Done.")]
     helper = [tool_step("terminal", {"command": command}, "call_ap"), text_step("Ran it.")]
-    with FakeOpenAIServer(parent, side_scripts={"HELPER-AP": helper}) as llm:
+    sides = {"HELPER-AP": helper, "HELPER-OK": [text_step("Hello.")]}
+    with FakeOpenAIServer(parent, side_scripts=sides) as llm:
         _write_config(env["hermes_home"], llm.base_url)
         daemon = Daemon(env).start()
         try:
