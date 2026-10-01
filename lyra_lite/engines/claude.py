@@ -82,7 +82,7 @@ AGENT_TOOLS = {"Task", "Agent"}
 # plumbing it can't observe, and worktree/workflow modes outside the project.
 DISALLOWED = ["CronCreate", "CronDelete", "CronList", "ScheduleWakeup", "EnterWorktree",
               "ExitWorktree", "Workflow", "ReportFindings", "SendMessage", "ListAgents"]
-ALWAYS_OK = {"WebSearch", "WebFetch", "TodoWrite", "Read", "Glob", "Grep"}
+ALWAYS_OK = {"WebSearch", "WebFetch", "TodoWrite", "Read", "Glob", "Grep", "Skill"}
 
 
 def _skill_index() -> str:
@@ -90,6 +90,38 @@ def _skill_index() -> str:
     for path in sorted(SKILLS_ROOT.rglob("SKILL.md")):
         lines.append(f"- ultimate-builder:{path.parent.name} → {path}")
     return "\n".join(lines)
+
+
+PLUGIN_NAME = "ultimate-builder"
+
+
+def builder_plugin_dir() -> Path:
+    """Lyra's builder playbooks as a native Claude Code plugin.
+
+    The playbooks are already SKILL.md files. Linked into a plugin called
+    ``ultimate-builder`` they load with Claude Code's own Skill tool under the
+    same names Hermes uses (``ultimate-builder:req-engineer`` …), instead of
+    relying on the model choosing to read a file.
+    """
+    from hermes_constants import get_hermes_home
+
+    root = get_hermes_home() / "lyra-lite" / "claude-plugin" / PLUGIN_NAME
+    (root / ".claude-plugin").mkdir(parents=True, exist_ok=True)
+    manifest = {"name": PLUGIN_NAME, "version": "1.0.0",
+                "description": "Lyra's application-builder playbooks."}
+    (root / ".claude-plugin" / "plugin.json").write_text(json.dumps(manifest, indent=2) + "\n")
+    skills = root / "skills"
+    skills.mkdir(exist_ok=True)
+    wanted = {path.parent.name: path.parent for path in SKILLS_ROOT.rglob("SKILL.md")}
+    for link in skills.iterdir():
+        if link.name not in wanted or not link.is_symlink() or link.resolve() != wanted[link.name].resolve():
+            if link.is_symlink() or link.is_file():
+                link.unlink()
+    for name, target in wanted.items():
+        link = skills / name
+        if not link.exists():
+            link.symlink_to(target, target_is_directory=True)
+    return root
 
 
 def engine_notes() -> str:
@@ -100,17 +132,21 @@ def engine_notes() -> str:
     return f"""
 ## Running on Claude Code
 
-The playbooks were written for another engine. Translate their tool names:
+Lyra's playbooks are installed as Claude Code skills named
+`{PLUGIN_NAME}:<name>`. Translate the playbooks' tool names:
+- `skill_view(name="{PLUGIN_NAME}:X")` → load it with the **Skill** tool as
+  `{PLUGIN_NAME}:X`, then follow it exactly. Never improvise a phase whose
+  playbook you have not loaded.
 - `delegate_task` → the Agent (Task) tool. Run agents in the foreground; to
-  work in parallel, start several in one message. Give each the task, the files
-  it owns and the playbook path to read.
-- `skill_view(name="ultimate-builder:X")` → Read the playbook file for X below.
+  work in parallel, start several in one message. Tell each agent which
+  `{PLUGIN_NAME}:` skill to load, its task, the files it owns and the test command.
 - `clarify` → ask in your reply and end the turn.
 - `terminal` → Bash; `read_file`/`write_file`/`patch`/`search_files` →
   Read/Write/Edit/Grep/Glob; `todo` → TodoWrite.
 
-Playbooks:
-{_skill_index()}
+Requirements: before asking any requirements question, load
+`{PLUGIN_NAME}:req-engineer` with the Skill tool and follow its conversation
+contract — one question per message.
 
 ## The app-it playbook (already loaded)
 
@@ -240,6 +276,7 @@ class ClaudeEngine:
                            "append": self.system_prompt + engine_notes()},
             include_partial_messages=True,
             setting_sources=[],
+            plugins=[{"type": "local", "path": str(builder_plugin_dir())}],
             can_use_tool=self._can_use_tool,
             disallowed_tools=list(DISALLOWED),
             hooks={"PreToolUse": [HookMatcher(matcher="Agent|Task", hooks=[_foreground_agents])]},

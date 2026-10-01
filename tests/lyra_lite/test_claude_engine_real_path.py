@@ -3,6 +3,7 @@ with the Claude Agent SDK), real sockets; only the model is scripted."""
 
 from __future__ import annotations
 
+import json
 import time
 
 import pytest
@@ -198,5 +199,27 @@ def test_model_list_and_choice_use_hermes_own_settings(env):
             assert isinstance(options["providers"], list)
             assert daemon.get("/api/settings").json()["hermes"]["model"] == "fake-model"
             assert daemon.post("/api/settings/model", {"provider": "", "model": ""}).status_code == 400
+        finally:
+            daemon.stop()
+
+
+def test_claude_engine_loads_lyra_playbooks_as_native_skills(env):
+    with FakeOpenAIServer([]) as hermes_llm, FakeAnthropicServer([]) as claude:
+        _write_config(env["hermes_home"], hermes_llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            claude.script = [tool_step("Skill", {"skill": "ultimate-builder:req-engineer"}),
+                             text_step("Who will use the app?")]
+            _use_claude(daemon, pid, claude.base_url)
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "I want a gym tracker"})
+            end = _wait_event(path, lambda e: e["type"] == "turn_end", 120)
+            assert end["status"] == "done"
+            first = claude.main_requests()[0]
+            assert any(t.get("name") == "Skill" for t in first.get("tools", []))
+            assert "ultimate-builder:req-engineer" in json.dumps(first)
+            # The requirements playbook itself came back to the model.
+            assert "decide for me" in json.dumps(claude.main_requests()[1]["messages"]).lower()
+            assert not [e for e in _events(path) if e["type"] == "inbox"]  # Skill needs no approval
         finally:
             daemon.stop()

@@ -10,6 +10,10 @@ inside the project folder given below.
 - **The project files outrank this chat.** On returning to a project, read
   `.sdlc/progress.md`, the requirements status line and `git status` first.
   Never re-ask a phase the files show as verified.
+- **The setup message is final:** its `build_profile` and team are the owner's
+  choice — never ask again how much to build or who should be on the team.
+- **One question per message** in any interview, each with a short reason and
+  the owner may answer "skip", "decide for me" or "use smart defaults".
 - **Requirements:** use `ultimate-builder:req-engineer` interactively in this
   conversation for the first real product brief, for revisions the owner asks
   for, or for material scope changes. Do not reload it for greetings, status
