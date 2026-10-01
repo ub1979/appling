@@ -24,6 +24,14 @@ A small, file-first shell around Lyra's agent engines. Start it with
   `daily_cap`, `max_no_progress`).
 - **Rules notice:** when `rules/lyra.md` or the app-it playbook changes, open
   chats offer "Use the new rules".
+- **Lighter Lyra:** Lyra coordinates and has no shell. Agents build, test and
+  commit. Her tool output is capped and her chat is summarised at about 100k
+  tokens (`lyra_lite/coordinator.py`).
+- **Build profile** (Personal / Reusable / Production) is chosen at set-up and
+  scales the plan, the team and QA. A Personal app gets a one-page plan of 1–3
+  tasks and one focused QA pass.
+- **Project Brain:** `.sdlc/project-brain.md`, at most 16 KB, is kept by the
+  agents and handed to each agent instead of the whole project.
 - **The project map** is read straight from `.sdlc/progress.md` (the phase
   ledger the builder skills keep), so it can't disagree with the files.
 - **Engines plug in** through `lyra_lite/engines/base.py`. Pick one per project

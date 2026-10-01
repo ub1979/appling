@@ -16,7 +16,8 @@ To stop Lyra Lite, press **Ctrl+C** in that Terminal window.
 
 ## 2. Test A: build a small app with Hermes (your usual models)
 
-1. Click **+ New project**, name it `pocket-tasks-hermes`, and click **Create**.
+1. Click **Create a new project**, name it `pocket-tasks-hermes`, and leave
+   **How much should Lyra build?** on **Personal / one-off**.
 2. The button next to **New chat** should say **Hermes ⚙**.
 3. Paste this brief:
 
@@ -38,7 +39,7 @@ You need one of the following:
   `qwen3-coder`). This costs nothing.
 
 Then:
-1. Create a project called `pocket-tasks-claude`.
+1. Create a project called `pocket-tasks-claude`, also **Personal / one-off**.
 2. Click **Hermes ⚙**, choose **Claude Code**, fill in the model (and the
    address, if you use Ollama), and click **Save**.
 3. Paste the same brief, and answer the same way you did in Test A.
