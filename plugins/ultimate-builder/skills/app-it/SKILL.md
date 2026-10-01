@@ -77,6 +77,22 @@ finding" while a fix within these bounds exists. Example: two official
 reports covering different dates → compute over the dates both cover and show
 the "data through" date, rather than reporting the mismatch and stopping.
 
+## When you need the owner to do something
+
+Anything only the owner can do (sign in, press a button in their running app,
+create a key or client ID, choose between options, send a file or
+screenshot) must be written as numbered steps, never folded into a status
+sentence such as "pending your signed-in Update analysis run". Each step says:
+
+1. where to go (the exact app page, terminal command, or website menu path);
+2. what to click, type, or choose;
+3. what to send back to you (a screenshot, the message shown, or "it worked").
+
+Add one plain sentence on why it is needed and what you will do with the
+result. Put these steps at the end of your reply, under a heading such as
+"What I need from you", and stop there. If the owner replies without the
+requested result, repeat the steps once in shorter form.
+
 When a specialist stops at its step limit, record that in the ledger row
 (status `running`, with what is left) before you reply, so the next session
 can see it even if this conversation is lost.

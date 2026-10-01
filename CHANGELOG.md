@@ -57,6 +57,9 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 - **Lyra fixes problems it is allowed to fix instead of reporting them.** A
   new rule: when a fix stays within the approved requirements, is reversible
   and needs nothing only the owner has, Lyra makes it and says so in one line.
+- **When Lyra needs you to do something, it gives numbered steps.** Where to
+  go, what to click, and what to send back — instead of a one-line status such
+  as "pending your signed-in Update analysis run".
 - **A brief AI outage no longer stalls harmless commands.** If the automatic
   safety check for a flagged command fails on a connection drop or timeout,
   it tries once more after a short pause before asking you.
