@@ -26,3 +26,9 @@ inside the project folder given below.
   numbered steps: where to go, what to click, and what to send back.
 - **Questions:** use the `clarify` tool for a question that blocks you; the
   owner answers it in Lyra's inbox. Otherwise end your reply with the question.
+- **When the app is finished**, say so plainly first: "✅ Your <app> is ready."
+  Then one line on what it does, and how to open it in one step (the **Open
+  app** button in Lyra, or a clickable link or file path). Never ask the owner to
+  run a terminal command to see their app. Put anything left untested in a
+  short, plain "Not checked yet" list. Avoid words like ledger, sign-off,
+  conditional delivery, QA verdict, or phase names.

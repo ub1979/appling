@@ -7,7 +7,9 @@ loses nothing — the UI and the daemon simply re-read the files:
                      helpers, inbox items, turn boundaries. Readers tail it by
                      byte offset.
 - ``messages.jsonl`` the conversation the engine resumes from, rewritten
-                     atomically at the end of each turn.
+                     atomically at the end of each turn (it may be compressed).
+- ``transcript.jsonl`` what the owner sees: every message, append-only, never
+                     compressed.
 - ``inbox/<id>.json`` one file per question for the owner (approval,
                      clarify, secret). Secret answers are never written.
 - ``state.json``     small mutable status (running, queue, chat id, offsets).
@@ -55,6 +57,7 @@ class ProjectStore:
         self.dir = self.root / LYRA_DIR
         self.events_path = self.dir / "events.jsonl"
         self.messages_path = self.dir / "messages.jsonl"
+        self.transcript_path = self.dir / "transcript.jsonl"
         self.state_path = self.dir / "state.json"
         self.inbox_dir = self.dir / "inbox"
         self.chats_dir = self.dir / "chats"
@@ -148,9 +151,13 @@ class ProjectStore:
     # -- messages ------------------------------------------------------------
 
     def messages(self) -> list[dict]:
+        return self._read_jsonl(self.messages_path)
+
+    @staticmethod
+    def _read_jsonl(path: Path) -> list[dict]:
         out: list[dict] = []
         try:
-            with open(self.messages_path, encoding="utf-8") as fh:
+            with open(path, encoding="utf-8") as fh:
                 for raw in fh:
                     raw = raw.strip()
                     if not raw:
@@ -172,12 +179,35 @@ class ProjectStore:
         with self._lock:
             _atomic_write_text(self.messages_path, text)
 
+    def transcript(self) -> list[dict]:
+        return self._read_jsonl(self.transcript_path)
+
+    def has_transcript(self) -> bool:
+        return self.transcript_path.exists()
+
+    def append_transcript(self, entries: list[dict]) -> None:
+        if not entries:
+            return
+        text = "".join(json.dumps(e, ensure_ascii=False, default=str) + "\n" for e in entries)
+        with self._lock:
+            with open(self.transcript_path, "a", encoding="utf-8") as fh:
+                fh.write(text)
+                fh.flush()
+                os.fsync(fh.fileno())
+
+    def write_transcript(self, entries: list[dict]) -> None:
+        with self._lock:
+            _atomic_write_text(self.transcript_path, "".join(
+                json.dumps(e, ensure_ascii=False, default=str) + "\n" for e in entries))
+
     def archive_chat(self) -> str:
         """Move the current conversation aside and start a new chat id."""
         with self._lock:
             old = self.state().get("chat_id") or uuid.uuid4().hex[:12]
             if self.messages_path.exists():
                 os.replace(self.messages_path, self.chats_dir / f"{old}.messages.jsonl")
+            if self.transcript_path.exists():
+                os.replace(self.transcript_path, self.chats_dir / f"{old}.transcript.jsonl")
             new_id = uuid.uuid4().hex[:12]
             self.update_state(chat_id=new_id, rules_hash="")
             return new_id

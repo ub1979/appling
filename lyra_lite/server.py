@@ -95,6 +95,24 @@ def default_engine_factory(store: ProjectStore, session_key: str):
     return make_engine(name, **kwargs)
 
 
+PREVIEW_DIRS = ("", "dist", "build", "public")
+PREVIEW_TYPES = {
+    ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",
+    ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".ico": "image/x-icon",
+    ".woff": "font/woff", ".woff2": "font/woff2", ".txt": "text/plain", ".map": "application/json",
+}
+
+
+def preview_root(project: Path) -> Path | None:
+    """The folder holding the app's web page, if the project has one."""
+    for sub in PREVIEW_DIRS:
+        base = project / sub if sub else project
+        if (base / "index.html").is_file():
+            return base
+    return None
+
+
 def placement(path: Path, *, creating: bool) -> str | None:
     """Return a reason the folder can't be used, or None when it can."""
     inside_repo = path == REPO_ROOT or path.is_relative_to(REPO_ROOT)
@@ -238,7 +256,7 @@ class Lyra:
         if team is not None or brief or style:
             chosen = agents.normalise_team(team)
             runner.store.update_state(team=chosen, style=style or "app-it", models=models or {})
-            if not runner.store.messages() and not runner.snapshot()["running"]:
+            if not runner.store.transcript() and not runner.snapshot()["running"]:
                 runner.submit(agents.setup_message(path, chosen, models, brief), kind="setup",
                               display=brief.strip() or "Project opened")
         return runner
@@ -390,7 +408,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         snap["rules_outdated"] = bool(
             snap["has_engine"] and snap["rules_hash"] and snap["rules_hash"] != current_rules_hash()
         )
-        return {"id": pid, **snap, "messages": display_messages(runner.store.messages())}
+        return {"id": pid, **snap, "messages": display_messages(runner.store.transcript())}
 
     @app.post("/api/projects/{pid}/settings")
     def settings(pid: str, body: dict = Body(...)):
@@ -435,6 +453,32 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         from lyra_lite.usage import summarise_usage
 
         return summarise_usage(lyra.get(pid).store)
+
+    @app.get("/api/projects/{pid}/preview")
+    def preview_info(pid: str):
+        root = preview_root(lyra.get(pid).root)
+        return {"available": root is not None, "url": f"/preview/{pid}/" if root else None}
+
+    @app.get("/preview/{pid}/{path:path}")
+    def preview(pid: str, path: str, request: Request):
+        # Browser tabs can't send headers, so the preview uses Lyra's cookie.
+        if not secrets.compare_digest(request.cookies.get("lyra_token", ""), token):
+            raise HTTPException(status_code=401, detail="Open the app from Lyra")
+        base = preview_root(lyra.get(pid).root)
+        if base is None:
+            raise HTTPException(status_code=404, detail="This project has no web page yet")
+        parts = [p for p in (path or "index.html").split("/") if p]
+        if any(p.startswith(".") for p in parts):
+            raise HTTPException(status_code=404)
+        target = (base.joinpath(*parts) if parts else base / "index.html").resolve()
+        if target.is_dir():
+            target = target / "index.html"
+        if not target.is_file() or not target.is_relative_to(base.resolve()):
+            raise HTTPException(status_code=404)
+        kind = PREVIEW_TYPES.get(target.suffix.lower())
+        if kind is None:
+            raise HTTPException(status_code=404)
+        return FileResponse(target, media_type=kind, headers={"Cache-Control": "no-store"})
 
     @app.get("/api/projects/{pid}/map")
     def project_map(pid: str):
@@ -530,7 +574,9 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
                                 "in <code>lyra_lite/ui</code>.</p>")
         html = index.read_text(encoding="utf-8")
         tag = f"<script>window.__LYRA_TOKEN__={json.dumps(token)};</script>"
-        return HTMLResponse(html.replace("</head>", f"{tag}</head>", 1))
+        res = HTMLResponse(html.replace("</head>", f"{tag}</head>", 1))
+        res.set_cookie("lyra_token", token, httponly=True, samesite="strict", path="/preview")
+        return res
 
     @app.get("/avatars/{name}")
     def avatar(name: str):

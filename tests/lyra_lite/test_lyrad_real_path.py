@@ -467,3 +467,32 @@ def test_new_project_sends_team_and_brief_and_team_changes_reach_lyra(env):
             assert httpx.get(f"{daemon.base}/avatars/req-engineer.webp", timeout=5).status_code == 200
         finally:
             daemon.stop()
+
+
+def test_open_app_serves_the_project_page_but_never_hidden_files(env):
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            assert daemon.get(f"/api/projects/{pid}/preview").json()["available"] is False
+            (path / "index.html").write_text("<h1>Calc</h1>")
+            (path / "src").mkdir()
+            (path / "src" / "app.mjs").write_text("export const x = 1;")
+            (path / ".env").write_text("SECRET=1")
+            assert daemon.get(f"/api/projects/{pid}/preview").json() == {"available": True, "url": f"/preview/{pid}/"}
+
+            assert httpx.get(f"{daemon.base}/preview/{pid}/", timeout=5).status_code == 401
+            with httpx.Client(base_url=daemon.base, timeout=5) as browser:
+                assert browser.get("/").status_code == 200  # Lyra's page sets the cookie
+                page = browser.get(f"/preview/{pid}/")
+                assert page.status_code == 200 and "Calc" in page.text
+                module = browser.get(f"/preview/{pid}/src/app.mjs")
+                assert module.headers["content-type"].startswith("text/javascript")
+                assert browser.get(f"/preview/{pid}/.env").status_code == 404
+                assert browser.get(f"/preview/{pid}/.lyra/state.json").status_code == 404
+                (env["home"] / "secret.txt").write_text("TOPSECRET")
+                for escape in ("../../secret.txt", "%2e%2e/%2e%2e/secret.txt", "..%2f..%2fsecret.txt"):
+                    assert "TOPSECRET" not in browser.get(f"/preview/{pid}/{escape}").text, escape
+        finally:
+            daemon.stop()

@@ -124,6 +124,13 @@ export function Studio({ id }: { id: string }) {
     };
   }, [id, live.turnsEnded]);
 
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  useEffect(() => {
+    void api.preview(id).then((p) => setPreviewUrl(p.url)).catch(() => undefined);
+  }, [id, live.turnsEnded, live.helperChanges]);
+
+  useAttentionSignals(detail?.name ?? "Lyra", live);
+
   const run = useCallback(async (action: () => Promise<unknown>) => {
     try {
       setProblem(null);
@@ -165,6 +172,7 @@ export function Studio({ id }: { id: string }) {
       (map?.phases ?? []).some((row) => (row.state === "blocked" || row.state === "owner") && rowIsAgent(row.name, currentAgent));
     return { ordered, completed, current, waiting };
   }, [detail?.messages, live.turn?.reply, ids, agents, map?.markdown, map?.phases, team]);
+  const allDone = phases.ordered.length > 0 && phases.ordered.every((p) => phases.completed.has(p));
   const workingIds = new Set(helpers.map((h) => agentForGoal(h.goal, agents)).filter((x): x is string => !!x));
 
   const shown: Shown[] = useMemo(() => (detail?.messages ?? []).map((m) => shownMessage(m, ids)), [detail?.messages, ids]);
@@ -196,7 +204,10 @@ export function Studio({ id }: { id: string }) {
           ? { text: "Stopped", tone: "" }
           : { text: "Ready", tone: "good" };
 
-  const send = (text: string) => run(() => api.send(id, text));
+  const send = (text: string) => {
+    askNotificationPermission();
+    return run(() => api.send(id, text));
+  };
   const labelOf = (agentId: string) => agents.find((a) => a.id === agentId)?.label ?? agentId;
 
   return (
@@ -227,6 +238,11 @@ export function Studio({ id }: { id: string }) {
           {(busy || live.queued.length > 0 || helpers.length > 0) && (
             <button className="btn danger small" onClick={() => void run(() => api.stop(id))}>■ Stop</button>
           )}
+          {previewUrl && (
+            <button className="btn soft small" onClick={() => window.open(previewUrl, "_blank")} title="Open the app Lyra built">
+              ▶ Open app
+            </button>
+          )}
           <button className="btn small" onClick={() => setShowSettings(true)} title="Engine and model">
             {detail.engine === "claude" ? "Claude Code" : "Hermes"} ⚙
           </button>
@@ -252,6 +268,12 @@ export function Studio({ id }: { id: string }) {
           </div>
         )}
         {(problem || live.lastProblem) && <div className="banner bad">{problem ?? live.lastProblem}</div>}
+        {!busy && helpers.length === 0 && allDone && (
+          <div className="banner good">
+            🎉 {detail.name} is ready — every step is done.
+            {previewUrl && <button className="btn primary small" onClick={() => window.open(previewUrl, "_blank")}>▶ Open app</button>}
+          </div>
+        )}
       </div>
 
       <div className="studio-body">
@@ -419,6 +441,42 @@ export function asksForApproval(reply: string): boolean {
   return /[?？]\s*$/.test(lastSentence) && /\bapprov/i.test(lastSentence);
 }
 
+function askNotificationPermission(): void {
+  try {
+    if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
+  } catch {
+    // notifications unavailable; the tab badge still works
+  }
+}
+
+/** When the tab is in the background: badge the title and notify on a reply or a question. */
+function useAttentionSignals(name: string, live: LiveState): void {
+  const seen = useRef({ ended: live.turnsEnded, inbox: live.inbox.length });
+  useEffect(() => {
+    const base = `${name} · Lyra`;
+    const clear = () => {
+      if (!document.hidden) document.title = base;
+    };
+    clear();
+    document.addEventListener("visibilitychange", clear);
+    return () => document.removeEventListener("visibilitychange", clear);
+  }, [name]);
+  useEffect(() => {
+    const prev = seen.current;
+    seen.current = { ended: live.turnsEnded, inbox: live.inbox.length };
+    const needs = live.inbox.length > prev.inbox;
+    const replied = live.turnsEnded > prev.ended && !live.turn && live.queued.length === 0;
+    if (!document.hidden || (!needs && !replied)) return;
+    const text = needs ? "Lyra needs you" : "Lyra replied";
+    document.title = `● ${text} — ${name}`;
+    try {
+      if ("Notification" in window && Notification.permission === "granted") new Notification(text, { body: name, icon: "/avatars/app-it.webp" });
+    } catch {
+      // ignore
+    }
+  }, [live.turnsEnded, live.inbox.length, live.turn, live.queued.length, name]);
+}
+
 function rowIsAgent(row: string, agent: Agent): boolean {
   const r = row.toLowerCase();
   return r.includes(agent.label.toLowerCase()) || r.includes(agent.id) || (agent.id === "qa-engineer" && /\bqa\b/.test(r));
@@ -547,6 +605,21 @@ function ChatScroll(props: {
   const turn = live.turn;
   const liveText = turn ? clean(turn.reply, ids).text : "";
 
+  const inner = useRef<HTMLDivElement>(null);
+  // Keep the newest message in view as content (markdown, avatars) lays out,
+  // unless the owner has scrolled up to read.
+  useEffect(() => {
+    const el = box.current;
+    const content = inner.current;
+    if (!el || !content) return;
+    const toBottom = () => {
+      if (stick.current) el.scrollTop = el.scrollHeight;
+    };
+    toBottom();
+    const observer = new ResizeObserver(toBottom);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
   useEffect(() => {
     const el = box.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
@@ -563,7 +636,7 @@ function ChatScroll(props: {
         stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
       }}
     >
-      <div className="chat-inner">
+      <div className="chat-inner" ref={inner}>
         {shown.length === 0 && !turn && (
           <div className="empty-note">Let's start building. What's the idea? ✨</div>
         )}

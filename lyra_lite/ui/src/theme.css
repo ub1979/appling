@@ -365,3 +365,4 @@ pre { background: var(--code); border-radius: 12px; padding: 10px 12px; overflow
 .usage-row .u-cache { color: var(--good) !important; }
 .usage-row.head span { font-size: 10.5px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; }
 .usage-row .avatar { border-radius: 7px; box-shadow: none; }
+.banner.good { background: color-mix(in srgb, var(--good) 12%, var(--card)); color: var(--good); font-weight: 600; }

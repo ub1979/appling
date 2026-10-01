@@ -336,8 +336,34 @@ class ProjectRunner:
 
     # -- recovery --------------------------------------------------------
 
+    def _rebuild_transcript(self) -> None:
+        """Projects from before the transcript existed: rebuild it once from
+        the activity log (current chat only), else from the saved messages."""
+        events, _ = self.store.read_events(0)
+        entries: list[dict] = []
+        if events:
+            starts: dict[str, dict] = {}
+            for e in events:
+                if e.get("type") == "chat_started":
+                    entries, starts = [], {}
+                elif e.get("type") == "turn_start":
+                    starts[str(e.get("turn"))] = e
+                elif e.get("type") == "turn_end" and str(e.get("turn")) in starts:
+                    entries.append({"role": "user", "content": starts.pop(str(e.get("turn")))["text"]})
+                    if e.get("reply"):
+                        entries.append({"role": "assistant", "content": e["reply"]})
+        else:
+            entries = [
+                {"role": m["role"], "content": m.get("content")}
+                for m in self.store.messages()
+                if m.get("role") in {"user", "assistant"} and m.get("content")
+            ]
+        self.store.write_transcript(entries)
+
     def _recover(self) -> None:
         """Make the files consistent after a crash or restart."""
+        if not self.store.has_transcript():
+            self._rebuild_transcript()
         state = self.store.state()
         self._expire_turn_inbox(None)
         turn = state.get("turn")
@@ -350,6 +376,8 @@ class ProjectRunner:
                 messages.append({"role": "user", "content": user_text})
             messages.append({"role": "assistant", "content": RESTART_NOTE})
             self.store.save_messages(messages)
+            self.store.append_transcript([{"role": "user", "content": user_text},
+                                          {"role": "assistant", "content": RESTART_NOTE}])
             self.store.append_event("turn_end", turn=turn.get("id"), status="lost_on_restart",
                                     reply=RESTART_NOTE)
             checkpoint(self.root, role="lyra", status="interrupted",
@@ -414,7 +442,14 @@ class ProjectRunner:
             result: TurnResult = engine.run_turn(turn["text"], history, hooks)
         finally:
             hooks.turn_id = None
-        if result.messages and len(result.messages) >= len(history):
+        # The engine's working conversation is saved even when it shrank:
+        # context compression replaces old turns with a summary on purpose.
+        # The owner's full chat lives in the append-only transcript.
+        entries = [{"role": "user", "content": turn["text"]}]
+        if result.reply:
+            entries.append({"role": "assistant", "content": result.reply})
+        self.store.append_transcript(entries)
+        if result.messages and not result.error:
             try:
                 self.store.save_messages(result.messages)
             except Exception as exc:
