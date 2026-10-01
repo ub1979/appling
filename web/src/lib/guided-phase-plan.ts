@@ -206,7 +206,7 @@ export function shouldAdvanceGuidedPhase({
   return !guidedPhaseAwaitsUser(reply);
 }
 
-/** Ledger phase names that differ from the specialist's display label. */
+/** Ledger phase words that differ from the specialist's display label. */
 const LEDGER_PHASE_ALIASES: Record<string, string> = {
   qa: "qa-engineer",
   "security audit": "security-auditor",
@@ -214,29 +214,52 @@ const LEDGER_PHASE_ALIASES: Record<string, string> = {
   deploy: "devops-engineer",
 };
 
+type LedgerState = "done" | "running" | "blocked" | "pending";
+
+/**
+ * Coordinators write free-form statuses ("verified document", "verified
+ * locally, incomplete product", "partial", "verified / approved"). Done means
+ * a verified/approved/complete claim with no incompleteness qualifier.
+ */
+function ledgerState(status: string): LedgerState {
+  const incomplete = /\b(incomplete|partial|pending|running|in progress|not (yet )?verified|unverified)\b/.test(status);
+  if (/\bblocked\b/.test(status)) return "blocked";
+  if (/\b(verified|approved|complete|completed|done)\b/.test(status) && !incomplete) return "done";
+  if (incomplete && !/^pending\b/.test(status)) return "running";
+  return "pending";
+}
+
+function escapeRegExp(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
 /**
  * Phase state from the project's own `.sdlc/progress.md` ledger.
  *
  * The browser's phase memory is rebuilt from this chat's markers, so it is
  * empty whenever the transcript is reset, compressed, or was never saved —
  * the map then showed 0/N for a project whose ledger had phases verified.
- * The ledger is the durable record: `verified` rows are done, and the first
- * `running` (else `blocked`) row is the phase in progress.
+ * The ledger is the durable record. Rows are matched by the phase words they
+ * contain ("Remaining development", "Independent security / QA"), and the
+ * first running (else blocked) phase is the one in progress.
  */
 export function phasesFromProgressLedger(
   markdown: string,
   labels: Readonly<Record<string, string>>,
 ): { completed: string[]; current: string | null } {
-  const byName = new Map<string, string>();
+  const terms: Array<{ id: string; pattern: RegExp }> = [];
+  const addTerm = (word: string, id: string) => {
+    const text = word.trim().toLowerCase();
+    if (text) terms.push({ id, pattern: new RegExp(`(^|[^a-z0-9-])${escapeRegExp(text)}($|[^a-z0-9-])`) });
+  };
   for (const [id, label] of Object.entries(labels)) {
-    byName.set(id.toLowerCase(), id);
-    byName.set(label.toLowerCase(), id);
+    addTerm(id, id);
+    addTerm(label, id);
   }
-  for (const [name, id] of Object.entries(LEDGER_PHASE_ALIASES)) {
-    if (!byName.has(name)) byName.set(name, id);
-  }
+  for (const [word, id] of Object.entries(LEDGER_PHASE_ALIASES)) addTerm(word, id);
 
   const completed: string[] = [];
+  const pendingOrRunning = new Set<string>();
   let running: string | null = null;
   let blocked: string | null = null;
   let inLedger = false;
@@ -249,21 +272,26 @@ export function phasesFromProgressLedger(
     const cells = line.split("|").slice(1, -1).map((cell) =>
       cell.replace(/[`*_]/g, "").trim().toLowerCase(),
     );
-    if (cells.length < 2 || /^:?-+:?$/.test(cells[0])) continue;
-    const id = byName.get(cells[0]);
-    if (!id) continue;
-    const status = cells[1];
-    if (status === "verified") {
-      if (!completed.includes(id)) completed.push(id);
-    } else if (status === "running") {
-      running ??= id;
-    } else if (status === "blocked") {
-      blocked ??= id;
+    if (cells.length < 2 || /^:?-+:?$/.test(cells[0]) || cells[0] === "phase") continue;
+    const ids = Array.from(new Set(terms.filter((t) => t.pattern.test(cells[0])).map((t) => t.id)));
+    if (!ids.length) continue;
+    const state = ledgerState(cells[1]);
+    for (const id of ids) {
+      if (state === "done") {
+        if (!completed.includes(id)) completed.push(id);
+      } else {
+        pendingOrRunning.add(id);
+        if (state === "running") running ??= id;
+        if (state === "blocked") blocked ??= id;
+      }
     }
   }
+  // A phase with any unfinished row (e.g. "Remaining development | running"
+  // after "Existing development slice | verified") is not done.
+  const done = completed.filter((id) => !pendingOrRunning.has(id));
   const current = running ?? blocked;
   return {
-    completed,
-    current: current && !completed.includes(current) ? current : null,
+    completed: done,
+    current: current && !done.includes(current) ? current : null,
   };
 }

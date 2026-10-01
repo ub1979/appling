@@ -50,6 +50,13 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
   page's live-update connection dropped (sleep, network blip) and reconnected,
   it stopped receiving Lyra's updates — including approval requests, so Lyra
   silently waited for an answer nobody could see. The link is now kept.
+- **The Project map reads free-form progress notes.** Phases written as
+  "verified document", "Remaining development | running" or
+  "security / QA | partial" showed as Next; the map now recognises the phase
+  words in a row and verified/partial/pending wording.
+- **Lyra fixes problems it is allowed to fix instead of reporting them.** A
+  new rule: when a fix stays within the approved requirements, is reversible
+  and needs nothing only the owner has, Lyra makes it and says so in one line.
 - **A brief AI outage no longer stalls harmless commands.** If the automatic
   safety check for a flagged command fails on a connection drop or timeout,
   it tries once more after a short pause before asking you.

@@ -58,6 +58,25 @@ history can be incomplete (compressed, reset, or never saved). Before replying:
    whether its tests pass) and **ask** whether to finish and commit it before
    anything new. Do not silently continue past it or start another piece.
 
+## Solve problems; don't hand them back
+
+When the work turns up a problem (a bug, real data that does not match an
+assumption, a failing check, a mismatch between two reports), fix it yourself
+when a sensible fix:
+
+- stays inside the approved requirements;
+- is reversible (an ordinary tested commit);
+- needs nothing only the owner has (their accounts, money, permissions, or a
+  change of scope).
+
+Choose the conservative option, implement it through a specialist with
+tests, and state the choice in one line of your report. Ask the owner only
+when the decision changes scope, data use or permissions, costs money, is
+irreversible, or needs their accounts. Never end a turn with "I recorded the
+finding" while a fix within these bounds exists. Example: two official
+reports covering different dates → compute over the dates both cover and show
+the "data through" date, rather than reporting the mismatch and stopping.
+
 When a specialist stops at its step limit, record that in the ledger row
 (status `running`, with what is left) before you reply, so the next session
 can see it even if this conversation is lost.

@@ -270,5 +270,31 @@ describe("phasesFromProgressLedger", () => {
     const text = "## Phase ledger\n| Phase | Status |\n|---|---|\n| QA | blocked |";
     expect(phasesFromProgressLedger(text, labels).current).toBe("qa-engineer");
   });
+
+  it("understands free-form coordinator wording", () => {
+    // Wording copied from a real project ledger (2026-10-01).
+    const realLabels = {
+      ...labels,
+      "task-planner": "Task planning",
+      "tech-writer": "Documentation",
+    };
+    const text = [
+      "## Phase ledger",
+      "| Phase | Status | Artifact | Evidence |",
+      "|---|---|---|---|",
+      "| Requirements and prototype | verified / approved | `requirements.md` | ok |",
+      "| Research | verified as source research | `research-report.md` | ok |",
+      "| Architecture | verified document | `plan.md` | ok |",
+      "| Task planning | verified document | `task-graph.md` | ok |",
+      "| Existing development slice | verified locally, incomplete product | `server/` | ok |",
+      "| Remaining development | running | T-001–T-051 | ok |",
+      "| Independent security / QA / performance | partial | T-041 | ok |",
+      "| Documentation/release | pending | T-045 | ok |",
+    ].join("\n");
+    expect(phasesFromProgressLedger(text, realLabels)).toEqual({
+      completed: ["req-engineer", "researcher", "sw-architect", "task-planner"],
+      current: "sw-developer",
+    });
+  });
 });
 
