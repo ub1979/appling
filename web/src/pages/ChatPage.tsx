@@ -57,6 +57,7 @@ import {
   EMPTY_GUIDED_USAGE,
   formatGuidedTokens,
   guidedEventMayRelabel,
+  guidedWorkerStatusLabel,
   guidedUsageTotal,
   markGuidedWorkerStopping,
   normalizeGuidedUsage,
@@ -796,11 +797,13 @@ function GuidedRuntimePanel({
   usage: GuidedUsageSnapshot;
 }) {
   const model = usage.model || defaultModelLabel;
-  const status = paused
-    ? "Workers paused"
-    : activeWorkers.length
-      ? `${activeWorkers.length} working`
-      : "No workers";
+  const lyraWorkingDirectly =
+    !paused && !activeWorkers.length && activity.phase === "working";
+  const status = guidedWorkerStatusLabel(
+    paused,
+    activeWorkers.length,
+    activity.phase === "working",
+  );
 
   return (
     <div className="flex min-h-0 min-w-0 w-full flex-1 flex-col overflow-x-hidden p-3 text-xs">
@@ -935,13 +938,19 @@ function GuidedRuntimePanel({
               </p>
             </article>
           ))}
+          {lyraWorkingDirectly && (
+            <p className="rounded-lg border border-emerald-500/25 bg-emerald-500/[0.07] px-2.5 py-2 text-[10px] leading-4 text-midground">
+              No helpers right now — Lyra is doing this step itself
+              {activity.text ? `: ${activity.text}` : "."}
+            </p>
+          )}
           {!activeWorkers.length && recentWorkers.length > 0 && (
             <p className="rounded-lg border border-current/10 px-2.5 py-2 text-[10px] text-text-secondary">
               Last: {recentWorkers[0].label} · {recentWorkers[0].status} ·{" "}
               {recentWorkers[0].calls} calls
             </p>
           )}
-          {!activeWorkers.length && !recentWorkers.length && (
+          {!activeWorkers.length && !recentWorkers.length && !lyraWorkingDirectly && (
             <p className="rounded-lg border border-dashed border-current/15 px-2.5 py-3 text-[10px] leading-4 text-text-secondary">
               Background agents will appear here while Lyra keeps chatting
               with you.

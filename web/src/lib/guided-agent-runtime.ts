@@ -187,3 +187,17 @@ export function formatGuidedTokens(value: number): string {
 export function guidedUsageTotal(usage: GuidedUsageSnapshot): number {
   return usage.input + usage.cacheRead + usage.output + usage.reasoning;
 }
+
+/**
+ * Label for the Project agents header. When the coordinator works without
+ * helpers, "No workers" read as "nothing is happening" while Lyra was busy.
+ */
+export function guidedWorkerStatusLabel(
+  paused: boolean,
+  activeWorkers: number,
+  lyraWorking: boolean,
+): string {
+  if (paused) return "Workers paused";
+  if (activeWorkers) return `${activeWorkers} working`;
+  return lyraWorking ? "Lyra working directly" : "No workers";
+}

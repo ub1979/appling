@@ -60,6 +60,9 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 - **When Lyra needs you to do something, it gives numbered steps.** Where to
   go, what to click, and what to send back — instead of a one-line status such
   as "pending your signed-in Update analysis run".
+- **The agent panel shows when Lyra works without helpers.** Instead of "No
+  workers" while Lyra was busy, it says "Lyra working directly" and what it is
+  doing.
 - **A brief AI outage no longer stalls harmless commands.** If the automatic
   safety check for a flagged command fails on a connection drop or timeout,
   it tries once more after a short pause before asking you.

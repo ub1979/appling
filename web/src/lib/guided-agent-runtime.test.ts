@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   formatGuidedTokens,
   guidedEventMayRelabel,
+  guidedWorkerStatusLabel,
   guidedUsageTotal,
   markGuidedWorkerStopping,
   normalizeGuidedUsage,
@@ -108,4 +109,12 @@ describe("guided agent runtime", () => {
     );
     expect(progressed[0].label).toBe("Development");
   });
+
+  it("says Lyra is working directly instead of 'No workers' while it is busy", () => {
+    expect(guidedWorkerStatusLabel(false, 0, true)).toBe("Lyra working directly");
+    expect(guidedWorkerStatusLabel(false, 0, false)).toBe("No workers");
+    expect(guidedWorkerStatusLabel(false, 2, true)).toBe("2 working");
+    expect(guidedWorkerStatusLabel(true, 2, true)).toBe("Workers paused");
+  });
 });
+
