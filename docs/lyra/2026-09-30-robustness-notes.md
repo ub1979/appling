@@ -93,3 +93,23 @@ click, never a one-line "once you …".
   so new regressions stand out.
 - The YouTube OAuth exchange sends no client secret; Google Desktop clients
   usually require one. Verify against real Google before calling it done.
+
+## Agreed direction (2026-10-01): files-first rebuild, after the YouTube app
+
+Most failures came from the plumbing, not the skills: the Studio drives a
+hidden TUI through a PTY, decides readiness by scanning the terminal for `❯`,
+receives events over a separately named side channel, and spreads state over
+browser storage, the PTY registry, in-memory gateway sessions, `state.db`, the
+ledger and Git. When they disagree the user sees a bug.
+
+Plan (owner decision: build after the YouTube app is finished):
+1. Per-project `.lyra/` as the single source of truth: append-only
+   `events.jsonl`, `inbox/` (approvals, questions, owner actions — one file
+   each, answered by a file), `tasks/` (one file per task), plus
+   `.sdlc/progress.md` and Git.
+2. Studio sends messages through a small direct API and renders by tailing the
+   files — no PTY, no screen scraping; refresh/sleep/restart lose nothing.
+3. Engines (Hermes, Claude Agent SDK) write the same files (fits
+   `qadir/claude-engine`).
+4. Light UI: chat, activity, project map, owner inbox. Skills unchanged.
+Trade-off: diverges from upstream Hermes' "embed the TUI" guidance.
