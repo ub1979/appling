@@ -206,6 +206,7 @@ class ProjectRunner:
             "keep_going": bool(state.get("keep_going", True)),
             "team": state.get("team") or [],
             "style": state.get("style") or "app-it",
+            "profile": state.get("profile"),
             "models": state.get("models") or {},
             "watchdog": state.get("watchdog") or {},
             "has_engine": self._engine is not None,

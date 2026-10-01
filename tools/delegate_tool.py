@@ -18,6 +18,7 @@ never the child's intermediate tool calls or reasoning.
 """
 
 import enum
+import contextvars
 import json
 import logging
 
@@ -2181,7 +2182,13 @@ def _run_single_child(
                     _max_continuations,
                 )
 
-        _child_future = _timeout_executor.submit(_run_with_thread_capture)
+        # Carry the parent's context variables (session key, platform) into the
+        # worker: without them a gateway chat cannot find the session's approval
+        # route and a child's flagged command is parked as "pending" with no
+        # prompt ever shown. Only contextvars are copied; the worker's own
+        # thread-local approval callback from the initializer is unchanged.
+        _child_ctx = contextvars.copy_context()
+        _child_future = _timeout_executor.submit(_child_ctx.run, _run_with_thread_capture)
         try:
             result = _child_future.result(timeout=child_timeout)
         except Exception as _timeout_exc:

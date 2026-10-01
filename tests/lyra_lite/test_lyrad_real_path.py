@@ -177,17 +177,19 @@ def test_reply_streams_over_sse_and_is_saved(env):
             daemon.stop()
 
 
-def test_approval_waits_in_inbox_and_runs_in_project_folder(env):
+def test_agents_risky_command_waits_in_inbox_and_runs_in_project_folder(env):
     command = "python3 -c 'open(\"approved.txt\",\"w\").write(\"yes\")'"
-    script = [tool_step("terminal", {"command": command}), text_step("Done.")]
-    with FakeOpenAIServer(script) as llm:
+    parent = [tool_step("delegate_task", {"goal": "HELPER-AP run the setup script", "background": True}),
+              text_step("An agent is on it."), text_step("Done.")]
+    helper = [tool_step("terminal", {"command": command}, "call_ap"), text_step("Ran it.")]
+    with FakeOpenAIServer(parent, side_scripts={"HELPER-AP": helper}) as llm:
         _write_config(env["hermes_home"], llm.base_url)
         daemon = Daemon(env).start()
         try:
             pid, path = _new_project(daemon, env)
             daemon.post(f"/api/projects/{pid}/messages", {"text": "make the file"})
 
-            ask = _wait_event(path, lambda e: e["type"] == "inbox")
+            ask = _wait_event(path, lambda e: e["type"] == "inbox", 90)
             item = ask["item"]
             assert item["kind"] == "approval" and "approved.txt" in item["command"]
             assert not (path / "approved.txt").exists()
@@ -198,8 +200,8 @@ def test_approval_waits_in_inbox_and_runs_in_project_folder(env):
             res = daemon.post(f"/api/projects/{pid}/inbox/{item['id']}", {"answer": "once"})
             assert res.status_code == 200, res.text
 
-            end = _wait_event(path, lambda e: e["type"] == "turn_end")
-            assert end["status"] == "done"
+            report = _wait_event(path, lambda e: e["type"] == "turn_start" and e["kind"] == "helper_done", 90)
+            _wait_event(path, lambda e: e["type"] == "turn_end" and e["turn"] == report["turn"], 60)
             assert (path / "approved.txt").read_text() == "yes"
             saved = json.loads((path / ".lyra" / "inbox" / f"{item['id']}.json").read_text())
             assert saved["status"] == "answered" and saved["answer"] == "once"
@@ -494,5 +496,74 @@ def test_open_app_serves_the_project_page_but_never_hidden_files(env):
                 (env["home"] / "secret.txt").write_text("TOPSECRET")
                 for escape in ("../../secret.txt", "%2e%2e/%2e%2e/secret.txt", "..%2f..%2fsecret.txt"):
                     assert "TOPSECRET" not in browser.get(f"/preview/{pid}/{escape}").text, escape
+        finally:
+            daemon.stop()
+
+
+def _tool_names(request: dict) -> set[str]:
+    return {t.get("function", {}).get("name") for t in request.get("tools") or []}
+
+
+def test_lyra_has_no_shell_but_her_agents_do(env):
+    def scripts(path: Path):
+        target = path / "made-by-agent.txt"
+        parent = [tool_step("delegate_task", {"goal": f"HELPER-SH create {target}", "background": True}),
+                  text_step("An agent is on it."), text_step("Done.")]
+        helper = [tool_step("terminal", {"command": f"echo ok > '{target}'"}, "call_sh"),
+                  text_step("Created it.")]
+        return parent, {"HELPER-SH": helper}
+
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            llm.script, llm.side_scripts = scripts(path)
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "make the file"})
+            report = _wait_event(path, lambda e: e["type"] == "turn_start" and e["kind"] == "helper_done", 120)
+            _wait_event(path, lambda e: e["type"] == "turn_end" and e["turn"] == report["turn"], 60)
+
+            lyra_tools = _tool_names(llm.main_requests()[0])
+            assert "delegate_task" in lyra_tools and "read_file" in lyra_tools
+            assert not lyra_tools & {"terminal", "process", "execute_code"}, lyra_tools
+            def first_user(r):
+                return next((json.dumps(m.get("content")) for m in r["messages"] if m.get("role") == "user"), "")
+
+            helper_requests = [r for r in llm.main_requests() if "HELPER-SH" in first_user(r)]
+            helper_tools = _tool_names(helper_requests[0])
+            assert "terminal" in helper_tools
+            assert (path / "made-by-agent.txt").read_text().strip() == "ok"
+        finally:
+            daemon.stop()
+
+
+def test_large_tool_output_is_cut_down_in_lyras_conversation(env):
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            (path / "big.txt").write_text("".join(f"needle line {i} {'x' * 80}\n" for i in range(400)))
+            llm.script = [tool_step("search_files", {"pattern": "needle", "path": str(path)}), text_step("Seen.")]
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "look"})
+            _wait_event(path, lambda e: e["type"] == "turn_end")
+            follow_up = llm.main_requests()[1]["messages"]
+            tool_result = [m for m in follow_up if m.get("role") == "tool"][-1]["content"]
+            assert len(tool_result) < 9_000, len(tool_result)
+        finally:
+            daemon.stop()
+
+
+def test_build_profile_reaches_lyra_in_the_setup_message(env):
+    with FakeOpenAIServer([text_step("Hi!")]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            path = env["home"] / "Lyra Projects" / "Tiny"
+            res = daemon.post("/api/projects", {"path": str(path), "create": True, "team": [],
+                                                "profile": "personal", "brief": "a to-do list"})
+            assert res.json()["profile"] == "personal"
+            start = _wait_event(path, lambda e: e["type"] == "turn_start")
+            assert '"build_profile": "personal"' in start["text"]
         finally:
             daemon.stop()

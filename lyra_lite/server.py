@@ -238,7 +238,7 @@ class Lyra:
 
     def add_project(self, raw_path: str, *, create: bool, team: list[str] | None = None,
                     style: str | None = None, brief: str = "",
-                    models: dict | None = None) -> ProjectRunner:
+                    models: dict | None = None, profile: str | None = None) -> ProjectRunner:
         path = Path(raw_path).expanduser().resolve(strict=False)
         reason = placement(path, creating=create and not path.exists())
         if reason:
@@ -253,11 +253,13 @@ class Lyra:
             subprocess.run(["git", "init", "-q"], cwd=path, check=False)
         runner = self._attach(path)
         self._save_registry()
-        if team is not None or brief or style:
+        if team is not None or brief or style or profile:
             chosen = agents.normalise_team(team)
-            runner.store.update_state(team=chosen, style=style or "app-it", models=models or {})
+            profile = profile if profile in agents.PROFILES else None
+            runner.store.update_state(team=chosen, style=style or "app-it", models=models or {},
+                                      profile=profile)
             if not runner.store.transcript() and not runner.snapshot()["running"]:
-                runner.submit(agents.setup_message(path, chosen, models, brief), kind="setup",
+                runner.submit(agents.setup_message(path, chosen, models, brief, profile), kind="setup",
                               display=brief.strip() or "Project opened")
         return runner
 
@@ -379,6 +381,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             style=str(body.get("style") or "") or None,
             brief=str(body.get("brief") or ""),
             models=body.get("models") if isinstance(body.get("models"), dict) else None,
+            profile=str(body.get("profile") or "") or None,
         )
         return {"id": project_key(runner.root), **runner.snapshot()}
 
@@ -515,7 +518,8 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             raise HTTPException(status_code=409, detail=str(exc))
         state = runner.store.state()
         if state.get("team"):
-            runner.submit(agents.setup_message(runner.root, state["team"], state.get("models"), ""),
+            runner.submit(agents.setup_message(runner.root, state["team"], state.get("models"), "",
+                                               state.get("profile")),
                           kind="setup", display="Project opened")
         return {"chat_id": chat_id}
 

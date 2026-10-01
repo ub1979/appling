@@ -43,6 +43,7 @@ export interface ProjectDetail {
   claude: { model?: string; base_url?: string };
   team: string[];
   style: string;
+  profile: BuildProfile | null;
   models: Record<string, string>;
   rules_outdated: boolean;
   watchdog: { gave_up?: boolean; count?: number };
@@ -96,12 +97,15 @@ export interface Catalog {
   default_root: string;
 }
 
+export type BuildProfile = "personal" | "reusable" | "production";
+
 export interface NewProject {
   path: string;
   create: boolean;
   team: string[];
   style: string;
   brief: string;
+  profile: BuildProfile;
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {

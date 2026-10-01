@@ -60,8 +60,8 @@ INSTRUCTION = (
     "keep internal skill names and orchestration out of user-facing messages, and work only inside the "
     "selected workspace. Vocabulary: when speaking to the user these are AGENTS — the requirements agent, "
     "the development agent, the QA agent. Never call them skills, specialists, playbooks, or subagents in a "
-    "user-facing message; those are internal words. Every file change must be verified and committed to "
-    "local Git before reporting completion or advancing phases. Stage only this task's files; never push "
+    "user-facing message; those are internal words. Agents verify and commit their own work; Lyra "
+    "coordinates and judges it from their reports, and her own edits are saved automatically. Never push "
     "remotely unless the user explicitly asks."
 )
 FIRST_TURN_GATE = (
@@ -120,7 +120,11 @@ def project_listing(root: Path, limit: int = 40) -> str:
     return "\n".join(lines)
 
 
-def setup_message(root: Path, team: list[str], models: dict | None, brief: str) -> str:
+PROFILES = ("personal", "reusable", "production")
+
+
+def setup_message(root: Path, team: list[str], models: dict | None, brief: str,
+                  profile: str | None = None) -> str:
     payload = {
         "instruction": INSTRUCTION,
         "first_turn_gate": FIRST_TURN_GATE,
@@ -133,6 +137,8 @@ def setup_message(root: Path, team: list[str], models: dict | None, brief: str) 
         "specialist_models": models or {},
         "user_request": brief.strip() or GREETING_REQUEST,
     }
+    if profile in PROFILES:
+        payload["build_profile"] = profile
     return f"{SETUP_BEGIN} {json.dumps(payload, ensure_ascii=False)} {SETUP_END}"
 
 

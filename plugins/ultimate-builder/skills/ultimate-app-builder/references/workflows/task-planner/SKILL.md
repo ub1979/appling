@@ -22,6 +22,26 @@ Plans for autonomous AI agents. No sprints, story points, velocity, or human-tea
 
 Accept inline args: `--plan`, `--requirements`.
 
+### Size the plan to the build profile (read it first)
+
+The delegation context and `requirements.md` carry the approved build profile.
+
+- **`personal`** — write a one-page `task-graph.md` and stop: 1–3 tasks, each a
+  whole user-visible slice (code, its tests and its commit) that one developer
+  agent finishes; a single line of acceptance criteria per task; the test
+  command; which tasks can run in parallel. Skip epics, waves analysis,
+  critical path, risk register, design scoring and multi-perspective review.
+  A small app (a calculator, a to-do list) is one or two tasks, not nine.
+- **`reusable`** — keep the graph proportional: target 6–20 tasks, fold safety
+  checks into the owning feature tasks, and ask the owner before exceeding 25.
+- **`production`** — a larger graph and dedicated assurance tasks are allowed
+  only where they trace to approved public, paid, regulated, scale or
+  operational requirements.
+
+If no profile is given, plan as `personal` for a local single-user tool and say
+so in the plan's first line. Never infer Production from "complete", "whole" or
+"everything working".
+
 ---
 
 ## Step 1 — Extract & Organize Work
@@ -219,7 +239,7 @@ Rules: split anything larger than L into M/S tasks; each task completable in one
 - 3-15 tasks per epic (more → split the epic). Types: development, testing, infrastructure, documentation, design, research/spike.
 - Identify dependencies within and across epics; flag cross-epic blockers.
 - Right-size: the smallest unit with its own test cycle, one agent invocation. If you can't describe "done", it's too big or too vague.
-- Fit one helper: a task must be finishable by one developer helper within about 60 tool calls, including reading, testing, and committing. As a rule of thumb that is one user-visible behavior touching at most ~5 files. Anything bigger is split, even when the pieces feel small.
+- Fit one helper (Reusable/Production): a task must be finishable by one developer helper within about 60 tool calls, including reading, testing, and committing — roughly one user-visible behavior touching at most ~5 files. Split anything bigger, but do not split below a coherent slice: every task costs a fresh agent start-up. For Personal projects prefer fewer, larger slices (see the profile section above).
 - Name file ownership: list the files each task creates or changes. Tasks in the same wave must not share files, so they can run as parallel helpers.
 - UI tasks cite specific design-system values: "Input (40px height, 8px radius), Primary button (md), error color for validation"; "single column < 768px, two-column > 1024px".
 

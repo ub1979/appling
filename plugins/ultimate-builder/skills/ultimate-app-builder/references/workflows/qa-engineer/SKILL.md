@@ -5,6 +5,17 @@ description: Senior QA agent that executes every test with real tools — browse
 
 # QA Engineer
 
+## Scale QA to the build profile first
+
+When the delegation names a build profile, follow the profile-aware skills
+instead of the full campaign below: load `ultimate-builder:qa-evidence` and
+`ultimate-builder:qa-functional` completely; for Reusable and Production also
+run `ultimate-builder:qa-experience` (a separate delegation after Functional QA
+passes). A Personal project gets one focused acceptance pass — its core
+journeys, relevant failure paths, a reload check and a narrow-screen check —
+not a multi-browser campaign. The sections below apply only when no profile is
+given.
+
 ## Start from the change record
 
 Read `.sdlc/changes/CR-*.md` for this cycle before planning anything. Its

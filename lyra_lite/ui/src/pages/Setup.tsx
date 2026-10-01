@@ -1,9 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, type Catalog } from "../api";
+import { api, type BuildProfile, type Catalog } from "../api";
 import { AvatarStack, Brand, FolderDialog, PrefButtons, TeamPicker } from "../components/common";
 import { go } from "../router";
 
 const REQUIRED = ["req-engineer", "task-planner"];
+
+const PROFILES: { id: BuildProfile; name: string; text: string }[] = [
+  { id: "personal", name: "Personal / one-off", text: "For you, used now and then. The core features, basic safety and a real check — quick and light." },
+  { id: "reusable", name: "Reusable project", text: "Used again and again. Stronger error handling, cleaner code, review and full testing." },
+  { id: "production", name: "Production / public", text: "For other people or the public. Full security, deployment, performance and release checks." },
+];
 
 function withRequired(ids: string[]): string[] {
   return Array.from(new Set([...REQUIRED, ...ids]));
@@ -18,6 +24,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
   const [team, setTeam] = useState<string[]>(REQUIRED);
   const [customizing, setCustomizing] = useState(false);
   const [brief, setBrief] = useState("");
+  const [profile, setProfile] = useState<BuildProfile>("personal");
   const [picking, setPicking] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -51,7 +58,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
     if (!path) return;
     setSaving(true);
     try {
-      const res = await api.addProject({ path, create: mode === "new", team: orderedTeam, style, brief });
+      const res = await api.addProject({ path, create: mode === "new", team: orderedTeam, style, brief, profile });
       go(`/p/${res.id}`);
     } catch (e) {
       setProblem(e instanceof Error ? e.message : String(e));
@@ -104,6 +111,20 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
                 <button className="btn" onClick={() => setPicking(true)}>Browse</button>
               </div>
             )}
+          </section>
+
+          <section className="card card-pad">
+            <h3>How much should Lyra build?</h3>
+            <p className="muted small" style={{ margin: "4px 0 0" }}>This sets how big the plan, the checks and the team are. You can grow it later.</p>
+            <div className="profile-grid">
+              {PROFILES.map((p) => (
+                <button key={p.id} type="button" className={`profile-card ${profile === p.id ? "on" : ""}`} onClick={() => setProfile(p.id)}>
+                  <span className="radio" />
+                  <b>{p.name}</b>
+                  <span>{p.text}</span>
+                </button>
+              ))}
+            </div>
           </section>
 
           <section className="card card-pad">

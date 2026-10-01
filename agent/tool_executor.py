@@ -86,9 +86,18 @@ def _budget_for_agent(agent) -> BudgetConfig:
     """
     try:
         ctx = getattr(getattr(agent, "context_compressor", None), "context_length", None)
-        return budget_for_context_window(int(ctx)) if ctx else DEFAULT_BUDGET
+        budget = budget_for_context_window(int(ctx)) if ctx else DEFAULT_BUDGET
     except Exception:
-        return DEFAULT_BUDGET
+        budget = DEFAULT_BUDGET
+    # Embedders may tighten one agent's budget (e.g. a coordinator that must
+    # not accumulate raw tool output) without touching its delegated children.
+    override = getattr(agent, "tool_budget_override", None)
+    if callable(override):
+        try:
+            return override(budget)
+        except Exception:
+            return budget
+    return budget
 
 # Maximum number of concurrent worker threads for parallel tool execution.
 # Mirrors the constant in ``run_agent`` for tests/imports that look here.

@@ -171,6 +171,9 @@ class HermesEngine:
             clarify_callback=self._on_clarify,
         )
         agent.interim_assistant_callback = self._on_interim
+        from lyra_lite.coordinator import make_coordinator
+
+        make_coordinator(agent)
         return agent
 
     # -- callbacks (run on agent threads) --------------------------------
@@ -314,6 +317,9 @@ class HermesEngine:
                 if self._agent is None:
                     self._agent = self._build_agent()
                 agent = self._agent
+            from lyra_lite.coordinator import withhold_shell
+
+            withhold_shell(agent)  # no-op unless something rebuilt the tool list
             # A Stop pressed between turns must not cancel this new turn.
             try:
                 agent.clear_interrupt()
