@@ -168,7 +168,9 @@ export function Studio({ id }: { id: string }) {
     !busy && lastLyra && lastLyra[0].proposal && (!lastTeamNote || lastTeamNote[1] < lastLyra[1]) ? lastLyra[0].proposal : null;
   const lastText = lastLyra?.[0].text.trim() ?? "";
   const asksQuestion = !busy && live.queued.length === 0 && /[?？]\s*$/.test(lastText) && !openProposal;
-  const asksApproval = !busy && live.queued.length === 0 && /\bapprov/i.test(lastText.slice(-500)) && !openProposal;
+  // Only when the reply actually asks for approval — not when it merely
+  // says an approval was recorded (that showed the button after every turn).
+  const asksApproval = !busy && live.queued.length === 0 && !openProposal && asksForApproval(lastText);
 
   if (!detail) {
     return (
@@ -384,6 +386,13 @@ export function Studio({ id }: { id: string }) {
       )}
     </div>
   );
+}
+
+export function asksForApproval(reply: string): boolean {
+  const tail = reply.trim().slice(-400);
+  if (/approve\s*\/\s*change/i.test(tail)) return true;
+  const lastSentence = tail.split(/(?<=[.!])\s+/).pop() ?? "";
+  return /[?？]\s*$/.test(lastSentence) && /\bapprov/i.test(lastSentence);
 }
 
 function orderedTeamAgents(agents: Agent[], team: string[]): Agent[] {

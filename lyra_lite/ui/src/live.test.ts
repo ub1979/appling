@@ -60,3 +60,15 @@ describe("applyEvent", () => {
     expect(s.lastProblem).toBe("provider down");
   });
 });
+
+import { asksForApproval } from "./pages/Studio";
+
+describe("asksForApproval", () => {
+  it("shows the Approve button only when Lyra asks for approval", () => {
+    expect(asksForApproval("Here is the summary. Do you approve these requirements?")).toBe(true);
+    expect(asksForApproval("Options: Approve / Change / Skip")).toBe(true);
+    expect(asksForApproval("Your approval is already recorded, so I won't ask again.")).toBe(false);
+    expect(asksForApproval("Approved—I have your go-ahead. The planning agent is still working.")).toBe(false);
+    expect(asksForApproval("I approved the plan. Which colour do you prefer?")).toBe(false);
+  });
+});
