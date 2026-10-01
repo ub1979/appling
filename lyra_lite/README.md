@@ -1,7 +1,8 @@
 # Lyra Lite
 
 A small, file-first shell around Lyra's agent engines. Start it with
-`./lyra.sh` (opens <http://127.0.0.1:9200/>).
+`./start.sh` (opens <http://127.0.0.1:9200/>) and stop it with `./stop.sh`.
+The classic Studio in this folder is `./start-studio.sh` / `./stop-studio.sh`.
 
 - **No hidden terminal.** `lyrad` (`python -m lyra_lite`) runs the engine
   directly. The browser sends messages over HTTP and follows a live feed.

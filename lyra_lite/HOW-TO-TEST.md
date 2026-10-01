@@ -6,9 +6,9 @@ between the screen and the engine.
 
 ## 1. Start it
 
-1. If the old Lyra is running, stop it first. In a Terminal, in the Lyra
-   folder, run `./stop.sh`. Only one Lyra should be building at a time.
-2. In the same folder, run `./lyra.sh`.
+1. If another Lyra is building, stop it first with `./stop.sh` in its own
+   folder. Only one Lyra should be building at a time.
+2. In a Terminal, go to the Lyra Lite folder and run `./start.sh`.
 3. Your browser opens <http://127.0.0.1:9200/>. Keep the Terminal window
    open; closing it stops Lyra. It also keeps your Mac awake while Lyra works.
 
@@ -54,7 +54,7 @@ Then:
 | Press **Stop** | Lyra and its agents stop. The project stays paused until you write again |
 | Leave it alone with work remaining | After about 10 quiet minutes Lyra keeps going by itself (switch: **Keep going on its own**) |
 | Lyra's rules were changed | A yellow bar offers **Use the new rules** |
-| Restart Lyra Lite (Ctrl+C, then `./lyra.sh`) during a build | History stays. Agents that were cut off are reported, and Lyra can redo them |
+| Restart Lyra Lite (`./stop.sh`, then `./start.sh`) during a build | History stays. Agents that were cut off are reported, and Lyra can redo them |
 
 ## 5. Compare the two engines
 
