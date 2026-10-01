@@ -2563,6 +2563,22 @@ def _strip_line_comment(line: str) -> str:
     return line
 
 
+_SMART_APPROVAL_RETRY_DELAY_S = 15
+
+
+def _is_transient_guard_error(exc: BaseException) -> bool:
+    """True for network drops and timeouts worth one spaced retry.
+
+    Configuration errors (no auxiliary provider, bad credentials) are not
+    retried: waiting would only delay the human prompt for nothing.
+    """
+    if isinstance(exc, (ConnectionError, TimeoutError)):
+        return True
+    names = {cls.__name__ for cls in type(exc).__mro__}
+    return bool(names & {"APIConnectionError", "APITimeoutError", "ConnectError",
+                         "ReadTimeout", "ConnectTimeout", "RemoteProtocolError"})
+
+
 def _smart_approve(command: str, description: str) -> str:
     """Use the auxiliary LLM to assess risk and decide approval.
 
@@ -2617,15 +2633,30 @@ def _smart_approve(command: str, description: str) -> str:
             "Respond with exactly one word: APPROVE, DENY, or ESCALATE"
         )
 
-        response = call_llm(
-            task="approval",
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0,
-            max_tokens=16,
-        )
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        try:
+            response = call_llm(
+                task="approval", messages=messages, temperature=0, max_tokens=16,
+            )
+        except Exception as first_error:
+            if not _is_transient_guard_error(first_error):
+                raise
+            # call_llm's own retries are seconds apart, so a short provider
+            # outage exhausts them and every flagged-but-benign command (e.g.
+            # `python -c`) escalates to a human prompt that may sit unanswered
+            # for the whole approval timeout. One spaced retry rides out the
+            # outage; a second failure still escalates.
+            logger.info(
+                "Smart approvals: guard call failed (%s); retrying once in %ss",
+                first_error, _SMART_APPROVAL_RETRY_DELAY_S,
+            )
+            time.sleep(_SMART_APPROVAL_RETRY_DELAY_S)
+            response = call_llm(
+                task="approval", messages=messages, temperature=0, max_tokens=16,
+            )
 
         answer = (response.choices[0].message.content or "").strip().upper()
 

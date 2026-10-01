@@ -10086,6 +10086,47 @@ class TestPtyWebSocket:
         assert refreshed_sub.sent == [frame]
         assert unrelated_sub.sent == []
 
+    def test_events_reconnect_keeps_alias_to_keepalive_publisher(self):
+        """A browser events socket that drops and reconnects on the same
+        channel must still receive its keep-alive PTY's events (approval
+        prompts, worker updates). Regression: the alias was popped on the
+        last subscriber's disconnect, leaving the Studio silently deaf."""
+        import asyncio
+        from hermes_cli import web_server as ws_mod
+
+        app = ws_mod.app
+        aliases = ws_mod._get_event_channel_aliases(app)
+        aliases["browser-chan"] = "pty-chan"
+        try:
+            with self.client.websocket_connect(
+                f"/api/events?token={self.token}&channel=browser-chan"
+            ):
+                pass  # connect, then drop (sleep / network blip)
+            assert aliases.get("browser-chan") == "pty-chan"
+
+            class _FakeSub:
+                def __init__(self):
+                    self.sent: list[str] = []
+
+                async def send_text(self, payload: str) -> None:
+                    self.sent.append(payload)
+
+            async def _reconnect_and_publish():
+                sub = _FakeSub()
+                event_channels, event_lock = ws_mod._get_event_state(app)
+                async with event_lock:
+                    event_channels.setdefault("browser-chan", set()).add(sub)
+                try:
+                    await ws_mod._broadcast_event(app, "pty-chan", '{"approval":1}')
+                finally:
+                    async with event_lock:
+                        event_channels.pop("browser-chan", None)
+                return sub
+
+            assert asyncio.run(_reconnect_and_publish()).sent == ['{"approval":1}']
+        finally:
+            aliases.pop("browser-chan", None)
+
     def test_events_rejects_missing_channel(self):
         from starlette.websockets import WebSocketDisconnect
 

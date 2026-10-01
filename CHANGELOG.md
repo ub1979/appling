@@ -46,6 +46,13 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
   are no longer treated as a continuation of the main chat, and a reconnected
   chat now redraws its screen so Send unlocks when Lyra is idle.
 - **An old tab that points at a helper's conversation reopens the main chat.**
+- **The Studio no longer goes deaf after a dropped connection.** When the
+  page's live-update connection dropped (sleep, network blip) and reconnected,
+  it stopped receiving Lyra's updates — including approval requests, so Lyra
+  silently waited for an answer nobody could see. The link is now kept.
+- **A brief AI outage no longer stalls harmless commands.** If the automatic
+  safety check for a flagged command fails on a connection drop or timeout,
+  it tries once more after a short pause before asking you.
 
 ### Changed
 

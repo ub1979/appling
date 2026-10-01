@@ -18988,7 +18988,12 @@ async def events_ws(ws: WebSocket) -> None:
 
                 if not subs:
                     event_channels.pop(channel, None)
-                    _get_event_channel_aliases(ws.app).pop(channel, None)
+                    # Keep the channel's alias to its keep-alive PTY publisher.
+                    # The browser's events socket drops on sleep, network blips
+                    # and tab throttling and reconnects on the SAME channel;
+                    # popping the alias here left the Studio deaf (no approval
+                    # prompts, no worker updates) until a full reload. The alias
+                    # is replaced when the PTY reattaches on a new channel.
 
 
 def _normalise_prefix(raw: Optional[str]) -> str:

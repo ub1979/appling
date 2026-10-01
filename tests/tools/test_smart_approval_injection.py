@@ -208,3 +208,61 @@ class TestSmartApprovePromptHardening(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+def test_smart_approval_retries_once_after_a_transient_guard_failure(monkeypatch):
+    """A brief provider outage must not turn a benign flagged command into a
+    human prompt: the guard call is retried once after a pause."""
+    import tools.approval as approval
+    from agent import auxiliary_client
+
+    calls = []
+
+    class _Resp:
+        class _Choice:
+            class _Msg:
+                content = "APPROVE"
+            message = _Msg()
+        choices = [_Choice()]
+
+    def flaky_call_llm(**kwargs):
+        calls.append(kwargs["task"])
+        if len(calls) == 1:
+            raise ConnectionError("Connection error.")
+        return _Resp()
+
+    monkeypatch.setattr(auxiliary_client, "call_llm", flaky_call_llm)
+    monkeypatch.setattr(approval, "_SMART_APPROVAL_RETRY_DELAY_S", 0)
+    assert approval._smart_approve("python3 -c 'print(1)'", "script execution via -c") == "approve"
+    assert calls == ["approval", "approval"]
+
+
+def test_smart_approval_escalates_when_the_retry_also_fails(monkeypatch):
+    import tools.approval as approval
+    from agent import auxiliary_client
+
+    def down(**kwargs):
+        raise ConnectionError("Connection error.")
+
+    monkeypatch.setattr(auxiliary_client, "call_llm", down)
+    monkeypatch.setattr(approval, "_SMART_APPROVAL_RETRY_DELAY_S", 0)
+    assert approval._smart_approve("python3 -c 'print(1)'", "script execution via -c") == "escalate"
+
+
+def test_smart_approval_does_not_wait_when_no_guard_is_configured(monkeypatch):
+    """A missing/invalid auxiliary provider escalates immediately: the spaced
+    retry is only for transient network failures."""
+    import tools.approval as approval
+    from agent import auxiliary_client
+
+    calls = []
+
+    def unconfigured(**kwargs):
+        calls.append(1)
+        raise RuntimeError("No auxiliary provider configured")
+
+    monkeypatch.setattr(auxiliary_client, "call_llm", unconfigured)
+    monkeypatch.setattr(approval, "_SMART_APPROVAL_RETRY_DELAY_S", 60)
+    assert approval._smart_approve("python3 -c 'print(1)'", "script execution via -c") == "escalate"
+    assert calls == [1]
+
