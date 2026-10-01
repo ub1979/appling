@@ -10,7 +10,8 @@ import {
   type ProjectDetail,
   type ProjectMap,
 } from "../api";
-import { Avatar, PrefButtons, TeamPicker } from "../components/common";
+import { ArrowLeft, ArrowUp, Check, Copy, MessageSquarePlus, Play, Square, UsersRound } from "lucide-react";
+import { Avatar, IconButton, PrefButtons, TeamPicker } from "../components/common";
 import { activeHelpers, applyEvent, emptyLive, type InboxItem, type LiveState, type LyraEvent } from "../live";
 import { go } from "../router";
 import {
@@ -211,7 +212,7 @@ export function Studio({ id }: { id: string }) {
   return (
     <div className="studio">
       <header className="studio-top">
-        <button className="btn ghost small" onClick={() => go("/")} title="All projects">←</button>
+        <IconButton label="All projects" onClick={() => go("/")}><ArrowLeft size={16} /></IconButton>
         <span className="brand-mark" style={{ width: 30, height: 30, fontSize: 14, borderRadius: 9 }}>L</span>
         <div className="studio-title">
           <b>{detail.name}</b>
@@ -234,25 +235,24 @@ export function Studio({ id }: { id: string }) {
             <span className="label">Keep going</span>
           </label>
           {(busy || live.queued.length > 0 || helpers.length > 0) && (
-            <button className="btn danger small" onClick={() => void run(() => api.stop(id))}>■ Stop</button>
+            <IconButton label="Stop Lyra and her agents" tone="danger" onClick={() => void run(() => api.stop(id))}>
+              <Square size={14} fill="currentColor" />
+            </IconButton>
           )}
           {previewUrl && (
-            <button className="btn soft small" onClick={() => window.open(previewUrl, "_blank")} title="Open the app Lyra built">
-              ▶ Open app
-            </button>
+            <IconButton label="Open the app Lyra built" tone="accent" onClick={() => window.open(previewUrl, "_blank")}>
+              <Play size={16} fill="currentColor" />
+            </IconButton>
           )}
-          <button className="btn small" onClick={() => go(`/settings?project=${id}`)} title="Engine and model settings">
-            ⚙ {detail.engine === "claude" ? "Claude Code" : "Hermes"}
-          </button>
-          <button
-            className="btn small"
+          <IconButton
+            label="New chat — project files stay as they are"
             disabled={busy || helpers.length > 0}
-            title="Start a fresh conversation. Project files stay as they are."
             onClick={() => void run(async () => { await api.newChat(id); await load(); })}
           >
-            New chat
-          </button>
-          <PrefButtons />
+            <MessageSquarePlus size={16} />
+          </IconButton>
+          <PrefButtons onAi={() => go(`/settings?project=${id}`)} />
+          <span className="engine-tag" title="Engine used by this project">{detail.engine === "claude" ? "Claude Code" : "Hermes"}</span>
         </div>
       </header>
 
@@ -290,7 +290,7 @@ export function Studio({ id }: { id: string }) {
           <section className="panel">
             <h3>
               Your team
-              <button className="btn ghost small" onClick={() => setShowTeam(true)}>Change</button>
+              <button className="mini-icon" onClick={() => setShowTeam(true)} title="Change the team" aria-label="Change the team"><UsersRound size={15} /></button>
             </h3>
             {orderedTeamAgents(agents, team).map((a) => {
               const working = workingIds.has(a.id) || (busy && helpers.length === 0 && phases.current === a.id && !phases.waiting);
@@ -704,7 +704,7 @@ function Message({ item, children }: { item: Shown; children?: React.ReactNode }
         <div className="msg-head">
           {item.role === "lyra" && <img className="lyra-face" src="/avatars/app-it.webp" alt="" />}
           {item.role === "lyra" ? "Lyra" : "You"}
-          <button className="copy" onClick={copy}>{copied ? "Copied" : "Copy"}</button>
+          <button className="copy" onClick={copy} title="Copy" aria-label="Copy message">{copied ? <Check size={13} /> : <Copy size={13} />}</button>
         </div>
         {item.role === "lyra" ? (
           <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{item.text}</ReactMarkdown></div>
@@ -818,7 +818,7 @@ function Composer({ busy, onSend }: { busy: boolean; onSend: (text: string) => P
             }
           }}
         />
-        <button className="send" onClick={() => void send()} disabled={!text.trim()} aria-label="Send">↑</button>
+        <button className="send" onClick={() => void send()} disabled={!text.trim()} aria-label="Send" title="Send"><ArrowUp size={18} /></button>
       </div>
       <div className="hint">Enter to send · Shift+Enter for a new line</div>
     </div>

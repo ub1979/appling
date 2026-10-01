@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { Moon, Sun } from "lucide-react";
 import { api, avatarUrl, type Agent, type FolderListing } from "../api";
 import { usePrefs } from "../prefs";
 
@@ -15,21 +16,40 @@ export function Brand({ sub, onClick }: { sub: string; onClick?: () => void }) {
   );
 }
 
-export function PrefButtons() {
+/** A round icon button, like the Studio's; the label shows as a tooltip. */
+export function IconButton({
+  label,
+  onClick,
+  children,
+  tone = "",
+  disabled = false,
+}: {
+  label: string;
+  onClick: () => void;
+  children: ReactNode;
+  tone?: "" | "danger" | "accent";
+  disabled?: boolean;
+}) {
+  return (
+    <button type="button" className={`round-btn ${tone}`} onClick={onClick} title={label} aria-label={label} disabled={disabled}>
+      {children}
+    </button>
+  );
+}
+
+export function PrefButtons({ onAi }: { onAi?: () => void }) {
   const { theme, setTheme, size, cycleSize } = usePrefs();
   return (
     <>
-      <button className="round-btn" onClick={cycleSize} title={`Text size: ${size}`} aria-label="Change text size">
-        Aa
-      </button>
-      <button
-        className="round-btn"
-        onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-        title={theme === "dark" ? "Light mode" : "Dark mode"}
-        aria-label="Toggle dark mode"
-      >
-        {theme === "dark" ? "☀" : "☾"}
-      </button>
+      <IconButton label={`Text size: ${size}`} onClick={cycleSize}>Aa</IconButton>
+      <IconButton label={theme === "dark" ? "Light mode" : "Dark mode"} onClick={() => setTheme(theme === "dark" ? "light" : "dark")}>
+        {theme === "dark" ? <Sun size={16} /> : <Moon size={16} />}
+      </IconButton>
+      {onAi && (
+        <IconButton label="AI engine and model" onClick={onAi}>
+          <span className="ai-mark">AI</span>
+        </IconButton>
+      )}
     </>
   );
 }

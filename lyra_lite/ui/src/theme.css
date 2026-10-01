@@ -103,7 +103,15 @@ pre { background: var(--code); border-radius: 12px; padding: 10px 12px; overflow
   width: 38px; height: 38px; border-radius: 99px; border: 1px solid var(--line); background: var(--card);
   display: grid; place-items: center; font-size: 12px; font-weight: 700; color: var(--ink); box-shadow: var(--shadow);
 }
-.round-btn:hover { border-color: var(--accent-2); }
+.round-btn:hover:not(:disabled) { border-color: var(--accent-2); color: var(--accent-ink); }
+.round-btn.danger { color: var(--bad); }
+.round-btn.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad); }
+.round-btn.accent { background: linear-gradient(135deg, #6d5cf5, #7e63ff); color: #fff; border-color: transparent; }
+.round-btn.accent:hover:not(:disabled) { color: #fff; box-shadow: var(--shadow-lift); }
+.ai-mark { font: 700 11px var(--mono); letter-spacing: .02em; }
+.engine-tag { font-size: 11.5px; color: var(--faint); white-space: nowrap; }
+.mini-icon { border: 0; background: transparent; color: var(--muted); width: 28px; height: 28px; border-radius: 99px; display: grid; place-items: center; }
+.mini-icon:hover { background: var(--accent-soft); color: var(--accent-ink); }
 
 .btn {
   display: inline-flex; align-items: center; justify-content: center; gap: 8px;

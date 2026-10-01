@@ -72,7 +72,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
         <button className="btn ghost" onClick={() => go("/")}>← Projects</button>
         <Brand sub={mode === "new" ? "New project" : "Open a project"} onClick={() => go("/")} />
         <div className="top-actions">
-          <PrefButtons />
+          <PrefButtons onAi={() => go("/settings")} />
         </div>
       </header>
 
