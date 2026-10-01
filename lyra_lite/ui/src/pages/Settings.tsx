@@ -133,6 +133,11 @@ export function Settings({ projectId }: { projectId: string | null }) {
             />
           )}
 
+          <AboutMe
+            initial={settings.about_me}
+            onSave={(text) => run(async () => setSettings(await api.settingsSave({ about_me: text })), "Saved. Open projects will offer to use it.")}
+          />
+
           {project && (
             <section className="card card-pad">
               <h2 style={{ fontSize: 20 }}>This project: {project.name}</h2>
@@ -231,6 +236,30 @@ function HermesModel({
           </button>
         </div>
       )}
+    </section>
+  );
+}
+
+function AboutMe({ initial, onSave }: { initial: string; onSave: (text: string) => Promise<void> }) {
+  const [text, setText] = useState(initial);
+  return (
+    <section className="card card-pad">
+      <h2 style={{ fontSize: 20 }}>About me</h2>
+      <p className="muted small" style={{ margin: "4px 0 0" }}>
+        The only thing Lyra carries between projects. Everything else stays inside each project's own memory.
+      </p>
+      <textarea
+        className="textarea"
+        style={{ marginTop: 14 }}
+        maxLength={2000}
+        value={text}
+        placeholder="e.g. Explain things simply, I'm not a programmer. I use an Android phone. Keep apps small and good-looking."
+        onChange={(e) => setText(e.target.value)}
+      />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: 8 }}>
+        <span className="tiny muted">{text.length} / 2000</span>
+        <button className="btn primary" disabled={text === initial} onClick={() => void onSave(text)}>Save</button>
+      </div>
     </section>
   );
 }

@@ -82,7 +82,8 @@ AGENT_TOOLS = {"Task", "Agent"}
 # plumbing it can't observe, and worktree/workflow modes outside the project.
 DISALLOWED = ["CronCreate", "CronDelete", "CronList", "ScheduleWakeup", "EnterWorktree",
               "ExitWorktree", "Workflow", "ReportFindings", "SendMessage", "ListAgents"]
-ALWAYS_OK = {"WebSearch", "WebFetch", "TodoWrite", "Read", "Glob", "Grep", "Skill"}
+RECALL_TOOL = "mcp__lyra__project_recall"
+ALWAYS_OK = {"WebSearch", "WebFetch", "TodoWrite", "Read", "Glob", "Grep", "Skill", RECALL_TOOL}
 
 
 def _skill_index() -> str:
@@ -141,6 +142,7 @@ Lyra's playbooks are installed as Claude Code skills named
   work in parallel, start several in one message. Tell each agent which
   `{PLUGIN_NAME}:` skill to load, its task, the files it owns and the test command.
 - `clarify` → ask in your reply and end the turn.
+- `project_recall` → the `{RECALL_TOOL}` tool (search this project's memory).
 - `terminal` → Bash; `read_file`/`write_file`/`patch`/`search_files` →
   Read/Write/Edit/Grep/Glob; `todo` → TodoWrite.
 
@@ -261,6 +263,23 @@ class ClaudeEngine:
         env["ANTHROPIC_API_KEY"] = key
         return env
 
+    def _memory_server(self):
+        """project_recall as an in-process tool for Claude Code (and its agents)."""
+        from claude_agent_sdk import create_sdk_mcp_server, tool
+
+        from lyra_lite.memory import RECALL_DESCRIPTION, ProjectMemory, format_results
+
+        root = self.workspace
+
+        @tool("project_recall", RECALL_DESCRIPTION,
+              {"type": "object", "properties": {"query": {"type": "string"}}, "required": ["query"]})
+        async def project_recall(args):
+            query = str(args.get("query") or "").strip()
+            results = await asyncio.to_thread(ProjectMemory(root).search, query) if query else []
+            return {"content": [{"type": "text", "text": format_results(query, results)}]}
+
+        return create_sdk_mcp_server("lyra", tools=[project_recall])
+
     async def _connect(self):
         from claude_agent_sdk import ClaudeAgentOptions, ClaudeSDKClient, HookMatcher
 
@@ -277,6 +296,7 @@ class ClaudeEngine:
             include_partial_messages=True,
             setting_sources=[],
             plugins=[{"type": "local", "path": str(builder_plugin_dir())}],
+            mcp_servers={"lyra": self._memory_server()},
             can_use_tool=self._can_use_tool,
             disallowed_tools=list(DISALLOWED),
             hooks={"PreToolUse": [HookMatcher(matcher="Agent|Task", hooks=[_foreground_agents])]},

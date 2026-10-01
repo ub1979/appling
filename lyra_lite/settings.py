@@ -41,6 +41,14 @@ def claude_defaults() -> dict:
         if isinstance(claude, dict) else {}
 
 
+ABOUT_ME_LIMIT = 2000
+
+
+def about_me() -> str:
+    """What the owner wrote about themselves — the only memory shared across projects."""
+    return str(_section().get("about_me") or "").strip()[:ABOUT_ME_LIMIT]
+
+
 def hermes_model() -> dict:
     from hermes_cli.config import load_config
 

@@ -58,7 +58,9 @@ APP_IT_SKILL = REPO_ROOT / "plugins" / "ultimate-builder" / "skills" / "app-it" 
 
 def current_rules_hash() -> str:
     """Changes when Lyra's rules or the app-it playbook change."""
-    digest = hashlib.sha1(rules_text().encode("utf-8"))
+    from lyra_lite.settings import about_me
+
+    digest = hashlib.sha1((rules_text() + about_me()).encode("utf-8"))
     try:
         digest.update(APP_IT_SKILL.read_bytes())
     except OSError:
@@ -82,7 +84,11 @@ def default_engine_factory(store: ProjectStore, session_key: str):
 
     text = rules_text()
     store.update_state(rules_hash=current_rules_hash())
+    from lyra_lite.settings import about_me
+
     prompt = f"{text}\n\nProject folder: {store.root}\n"
+    if about_me():
+        prompt += f"\nAbout the owner (written by them; applies to every project):\n{about_me()}\n"
     from lyra_lite.settings import effective_claude, effective_engine
 
     state = store.state()
@@ -455,6 +461,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             "claude": {"model": claude.get("model", ""), "base_url": claude.get("base_url", ""),
                        "route": claude_route(claude), "has_token": bool(claude.get("auth_token"))},
             "anthropic_key": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()),
+            "about_me": st.about_me(),
         }
 
     def _apply_everywhere() -> None:
@@ -491,6 +498,8 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
                         continue  # blank token field keeps the saved one
                     current[key] = value
             changes["claude"] = {k: v for k, v in current.items() if v}
+        if "about_me" in body:
+            changes["about_me"] = str(body.get("about_me") or "").strip()[:st.ABOUT_ME_LIMIT]
         if changes:
             st.save_section(changes)
             _apply_everywhere()

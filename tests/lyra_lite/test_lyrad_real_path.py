@@ -49,7 +49,7 @@ def env(tmp_path, monkeypatch):
 
 
 def _write_config(hermes_home: Path, base_url: str, **extra) -> None:
-    config = {**extra,
+    config = {
         "model": {"default": "fake-model", "provider": "custom",
                   "base_url": base_url, "api_key": "fake-key"},
         "approvals": {"mode": "manual", "timeout": 60},
@@ -57,6 +57,7 @@ def _write_config(hermes_home: Path, base_url: str, **extra) -> None:
         "skills": {"creation_nudge_interval": 0},
         "compression": {"enabled": False},
         "display": {"interim_assistant_messages": False},
+        **extra,
     }
     (hermes_home / "config.yaml").write_text(yaml.safe_dump(config), encoding="utf-8")
 
@@ -568,5 +569,82 @@ def test_build_profile_reaches_lyra_in_the_setup_message(env):
             assert res.json()["profile"] == "personal"
             start = _wait_event(path, lambda e: e["type"] == "turn_start")
             assert '"build_profile": "personal"' in start["text"]
+        finally:
+            daemon.stop()
+
+
+def _first_user_message(request: dict) -> str:
+    return next(json.dumps(m.get("content")) for m in request["messages"] if m.get("role") == "user")
+
+
+def test_hermes_shared_memory_never_reaches_lyra_but_project_recall_does(env):
+    memories = env["hermes_home"] / "memories"
+    memories.mkdir(parents=True, exist_ok=True)
+    (memories / "MEMORY.md").write_text("OTHER-PROJECT-SECRET: the YouTube app uses OAuth.\n")
+    (memories / "USER.md").write_text("OTHER-PROJECT-PROFILE: works on YouTube analytics.\n")
+    script = [text_step("Noted, semicolons."),
+              tool_step("project_recall", {"query": "CSV separator"}), text_step("You chose semicolons.")]
+    with FakeOpenAIServer(script) as llm:
+        _write_config(env["hermes_home"], llm.base_url,
+                      memory={"memory_enabled": True, "user_profile_enabled": True})
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "The CSV export must use semicolons as separator."})
+            _wait_event(path, lambda e: e["type"] == "turn_end")
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "What separator did I pick?"})
+            _wait_event(path, lambda e: e["type"] == "turn_end" and "semicolons" in (e.get("reply") or "") and "chose" in e["reply"])
+
+            first = llm.main_requests()[0]
+            assert "OTHER-PROJECT" not in json.dumps(first), "shared Hermes memory leaked into the project"
+            tools = _tool_names(first)
+            assert "project_recall" in tools and not tools & {"memory", "session_search"}
+            recall_result = [m for m in llm.main_requests()[-1]["messages"] if m.get("role") == "tool"][-1]["content"]
+            assert "Owner: The CSV export must use semicolons" in recall_result
+        finally:
+            daemon.stop()
+
+
+def test_focus_note_rides_along_only_when_the_state_changes(env):
+    with FakeOpenAIServer([text_step("One."), text_step("Two."), text_step("Three.")]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            (path / ".sdlc").mkdir()
+            ledger = path / ".sdlc" / "progress.md"
+            ledger.write_text("## Phase ledger\n| Phase | Status |\n|---|---|\n| Development | running — CSV export left |\n")
+            for n, text in enumerate(["first", "second"], 1):
+                daemon.post(f"/api/projects/{pid}/messages", {"text": text})
+                _wait_event(path, lambda e, n=n: e["type"] == "turn_end" and sum(
+                    1 for x in _events(path) if x["type"] == "turn_end") >= n)
+            ledger.write_text("## Phase ledger\n| Phase | Status |\n|---|---|\n| Development | verified |\n| QA | running |\n")
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "third"})
+            _wait_event(path, lambda e: e["type"] == "turn_end" and e.get("reply") == "Three.")
+
+            def latest_user(request):
+                return [m for m in request["messages"] if m.get("role") == "user"][-1]["content"]
+
+            sent = [latest_user(r) for r in llm.main_requests()]
+            assert "[Project focus" in sent[0] and "CSV export left" in sent[0]
+            assert sent[1] == "second"  # unchanged state: no repeat
+            assert "[Project focus" in sent[2] and "QA" in sent[2]
+            shown = [m["content"] for m in daemon.get(f"/api/projects/{pid}").json()["messages"]]
+            assert "first" in shown and not any("[Project focus" in m for m in shown)
+        finally:
+            daemon.stop()
+
+
+def test_about_me_reaches_lyra_in_every_project(env):
+    with FakeOpenAIServer([text_step("Hi.")]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            saved = daemon.post("/api/settings", {"about_me": "ABOUT-ME: explain simply, Android user."}).json()
+            assert saved["about_me"].startswith("ABOUT-ME")
+            pid, path = _new_project(daemon, env)
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "hello"})
+            _wait_event(path, lambda e: e["type"] == "turn_end")
+            assert "ABOUT-ME: explain simply" in json.dumps(llm.main_requests()[0]["messages"][0])
         finally:
             daemon.stop()

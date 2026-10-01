@@ -9,6 +9,29 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Lyra Lite v0.02 beta — 2026-10-01
+
+Memory that keeps each project focused — and stays inside that project.
+
+- **No more memory leaking between projects.** Lyra Lite no longer uses
+  Hermes' shared memory notes or searches other chats; details from one
+  project can't drift into another.
+- **Project focus note.** Every message Lyra gets carries a short "where we
+  are" from the project's own files (current step, what's left, next
+  actions, open questions) — re-sent only when it changes. Long chats can be
+  summarised without Lyra losing track.
+- **Project recall.** A searchable memory per project (`.lyra/memory.db`):
+  the whole chat with the owner, requirements, plans, progress, agent reports
+  and Git history. Lyra and her agents look things up with `project_recall`
+  instead of guessing or asking again. Works on Hermes and Claude Code.
+- **About me** (AI settings): the one thing Lyra carries between projects,
+  written only by the owner.
+- **Claude Code engine** loads Lyra's playbooks as native skills (one
+  question at a time in requirements; never re-asks the build size), and
+  can run on the owner's Claude plan, Ollama or an API key.
+- Settings page with engine/model choice; round icon buttons; `./start.sh`
+  and `./stop.sh` run Lyra Lite.
+
 ### Lyra Lite v0.01 beta — 2026-10-01
 
 A new, lighter Lyra (`./lyra.sh`, <http://127.0.0.1:9200/>) beside the Studio.

@@ -31,6 +31,11 @@ The classic Studio in this folder is `./start-studio.sh` / `./stop-studio.sh`.
 - **Build profile** (Personal / Reusable / Production) is chosen at set-up and
   scales the plan, the team and QA. A Personal app gets a one-page plan of 1–3
   tasks and one focused QA pass.
+- **Project memory, per project only:** a focus note from the project files
+  rides along with Lyra's messages; `project_recall` searches the project's
+  whole chat, documents, reports and Git history (`.lyra/memory.db`);
+  Hermes' shared cross-project memory is not used. "About me" in AI settings
+  is the only thing carried between projects.
 - **Project Brain:** `.sdlc/project-brain.md`, at most 16 KB, is kept by the
   agents and handed to each agent instead of the whole project.
 - **The project map** is read straight from `.sdlc/progress.md` (the phase

@@ -195,6 +195,7 @@ class ProjectRunner:
                 raise RuntimeError("Agents are still working; press Stop first")
             self._drop_engine()
             chat_id = self.store.archive_chat()
+            self.store.update_state(focus_hash=None, focus_turns=0)
         self.store.append_event("chat_started", chat_id=chat_id)
         return chat_id
 
@@ -255,6 +256,7 @@ class ProjectRunner:
                 # A blank token field means "keep the saved one".
                 merged = {**(self.store.state().get("claude") or {}), **claude}
                 changes["claude"] = {k: v for k, v in merged.items() if v != "" or k != "auth_token"}
+            changes.update(focus_hash=None, focus_turns=0)  # a new engine hasn't seen the note
             self.store.update_state(**changes)
             self._drop_engine()
         self.store.append_event("setting", name="engine", value=name or "default")
@@ -358,9 +360,10 @@ class ProjectRunner:
                 elif e.get("type") == "turn_start":
                     starts[str(e.get("turn"))] = e
                 elif e.get("type") == "turn_end" and str(e.get("turn")) in starts:
-                    entries.append({"role": "user", "content": starts.pop(str(e.get("turn")))["text"]})
+                    start = starts.pop(str(e.get("turn")))
+                    entries.append({"role": "user", "content": start["text"], "ts": start.get("ts")})
                     if e.get("reply"):
-                        entries.append({"role": "assistant", "content": e["reply"]})
+                        entries.append({"role": "assistant", "content": e["reply"], "ts": e.get("ts")})
         else:
             entries = [
                 {"role": m["role"], "content": m.get("content")}
@@ -448,16 +451,18 @@ class ProjectRunner:
         hooks.turn_id = turn_id
         engine = self._engine_for_chat()
         history = self.store.messages()
+        engine_text = turn["text"] + self._focus_for(turn["kind"])
         try:
-            result: TurnResult = engine.run_turn(turn["text"], history, hooks)
+            result: TurnResult = engine.run_turn(engine_text, history, hooks)
         finally:
             hooks.turn_id = None
         # The engine's working conversation is saved even when it shrank:
         # context compression replaces old turns with a summary on purpose.
         # The owner's full chat lives in the append-only transcript.
-        entries = [{"role": "user", "content": turn["text"]}]
+        now = round(time.time(), 3)
+        entries = [{"role": "user", "content": turn["text"], "ts": turn.get("started") or now}]
         if result.reply:
-            entries.append({"role": "assistant", "content": result.reply})
+            entries.append({"role": "assistant", "content": result.reply, "ts": now})
         self.store.append_transcript(entries)
         if result.messages and not result.error:
             try:
@@ -480,3 +485,35 @@ class ProjectRunner:
             "turn_end", turn=turn_id, status=status, reply=result.reply,
             error=result.error, usage=result.usage, checkpoint=sha,
         )
+        try:
+            from lyra_lite.memory import ProjectMemory
+
+            ProjectMemory(self.root).refresh()
+        except Exception:
+            logger.warning("lyra-lite: project memory index failed", exc_info=True)
+
+    FOCUS_REMIND_EVERY = 8
+
+    def _focus_for(self, kind: str) -> str:
+        """The project-focus note, sent when the state changed or as a periodic reminder."""
+        if kind in {"setup", "team"}:
+            return ""
+        try:
+            import hashlib
+
+            from lyra_lite.focus import focus_note
+
+            note = focus_note(self.root, open_inbox=len(self.store.inbox(status="open")))
+        except Exception:
+            logger.debug("focus note failed", exc_info=True)
+            return ""
+        if not note:
+            return ""
+        state = self.store.state()
+        digest = hashlib.sha1(note.encode("utf-8")).hexdigest()[:12]
+        since = int(state.get("focus_turns") or 0)
+        if digest == state.get("focus_hash") and since < self.FOCUS_REMIND_EVERY:
+            self.store.update_state(focus_turns=since + 1)
+            return ""
+        self.store.update_state(focus_hash=digest, focus_turns=0)
+        return "\n\n" + note

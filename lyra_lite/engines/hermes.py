@@ -20,6 +20,7 @@ logger = logging.getLogger(__name__)
 # The platform tag shapes the system prompt ("graphical chat surface, markdown
 # renders") and puts approvals on the gateway round-trip path.
 PLATFORM = "desktop"
+SHARED_MEMORY_TOOLSETS = {"memory", "session_search"}
 CLARIFY_TIMEOUT_S = 30 * 60
 _PREVIEW_CHARS = 600
 
@@ -138,6 +139,16 @@ class HermesEngine:
             prompt = "\n\n".join(p for p in (prompt, skills_prompt) if p)
 
         routing = gw._load_provider_routing()
+        # Project memory replaces Hermes' shared memory here: Lyra Lite gets
+        # project_recall instead, and never loads or writes the notes that
+        # Hermes shares across every project (or searches other chats).
+        from lyra_lite.recall_tool import TOOLSET, register, remember_workspace
+
+        register()
+        remember_workspace(self.session_key, self.workspace)
+        toolsets = gw._load_enabled_toolsets()
+        if toolsets is not None:
+            toolsets = [t for t in toolsets if t not in SHARED_MEMORY_TOOLSETS] + [TOOLSET]
         agent = AIAgent(
             model=model,
             max_iterations=gw._cfg_max_turns(cfg, 90),
@@ -152,7 +163,8 @@ class HermesEngine:
             verbose_logging=False,
             reasoning_config=gw._load_reasoning_config(str(model or "")),
             service_tier=gw._load_service_tier(),
-            enabled_toolsets=gw._load_enabled_toolsets(),
+            enabled_toolsets=toolsets,
+            skip_memory=True,
             providers_allowed=routing.get("only"),
             providers_ignored=routing.get("ignore"),
             providers_order=routing.get("order"),

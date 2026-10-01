@@ -61,6 +61,7 @@ export interface AiSettings {
   hermes: { provider: string; model: string };
   claude: { model: string; base_url: string; route: string; has_token: boolean };
   anthropic_key: boolean;
+  about_me: string;
 }
 
 export interface ModelOptions {

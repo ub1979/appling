@@ -15,7 +15,9 @@ from __future__ import annotations
 
 from typing import Any
 
-WITHHELD_TOOLS = frozenset({"terminal", "process", "read_terminal", "close_terminal", "execute_code"})
+WITHHELD_TOOLS = frozenset({"terminal", "process", "read_terminal", "close_terminal", "execute_code",
+                            # Hermes' cross-project memory; Lite uses project_recall.
+                            "memory", "session_search"})
 RESULT_CHARS = 8_000
 TURN_CHARS = 32_000
 COMPRESSION_CAP_TOKENS = 100_000
@@ -52,7 +54,7 @@ def make_coordinator(agent: Any) -> None:
         agent.enabled_toolsets = sorted({
             ts for name in getattr(agent, "valid_tool_names", set())
             if (ts := model_tools.get_toolset_for_tool(name)) is not None
-        })
+        } - {"memory", "session_search"})
     # The between-turns MCP refresh rebuilds the tool list from toolsets and
     # would hand the shell back; Lyra has no use for late MCP tools.
     agent._skip_mcp_refresh = True

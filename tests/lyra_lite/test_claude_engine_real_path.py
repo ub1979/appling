@@ -223,3 +223,25 @@ def test_claude_engine_loads_lyra_playbooks_as_native_skills(env):
             assert not [e for e in _events(path) if e["type"] == "inbox"]  # Skill needs no approval
         finally:
             daemon.stop()
+
+
+def test_claude_engine_recalls_project_memory(env):
+    with FakeOpenAIServer([]) as hermes_llm, FakeAnthropicServer([]) as claude:
+        _write_config(env["hermes_home"], hermes_llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            claude.script = [text_step("Noted."),
+                             tool_step("mcp__lyra__project_recall", {"query": "CSV separator"}),
+                             text_step("You chose semicolons.")]
+            _use_claude(daemon, pid, claude.base_url)
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "The CSV export must use semicolons."})
+            _wait_event(path, lambda e: e["type"] == "turn_end", 120)
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "What separator did I pick?"})
+            _wait_event(path, lambda e: e["type"] == "turn_end" and e.get("reply") == "You chose semicolons.", 120)
+            first = claude.main_requests()[0]
+            assert any(t.get("name") == "mcp__lyra__project_recall" for t in first.get("tools", []))
+            assert "Owner: The CSV export must use semicolons" in json.dumps(claude.main_requests()[-1]["messages"])
+            assert not [e for e in _events(path) if e["type"] == "inbox"]
+        finally:
+            daemon.stop()
