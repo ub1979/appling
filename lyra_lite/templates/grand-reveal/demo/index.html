@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Altavia GT — Grand Reveal demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,400;0,500;1,400;1,500&family=Inter:wght@300;400;500&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --black: #0b0908; --ink: #15110f; --bone: #efe6d8; --brass: #c9a46a; --oxblood: #6e1620; --muted: #9b8f80;
+    --serif: "Cormorant", Georgia, serif; --sans: "Inter", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--black); }
+  body { color: var(--bone); font-family: var(--sans); font-weight: 300; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: var(--mono); font-size: 11px; letter-spacing: .22em; text-transform: uppercase; }
+  .pad { padding-inline: clamp(18px, 4vw, 56px); }
+
+  /* header */
+  .bar { position: fixed; inset: 0 0 auto; z-index: 40; display: flex; align-items: center; gap: 28px; padding-block: 22px; border-bottom: 1px solid #efe6d81a; background: linear-gradient(#0b0908cc, #0b090800); }
+  .brand { display: flex; align-items: center; gap: 12px; font-family: var(--serif); font-size: 22px; letter-spacing: .32em; }
+  .brand svg { width: 22px; height: 16px; }
+  .claim { font-size: 12px; line-height: 1.35; color: var(--muted); max-width: 190px; }
+  .bar nav { margin-left: auto; display: flex; gap: 30px; }
+  .bar nav a { color: var(--bone); text-decoration: none; }
+  .bar nav a.hot { color: var(--brass); }
+  .timecode { position: fixed; z-index: 40; right: clamp(18px, 4vw, 56px); top: 92px; text-align: right; color: #efe6d8bb; line-height: 1.9; }
+
+  /* 1 — the reveal (scroll-scrubbed sequence) */
+  .reveal { position: relative; height: 380svh; }
+  .stage { position: sticky; top: 0; height: 100svh; overflow: hidden; }
+  #seq { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .stage::after { content: ""; position: absolute; inset: 0; pointer-events: none; background: radial-gradient(120% 90% at 50% 45%, transparent 55%, #0b0908 100%), linear-gradient(transparent 70%, #0b0908cc); }
+  .act { position: absolute; z-index: 3; left: clamp(18px, 4vw, 56px); bottom: 12svh; opacity: 0; }
+  .act .mono { color: #efe6d8aa; }
+  .act h2 { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: clamp(44px, 6vw, 96px); line-height: .95; margin-top: 8px; }
+  .act p { max-width: 380px; margin-top: 12px; color: #efe6d8cc; line-height: 1.6; font-size: 15px; }
+  .drag { position: absolute; z-index: 3; left: 58%; top: 52%; display: flex; align-items: center; gap: 12px; color: var(--bone); cursor: ew-resize; user-select: none; }
+  .drag i { width: 14px; height: 14px; border-radius: 50%; background: var(--bone); box-shadow: 0 0 0 6px #efe6d833; animation: pulse 2s ease-in-out infinite; }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 12px #efe6d800; } }
+  .scrollcue { position: absolute; z-index: 3; right: clamp(18px, 4vw, 56px); bottom: 5svh; color: #efe6d8aa; }
+  .share { position: absolute; z-index: 3; left: clamp(18px, 4vw, 56px); bottom: 5svh; color: #efe6d8aa; }
+
+  /* 2 — detail tour */
+  .tour { position: relative; height: 260svh; }
+  .tstage { position: sticky; top: 0; height: 100svh; overflow: hidden; }
+  .shot { position: absolute; inset: 0; overflow: hidden; }
+  .shot img { width: 100%; height: 100%; object-fit: cover; display: block; transform-origin: 60% 50%; }
+  .shot + .shot { clip-path: inset(0 0 0 100%); }
+  .tcap { position: absolute; z-index: 3; right: clamp(18px, 4vw, 56px); bottom: 12svh; max-width: 380px; text-align: right; }
+  .tcap h3 { font-family: var(--serif); font-weight: 400; font-style: italic; font-size: clamp(36px, 4vw, 64px); line-height: 1; margin: 8px 0 10px; }
+  .tcap p { color: #efe6d8cc; font-size: 15px; line-height: 1.6; }
+  .tstage::after { content: ""; position: absolute; inset: 0; background: linear-gradient(90deg, transparent 50%, #0b0908cc); pointer-events: none; }
+
+  /* 3 — specification with a tachometer */
+  .spec { min-height: 100svh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 5vw; align-items: center; padding-block: 16svh; background: radial-gradient(60% 70% at 30% 50%, #2a0d12, var(--black) 70%); }
+  .tach { position: relative; aspect-ratio: 1; max-width: 560px; width: 100%; margin: 0 auto; }
+  .tach svg { width: 100%; height: 100%; overflow: visible; }
+  .tach .tick { stroke: #efe6d855; stroke-width: 2; }
+  .tach .tick.big { stroke: var(--bone); stroke-width: 3; }
+  .tach .red { stroke: #b4232f; stroke-width: 6; fill: none; }
+  .tach text { fill: #efe6d8cc; font: 400 18px var(--mono); }
+  .tach .needle { stroke: var(--brass); stroke-width: 4; stroke-linecap: round; }
+  .tach .rpm { position: absolute; left: 0; right: 0; top: 64%; text-align: center; }
+  .tach .rpm b { display: block; font-family: var(--serif); font-weight: 400; font-size: clamp(44px, 5vw, 72px); line-height: 1; }
+  .specs h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(42px, 5vw, 80px); line-height: 1; margin: 12px 0 34px; }
+  .specs h2 em { color: var(--brass); }
+  .rows { display: grid; }
+  .row { display: flex; justify-content: space-between; align-items: baseline; padding: 18px 0; border-bottom: 1px solid #efe6d81f; }
+  .row b { font-family: var(--serif); font-weight: 400; font-size: clamp(32px, 3vw, 46px); }
+  .row b small { font-family: var(--mono); font-size: 12px; letter-spacing: .1em; color: var(--muted); margin-left: 6px; }
+
+  /* 4 — private viewing */
+  .viewing { padding-block: 18svh 8svh; text-align: center; background: var(--ink); }
+  .viewing h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(48px, 8vw, 140px); line-height: .9; }
+  .viewing h2 em { color: var(--brass); }
+  .viewing p { max-width: 520px; margin: 24px auto 0; color: #efe6d8cc; line-height: 1.7; }
+  .viewing form { margin: 40px auto 0; display: flex; max-width: 560px; border-bottom: 1px solid #efe6d855; }
+  .viewing input { flex: 1; min-width: 0; background: none; border: 0; color: var(--bone); font: 300 18px var(--sans); padding: 14px 0; outline: none; }
+  .viewing button { background: none; border: 0; color: var(--brass); cursor: pointer; }
+  .ok { min-height: 22px; margin-top: 14px; color: var(--brass); }
+  footer { margin-top: 14svh; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .bar nav, .claim, .timecode, .drag { display: none; }
+    .spec { grid-template-columns: 1fr; }
+    .tcap { left: 18px; text-align: left; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .reveal, .tour { height: auto; }
+    .stage, .tstage { position: relative; }
+    .act[data-at="2"] { opacity: 1; }
+    .shot + .shot { clip-path: none; position: relative; height: 100svh; }
+    .drag i { animation: none; }
+  }
+</style>
+</head>
+<body>
+<header class="bar pad">
+  <span class="brand"><svg viewBox="0 0 22 16" aria-hidden="true"><path d="M1 1 L11 15 L21 1" fill="none" stroke="#c9a46a" stroke-width="1.6"/><path d="M6 1 L11 8 L16 1" fill="none" stroke="#efe6d8" stroke-width="1.2"/></svg>ALTAVIA</span>
+  <span class="claim">A grand tourer built as if 1962 never ended.</span>
+  <nav class="mono"><a href="#tour">Design</a><a href="#spec">Specification</a><a href="#viewing">Atelier</a><a class="hot" href="#viewing">Private viewing</a></nav>
+</header>
+<div class="timecode mono" aria-hidden="true">Reel 01 · <span id="tc">00:00:00</span><br><span id="speed">▸ 1.0×</span></div>
+
+<section class="reveal" id="reveal">
+  <div class="stage" id="stage">
+    <canvas id="seq" role="img" aria-label="The car is unveiled as the dust sheet slides off"></canvas>
+    <div class="act" data-at="0"><span class="mono">Act I</span><h2>Under the sheet</h2><p>Sixty years of patience in one silhouette.</p></div>
+    <div class="act" data-at="1"><span class="mono">Act II</span><h2>The line</h2><p>One continuous stroke from headlamp to tail.</p></div>
+    <div class="act" data-at="2"><span class="mono">Act III</span><h2>Altavia GT</h2><p>Hand-formed aluminium over a modern chassis. Forty-two will be made.</p></div>
+    <div class="drag mono" id="drag"><i></i>Drag to reveal</div>
+    <span class="share mono">Share</span><span class="scrollcue mono">Scroll</span>
+  </div>
+</section>
+
+<section class="tour" id="tour">
+  <div class="tstage">
+    <div class="shot" id="shotA"><img src="img/detail-light.webp" alt="Headlamp and grille" /></div>
+    <div class="shot" id="shotB"><img src="img/detail-cabin.webp" alt="The cabin" /></div>
+    <div class="tcap"><span class="mono" id="tourN">Detail 01</span><h3 id="tourH">Glass and chrome</h3><p id="tourP">Hand-blown lamp lenses behind a grille of 31 polished bars.</p></div>
+  </div>
+</section>
+
+<section class="spec pad" id="spec">
+  <div class="tach" id="tach">
+    <svg viewBox="-260 -260 520 520" aria-hidden="true" id="tachSvg"></svg>
+    <div class="rpm"><b id="rpm">0</b><span class="mono">RPM × 1</span></div>
+  </div>
+  <div class="specs">
+    <span class="mono" style="color:var(--brass)">Specification</span>
+    <h2>Measured in <em>heartbeats</em>.</h2>
+    <div class="rows">
+      <div class="row"><span class="mono">Engine</span><b><span data-to="4.2" data-dec="1">0</span><small>L V12</small></b></div>
+      <div class="row"><span class="mono">Power</span><b><span data-to="402">0</span><small>HP</small></b></div>
+      <div class="row"><span class="mono">0 — 100 km/h</span><b><span data-to="4.6" data-dec="1">0</span><small>SEC</small></b></div>
+      <div class="row"><span class="mono">Top speed</span><b><span data-to="286">0</span><small>KM/H</small></b></div>
+      <div class="row"><span class="mono">Production</span><b><span data-to="42">0</span><small>CARS</small></b></div>
+    </div>
+  </div>
+</section>
+
+<section class="viewing pad" id="viewing">
+  <span class="mono" style="color:var(--brass)">Private viewing</span>
+  <h2>See it <em>uncovered.</em></h2>
+  <p>Viewings are held at the atelier by appointment, one guest at a time. Leave your email and we will write by hand.</p>
+  <form id="form"><input type="email" required placeholder="Your email" aria-label="Email" /><button class="mono">Request →</button></form>
+  <p class="ok" id="ok" aria-live="polite"></p>
+  <footer class="mono"><span>© 2026 Altavia — a Lyra template (fictional marque)</span><span>Imagery: AI-generated stills</span><span>Instagram · Journal</span></footer>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  gsap.registerPlugin(ScrollTrigger);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---- Scroll-scrubbed sequence.
+  // Two modes, same player:
+  //   frames:    many frames from the owner's video (e.g. frames/f_001.webp … f_120.webp)
+  //              — play them like a film as you scroll (the best result);
+  //   keyframes: a few stills of the same shot — a soft wipe slides from one
+  //              to the next (what this demo uses: three AI stills).
+  const SEQUENCE = { mode: "keyframes", sources: ["img/covered.webp", "img/half.webp", "img/revealed.webp"] };
+  // const SEQUENCE = { mode: "frames", sources: Array.from({ length: 120 }, (_, i) => `frames/f_${String(i + 1).padStart(3, "0")}.webp`) };
+
+  const canvas = document.getElementById("seq"), ctx = canvas.getContext("2d");
+  const off = document.createElement("canvas"), octx = off.getContext("2d");
+  const images = SEQUENCE.sources.map((src) => { const im = new Image(); im.decoding = "async"; im.src = src; return im; });
+  let progress = 0, zoom = 1;
+  const size = () => {
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    canvas.width = off.width = Math.round(canvas.clientWidth * dpr);
+    canvas.height = off.height = Math.round(canvas.clientHeight * dpr);
+    draw();
+  };
+  const cover = (im, c) => { // object-fit: cover, with a gentle push-in
+    const s = Math.max(c.width / im.naturalWidth, c.height / im.naturalHeight) * zoom;
+    const w = im.naturalWidth * s, h = im.naturalHeight * s;
+    return [(c.width - w) / 2, (c.height - h) / 2, w, h];
+  };
+  function draw() {
+    if (!canvas.width) return;
+    const n = images.length - 1, f = Math.min(n, Math.max(0, progress * n));
+    const a = Math.floor(f), b = Math.min(n, a + 1), t = f - a;
+    const A = images[a], B = images[b];
+    if (!A.complete || !A.naturalWidth) return;
+    ctx.globalCompositeOperation = "source-over";
+    if (SEQUENCE.mode === "frames" || t === 0 || !B.naturalWidth) {
+      ctx.drawImage(A, ...cover(A, canvas));
+      if (SEQUENCE.mode === "frames" && t > 0 && B.naturalWidth) { ctx.globalAlpha = t; ctx.drawImage(B, ...cover(B, canvas)); ctx.globalAlpha = 1; }
+      return;
+    }
+    // Keyframes: B underneath, A on top fading out behind a soft edge that
+    // travels front-to-back — like the sheet sliding off the car.
+    ctx.drawImage(B, ...cover(B, canvas));
+    octx.globalCompositeOperation = "source-over";
+    octx.clearRect(0, 0, off.width, off.height);
+    octx.drawImage(A, ...cover(A, off));
+    const edge = -0.25 + t * 1.5, soft = 0.28;
+    const g = octx.createLinearGradient(off.width * (edge - soft), off.height * .1, off.width * (edge + soft), off.height * .35);
+    g.addColorStop(0, "rgba(0,0,0,0)"); g.addColorStop(1, "rgba(0,0,0,1)");
+    octx.globalCompositeOperation = "destination-in";
+    octx.fillStyle = g; octx.fillRect(0, 0, off.width, off.height);
+    ctx.drawImage(off, 0, 0);
+  }
+  images.forEach((im) => im.addEventListener("load", draw));
+  addEventListener("resize", size);
+  size();
+
+  // Detail tour copy.
+  const tour = [["Detail 01", "Glass and chrome", "Hand-blown lamp lenses behind a grille of 31 polished bars."],
+    ["Detail 02", "The cabin", "Cream hide, a thin wooden wheel and dials you read like a watch."]];
+  const setTour = (i) => { ["tourN", "tourH", "tourP"].forEach((id, k) => { document.getElementById(id).textContent = tour[i][k]; }); };
+
+  // Tachometer drawn in code.
+  const svg = document.getElementById("tachSvg");
+  const START = -225, END = 45, MAX = 8; // ×1000 rpm, 270° sweep
+  const ang = (v) => (START + (END - START) * (v / MAX)) * Math.PI / 180;
+  let marks = "";
+  for (let v = 0; v <= MAX * 4; v++) {
+    const a = ang(v / 4), big = v % 4 === 0, r1 = big ? 196 : 206, r2 = 222;
+    marks += `<line class="tick ${big ? "big" : ""}" x1="${Math.cos(a) * r1}" y1="${Math.sin(a) * r1}" x2="${Math.cos(a) * r2}" y2="${Math.sin(a) * r2}"/>`;
+    if (big) marks += `<text x="${Math.cos(a) * 168}" y="${Math.sin(a) * 168 + 6}" text-anchor="middle">${v / 4}</text>`;
+  }
+  const r = 214, a0 = ang(6.5), a1 = ang(8);
+  marks += `<path class="red" d="M ${Math.cos(a0) * r} ${Math.sin(a0) * r} A ${r} ${r} 0 0 1 ${Math.cos(a1) * r} ${Math.sin(a1) * r}"/>`;
+  marks += `<line class="needle" id="needle" x1="0" y1="0" x2="${Math.cos(ang(0)) * 190}" y2="${Math.sin(ang(0)) * 190}"/><circle r="12" fill="#c9a46a"/>`;
+  svg.innerHTML = marks;
+  const needle = document.getElementById("needle"), rpmEl = document.getElementById("rpm");
+  const setRpm = (v) => {
+    const a = ang(v);
+    needle.setAttribute("x2", Math.cos(a) * 190); needle.setAttribute("y2", Math.sin(a) * 190);
+    rpmEl.textContent = Math.round(v * 1000).toLocaleString();
+  };
+  const specs = [...document.querySelectorAll(".row [data-to]")];
+  const setSpecs = (p) => specs.forEach((el) => { el.textContent = (+el.dataset.to * p).toFixed(+el.dataset.dec || 0); });
+
+  document.getElementById("form").addEventListener("submit", (e) => { e.preventDefault(); document.getElementById("ok").textContent = "Thank you — the atelier will be in touch."; });
+
+  if (reduce) { progress = 1; draw(); setRpm(7.2); setSpecs(1); return; }
+
+  const lenis = new Lenis({ lerp: .08 });
+  lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add((t) => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+
+  // Reveal: progress drives the sequence, the acts, the timecode and a slow push-in.
+  const acts = gsap.utils.toArray(".act");
+  const tc = document.getElementById("tc"), speed = document.getElementById("speed");
+  ScrollTrigger.create({ trigger: "#reveal", start: "top top", end: "bottom bottom", scrub: true,
+    onUpdate: (self) => {
+      progress = self.progress; zoom = 1.12 - .12 * self.progress; draw();
+      const secs = self.progress * 10.08;
+      tc.textContent = `00:${String(Math.floor(secs)).padStart(2, "0")}:${String(Math.floor((secs % 1) * 24)).padStart(2, "0")}`;
+      speed.textContent = `▸ ${Math.max(.5, Math.min(4, Math.abs(self.getVelocity()) / 900 + 1)).toFixed(1)}×`;
+      const act = self.progress < .22 ? 0 : self.progress < .7 ? 1 : 2; // covered · sliding · revealed
+      acts.forEach((el, i) => gsap.to(el, { opacity: i === act ? 1 : 0, y: i === act ? 0 : 20, duration: .6, overwrite: true }));
+    } });
+  gsap.from(".bar", { y: -40, opacity: 0, duration: 1.2, ease: "expo.out" });
+
+  // Drag the hero sideways to scrub, like pulling the sheet yourself.
+  const drag = document.getElementById("drag"), stage = document.getElementById("stage");
+  let start = null;
+  stage.addEventListener("pointerdown", (e) => { if (e.target.closest(".drag") || e.pointerType === "mouse") { start = { x: e.clientX, y: lenis.scroll }; stage.setPointerCapture(e.pointerId); } });
+  stage.addEventListener("pointermove", (e) => {
+    if (!start) return;
+    const trig = ScrollTrigger.getAll()[0];
+    const span = trig.end - trig.start;
+    lenis.scrollTo(Math.max(trig.start, Math.min(trig.end, start.y + (e.clientX - start.x) / innerWidth * span * 1.2)), { immediate: true });
+  });
+  stage.addEventListener("pointerup", () => { start = null; });
+  gsap.to(drag, { opacity: 0, scrollTrigger: { trigger: "#reveal", start: "top top", end: "10% top", scrub: true } });
+
+  // Detail tour: slow camera drift, second shot wipes across.
+  const tl = gsap.timeline({ scrollTrigger: { trigger: "#tour", start: "top top", end: "bottom bottom", scrub: .8,
+    onUpdate: (self) => setTour(self.progress > .5 ? 1 : 0) } });
+  tl.fromTo("#shotA img", { scale: 1.25, xPercent: 4 }, { scale: 1.05, xPercent: -4, ease: "none", duration: 1 }, 0)
+    .to("#shotB", { clipPath: "inset(0 0 0 0%)", ease: "power2.inOut", duration: .35 }, .45)
+    .fromTo("#shotB img", { scale: 1.3, xPercent: -5 }, { scale: 1.06, xPercent: 3, ease: "none", duration: .6 }, .4);
+
+  // Specification: the needle sweeps and the numbers count with it.
+  const st = { p: 0 };
+  gsap.to(st, { p: 1, ease: "none", scrollTrigger: { trigger: "#spec", start: "top 70%", end: "center 45%", scrub: .6 },
+    onUpdate: () => { setRpm(st.p * 7.2 + Math.sin(st.p * Math.PI) * .6); setSpecs(st.p); } });
+  gsap.from(".viewing h2", { y: 80, opacity: 0, duration: 1.4, ease: "expo.out", scrollTrigger: { trigger: "#viewing", start: "top 70%" } });
+})();
+</script>
+</body>
+</html>

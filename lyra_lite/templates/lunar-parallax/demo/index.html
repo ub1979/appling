@@ -1,0 +1,225 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Perigee — Lunar Parallax demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Syncopate:wght@400;700&family=Inter:wght@300;400;500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --void: #030407; --ink: #0a0d14; --frost: #e9eef6; --ice: #9fc3ff; --amber: #ffb35c; --muted: #8790a3;
+    --wide: "Syncopate", system-ui, sans-serif; --sans: "Inter", system-ui, sans-serif; --mono: "Space Mono", ui-monospace, monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--void); }
+  body { color: var(--frost); font-family: var(--sans); font-weight: 300; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  .mono { font-family: var(--mono); font-size: 11px; letter-spacing: .2em; text-transform: uppercase; }
+  .pad { padding-inline: clamp(18px, 4vw, 56px); }
+  .bar { position: fixed; inset: 0 0 auto; z-index: 50; display: flex; align-items: center; justify-content: space-between; padding-block: 22px; }
+  .brand { font-family: var(--wide); font-size: 15px; letter-spacing: .5em; display: flex; align-items: center; gap: 12px; }
+  .brand i { width: 16px; height: 16px; border-radius: 50%; box-shadow: inset -5px 0 0 0 var(--frost); }
+  .bar nav { display: flex; gap: 30px; align-items: center; }
+  .bar nav a { color: var(--frost); text-decoration: none; }
+  .bar .seat { border: 1px solid var(--frost); background: var(--frost); color: var(--void); padding: 10px 16px; }
+
+  /* 1 — six-layer parallax scene */
+  .scene { position: relative; height: 240svh; }
+  .sstage { position: sticky; top: 0; height: 100svh; overflow: hidden; background: var(--void); }
+  .layer { position: absolute; left: 50%; will-change: transform; pointer-events: none; }
+  .layer img { display: block; width: 100%; height: auto; }
+  .l-space { inset: -8%; left: -8%; width: 116%; height: 116%; }
+  .l-space img { width: 100%; height: 100%; object-fit: cover; }
+  .l-earth { width: min(46vw, 640px); top: 13%; translate: -10% 0; mix-blend-mode: screen; }
+  .l-title { position: absolute; left: 0; right: 0; top: 12%; text-align: center; font-family: var(--wide); font-weight: 700; font-size: clamp(40px, 8.4vw, 170px); letter-spacing: .1em; white-space: nowrap; color: transparent; background: linear-gradient(#e9eef6, #e9eef633 85%); -webkit-background-clip: text; background-clip: text; will-change: transform; }
+  .l-surface { width: 118vw; min-width: 1200px; bottom: -6%; translate: -50% 0; }
+  .l-astro { width: clamp(150px, 15vw, 260px); bottom: 3%; translate: -10% 0; left: 46%; }
+  .l-rocks { width: 112vw; min-width: 1100px; bottom: -4%; translate: -50% 0; }
+  .l-dust { position: absolute; inset: 0; pointer-events: none; background-image:
+      radial-gradient(1.5px 1.5px at 20% 70%, #fff8, transparent), radial-gradient(1px 1px at 70% 80%, #fff6, transparent),
+      radial-gradient(1.5px 1.5px at 40% 85%, #fff5, transparent), radial-gradient(1px 1px at 85% 65%, #fff7, transparent);
+    animation: drift 14s linear infinite; }
+  @keyframes drift { to { transform: translate(-30px, -40px); } }
+  .hero-copy { position: absolute; z-index: 10; left: clamp(18px, 4vw, 56px); bottom: 7svh; max-width: 420px; }
+  .hero-copy p { color: #e9eef6cc; line-height: 1.6; margin-top: 10px; }
+  .coords { position: absolute; z-index: 10; right: clamp(18px, 4vw, 56px); top: 84px; text-align: right; color: #e9eef6aa; line-height: 1.9; }
+  .sstage::after { content: ""; position: absolute; inset: 0; z-index: 9; pointer-events: none; background: linear-gradient(transparent 65%, #030407 100%); }
+
+  /* 2 — trajectory that inks itself */
+  .traj { position: relative; height: 300svh; background: var(--void); }
+  .tstage { position: sticky; top: 0; height: 100svh; overflow: hidden; display: grid; grid-template-rows: auto 1fr; padding-top: 14svh; }
+  .tstage h2 { font-family: var(--wide); font-weight: 400; font-size: clamp(22px, 2.6vw, 38px); letter-spacing: .12em; line-height: 1.3; max-width: 760px; }
+  .distance { position: absolute; right: clamp(18px, 4vw, 56px); top: 14svh; text-align: right; }
+  .distance b { display: block; font-family: var(--mono); font-weight: 400; font-size: clamp(36px, 5vw, 80px); letter-spacing: -.02em; color: var(--frost); }
+  .map { position: relative; }
+  .map svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+  .map .orbit { fill: none; stroke: #e9eef622; stroke-dasharray: 3 7; }
+  .map .path { fill: none; stroke: var(--amber); stroke-width: 2.5; }
+  .map .phase circle { fill: var(--void); stroke: var(--amber); stroke-width: 2; }
+  .map .phase text { fill: #e9eef6cc; font: 400 12px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+
+  /* 3 — mission reel */
+  .reel { position: relative; height: 100svh; overflow: hidden; background: var(--ink); }
+  .reel header { position: absolute; z-index: 2; left: clamp(18px, 4vw, 56px); top: 12svh; }
+  .reel h2 { font-family: var(--wide); font-weight: 400; font-size: clamp(22px, 2.6vw, 38px); letter-spacing: .12em; margin-top: 10px; }
+  .strip { position: absolute; left: 0; top: 32svh; display: flex; gap: 0; padding: 0 clamp(18px, 4vw, 56px); will-change: transform; }
+  .frame { flex: 0 0 auto; width: clamp(280px, 36vw, 560px); background: #000; padding: 26px 10px; position: relative; }
+  .frame::before, .frame::after { content: ""; position: absolute; left: 0; right: 0; height: 12px; background: repeating-linear-gradient(90deg, transparent 0 10px, #e9eef633 10px 22px); }
+  .frame::before { top: 7px; } .frame::after { bottom: 7px; }
+  .frame img { display: block; width: 100%; aspect-ratio: 3 / 2; object-fit: cover; }
+  .frame figcaption { display: flex; justify-content: space-between; color: #e9eef6aa; padding: 10px 2px 0; }
+
+  /* 4 — reserve */
+  .reserve { padding-block: 18svh 8svh; text-align: center; background: radial-gradient(60% 60% at 50% 0%, #142035, var(--void) 70%); }
+  .reserve h2 { font-family: var(--wide); font-weight: 700; font-size: clamp(34px, 6.4vw, 110px); letter-spacing: .08em; line-height: 1.05; }
+  .reserve p { max-width: 520px; margin: 22px auto 0; color: #e9eef6cc; line-height: 1.7; }
+  .reserve form { margin: 36px auto 0; display: flex; max-width: 540px; gap: 0; border: 1px solid #e9eef655; }
+  .reserve input { flex: 1; min-width: 0; background: none; border: 0; color: var(--frost); font: 300 16px var(--sans); padding: 16px; outline: none; }
+  .reserve button { border: 0; background: var(--frost); color: var(--void); padding: 0 20px; cursor: pointer; }
+  .ok { min-height: 22px; margin-top: 14px; color: var(--amber); }
+  footer { margin-top: 12svh; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); }
+
+  @media (max-width: 860px) {
+    .bar nav a:not(.seat) { display: none; }
+    .coords { display: none; }
+    .l-earth { width: 70vw; top: 22%; }
+    .l-astro { left: 52%; width: 120px; }
+    .distance { position: static; text-align: left; margin-top: 18px; }
+    .tstage { grid-template-rows: auto auto 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .scene, .traj { height: auto; }
+    .sstage, .tstage { position: relative; }
+    .tstage { min-height: 100svh; }
+    .l-dust { animation: none; }
+  }
+</style>
+</head>
+<body>
+<header class="bar pad">
+  <span class="brand"><i></i>PERIGEE</span>
+  <nav class="mono"><a href="#log">Log</a><a href="#trajectory">Trajectory</a><a href="#reel">Missions</a><a class="seat" href="#reserve">Reserve a seat</a></nav>
+</header>
+
+<section class="scene" id="scene">
+  <div class="sstage" id="sstage">
+    <div class="layer l-space" data-depth=".05"><img src="img/space.webp" alt="" /></div>
+    <div class="layer l-earth" data-depth=".12" id="earth"><img src="img/earth.webp" alt="The Earth rising over the Moon" /></div>
+    <div class="l-title" id="title" aria-hidden="true">EARTHRISE</div>
+    <div class="layer l-surface" data-depth=".25" id="surface"><img src="img/surface.webp" alt="" /></div>
+    <div class="layer l-astro" data-depth=".4" id="astro"><img src="img/astronaut.webp" alt="An astronaut watching the Earth rise" /></div>
+    <div class="l-dust" aria-hidden="true"></div>
+    <div class="layer l-rocks" data-depth=".7" id="rocks"><img src="img/rocks.webp" alt="" /></div>
+    <div class="coords mono" aria-hidden="true">Mare Tranquillitatis<br>0.67°N · 23.47°E<br>T+ <span id="t">00:00:00</span></div>
+    <div class="hero-copy" id="log"><span class="mono" style="color:var(--amber)">Mission log · Day 4</span><h1 class="mono" style="font-size:13px;margin-top:10px;color:var(--frost)">Perigee lunar expeditions</h1><p>Six travellers. Three days out, three days back, and one morning when the Earth comes up over the horizon.</p></div>
+  </div>
+</section>
+
+<section class="traj" id="trajectory">
+  <div class="tstage pad">
+    <div><span class="mono" style="color:var(--amber)">Trajectory</span><h2>From pad to the Sea of Tranquillity, one line at a time.</h2></div>
+    <div class="distance"><span class="mono">Distance from Earth</span><b><span id="km">0</span> km</b></div>
+    <div class="map">
+      <svg viewBox="0 0 1200 520" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Flight path from the Earth to the Moon">
+        <defs><clipPath id="earthDisc"><circle cx="170" cy="300" r="75"/></clipPath><clipPath id="moonDisc"><circle cx="1030" cy="230" r="46"/></clipPath></defs>
+        <image href="img/earth.webp" x="41.5" y="197" width="250" height="208" clip-path="url(#earthDisc)"/>
+        <circle class="orbit" cx="170" cy="300" r="105"/>
+        <image href="img/moon.webp" x="978.5" y="177" width="107" height="107" clip-path="url(#moonDisc)"/><circle class="orbit" cx="1030" cy="230" r="70"/>
+        <path class="path" id="path" d="M170 195 C 380 60, 640 40, 820 120 C 930 170, 1010 150, 1040 162 C 1090 175, 1100 240, 1060 280 C 1040 298, 1020 292, 1018 268"/>
+        <circle id="craft" r="7" fill="#ffb35c"/>
+        <g class="phase" id="ph0"><circle cx="170" cy="195" r="6"/><text x="150" y="176">Launch</text></g>
+        <g class="phase" id="ph1"><circle cx="420" cy="78" r="6"/><text x="380" y="58">Translunar injection</text></g>
+        <g class="phase" id="ph2"><circle cx="820" cy="120" r="6"/><text x="760" y="96">Coast · Day 3</text></g>
+        <g class="phase" id="ph3"><circle cx="1060" cy="280" r="6"/><text x="980" y="320">Lunar orbit</text></g>
+        <g class="phase" id="ph4"><circle cx="1018" cy="268" r="6"/><text x="900" y="360">Landing</text></g>
+      </svg>
+    </div>
+  </div>
+</section>
+
+<section class="reel" id="reel">
+  <header><span class="mono" style="color:var(--amber)">Mission reel</span><h2>Four frames from the last flight.</h2></header>
+  <div class="strip" id="strip">
+    <figure class="frame"><img src="img/reel-1.webp" alt="Rocket on the pad at dawn" /><figcaption class="mono"><span>01 · Pad 39</span><span>T−00:04</span></figcaption></figure>
+    <figure class="frame"><img src="img/reel-2.webp" alt="The crew in the capsule" /><figcaption class="mono"><span>02 · Ascent</span><span>T+00:12</span></figcaption></figure>
+    <figure class="frame"><img src="img/reel-4.webp" alt="The Moon below the window" /><figcaption class="mono"><span>03 · Lunar orbit</span><span>T+76:40</span></figcaption></figure>
+    <figure class="frame"><img src="img/reel-3.webp" alt="The lander on the surface" /><figcaption class="mono"><span>04 · Surface</span><span>T+102:45</span></figcaption></figure>
+  </div>
+</section>
+
+<section class="reserve pad" id="reserve">
+  <span class="mono" style="color:var(--amber)">Next window · spring</span>
+  <h2>RESERVE<br>A SEAT</h2>
+  <p>Six seats per flight. Eighteen months of training, included. Leave your email for the briefing pack.</p>
+  <form id="form"><input type="email" required placeholder="Your email" aria-label="Email" /><button class="mono">Send</button></form>
+  <p class="ok" id="ok" aria-live="polite"></p>
+  <footer class="mono"><span>© 2026 Perigee — a Lyra template (fictional)</span><span>Imagery: AI-generated</span><span>Press · Careers</span></footer>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  gsap.registerPlugin(ScrollTrigger);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const phone = matchMedia("(max-width: 860px)").matches;
+  document.getElementById("form").addEventListener("submit", (e) => { e.preventDefault(); document.getElementById("ok").textContent = "Briefing pack on its way."; });
+
+  const km = document.getElementById("km");
+  const path = document.getElementById("path"), craft = document.getElementById("craft"), len = path.getTotalLength();
+  const placeCraft = (p) => { const pt = path.getPointAtLength(len * p); craft.setAttribute("cx", pt.x); craft.setAttribute("cy", pt.y); };
+  if (reduce) { km.textContent = "384,400"; placeCraft(1); return; }
+
+  const lenis = new Lenis({ lerp: .085 });
+  lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add((t) => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+
+  // Scene: layers drift with the pointer by depth; on scroll the Earth rises,
+  // the camera pushes in, the foreground rocks part and the title sinks.
+  const layers = gsap.utils.toArray("[data-depth]");
+  if (!phone) {
+    const movers = layers.map((el) => [gsap.quickTo(el, "x", { duration: 1.2, ease: "power3.out" }), gsap.quickTo(el, "y", { duration: 1.2, ease: "power3.out" }), +el.dataset.depth]);
+    addEventListener("pointermove", (e) => {
+      const dx = e.clientX / innerWidth - .5, dy = e.clientY / innerHeight - .5;
+      movers.forEach(([mx, my, d]) => { mx(-dx * 90 * d); my(-dy * 50 * d); });
+    });
+  }
+  gsap.from("#earth", { yPercent: 40, opacity: 0, duration: 2.4, ease: "expo.out" });
+  gsap.from("#title", { yPercent: 30, opacity: 0, letterSpacing: ".4em", duration: 2, ease: "expo.out", delay: .3 });
+  gsap.from("#rocks", { yPercent: 20, duration: 2, ease: "expo.out" });
+  const t = document.getElementById("t");
+  const tl = gsap.timeline({ scrollTrigger: { trigger: "#scene", start: "top top", end: "bottom bottom", scrub: .7,
+    onUpdate: (self) => { const s = Math.floor(76 * 3600 + self.progress * 5400); t.textContent = [s / 3600, (s / 60) % 60, s % 60].map((v) => String(Math.floor(v)).padStart(2, "0")).join(":"); } } });
+  tl.to("#earth", { yPercent: -38, scale: 1.12, ease: "none" }, 0)
+    .to("#title", { yPercent: 70, opacity: 0, ease: "none" }, 0)
+    .to(".l-space", { scale: 1.08, ease: "none" }, 0)
+    .to("#surface", { scale: 1.12, yPercent: 4, ease: "none" }, 0)
+    .to("#astro", { scale: 1.3, yPercent: 6, ease: "none" }, 0)
+    .to("#rocks", { scale: 1.35, yPercent: 14, ease: "none" }, 0)
+    .to("#log", { opacity: 0, y: -30, ease: "none", duration: .3 }, .55);
+
+  // Trajectory: the line inks itself, the craft follows, the distance counts.
+  gsap.set(path, { strokeDasharray: len, strokeDashoffset: len });
+  gsap.set(".phase", { opacity: .15 });
+  const marks = [0, .2, .55, .86, 1];
+  const tt = { p: 0 };
+  gsap.to(tt, { p: 1, ease: "none", scrollTrigger: { trigger: "#trajectory", start: "top top", end: "bottom bottom", scrub: .6 },
+    onUpdate: () => {
+      path.style.strokeDashoffset = len * (1 - tt.p);
+      placeCraft(tt.p);
+      km.textContent = Math.round(384400 * Math.sin(tt.p * Math.PI / 2)).toLocaleString();
+      marks.forEach((m, i) => gsap.set("#ph" + i, { opacity: tt.p >= m - .001 ? 1 : .15 }));
+    } });
+
+  // Mission reel slides past like film through a gate.
+  const strip = document.getElementById("strip");
+  const dist = () => strip.scrollWidth - innerWidth;
+  gsap.to(strip, { x: () => -dist(), ease: "none", scrollTrigger: { trigger: "#reel", start: "top top", end: () => "+=" + dist(), pin: true, scrub: 1, invalidateOnRefresh: true } });
+  gsap.utils.toArray(".frame img").forEach((img) => gsap.fromTo(img, { filter: "brightness(.5) saturate(.6)" }, { filter: "brightness(1) saturate(1)", ease: "none",
+    scrollTrigger: { trigger: "#reel", start: "top top", end: () => "+=" + dist(), scrub: true } }));
+  gsap.from(".reserve h2", { y: 80, opacity: 0, duration: 1.4, ease: "expo.out", scrollTrigger: { trigger: "#reserve", start: "top 70%" } });
+})();
+</script>
+</body>
+</html>

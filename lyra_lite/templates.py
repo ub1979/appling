@@ -15,10 +15,12 @@ import shutil
 from pathlib import Path
 
 BUILTIN_ROOT = Path(__file__).resolve().parent / "templates"
+REPO_ROOT = Path(__file__).resolve().parent.parent
 SITE_CHECK = (Path(__file__).resolve().parent.parent / "plugins" / "ultimate-builder" / "skills"
               / "ultimate-app-builder" / "references" / "workflows" / "web-cinematic" / "scripts"
               / "site-check.mjs")
 KIT_DIR = Path(".lyra") / "kit"
+SKILL_SCRIPTS = SITE_CHECK.parent
 KINDS = ("app", "website", "slides", "video")
 MAX_SPEC_CHARS = 20_000
 
@@ -125,6 +127,32 @@ def _copy_if_changed(src: Path, dst: Path) -> None:
         pass
 
 
+def _write_tools(kit: Path) -> None:
+    """Small commands that run with Lyra's own Python (Pillow, the Codex image
+    provider), whatever the project's own setup is."""
+    import os
+    import sys
+
+    from hermes_constants import get_hermes_home
+
+    py, repo, home = sys.executable, str(REPO_ROOT), str(get_hermes_home())
+    tools = {
+        "imagine": f'exec env PYTHONPATH="{repo}" HERMES_HOME="${{HERMES_HOME:-{home}}}" "{py}" -m lyra_lite.imagine "$@"',
+        "cutout": f'exec "{py}" "{SKILL_SCRIPTS / "cutout.py"}" "$@"',
+        "frames": f'exec "{py}" "{SKILL_SCRIPTS / "frames.py"}" "$@"',
+    }
+    kit.mkdir(parents=True, exist_ok=True)
+    for name, line in tools.items():
+        path = kit / name
+        body = f"#!/bin/sh\n# Lyra kit: {name} — see the web-cinematic skill.\n{line}\n"
+        try:
+            if not path.is_file() or path.read_text() != body:
+                path.write_text(body)
+                os.chmod(path, 0o755)
+        except OSError:
+            pass
+
+
 def ensure_website_kit(root: Path, tid: str | None) -> None:
     """Put the site checker, and the chosen template's live demo as the
     reference design, inside the project (``.lyra/kit/``, git-ignored) so
@@ -132,6 +160,7 @@ def ensure_website_kit(root: Path, tid: str | None) -> None:
     kit = Path(root) / KIT_DIR
     if SITE_CHECK.is_file():
         _copy_if_changed(SITE_CHECK, kit / "site-check.mjs")
+    _write_tools(kit)
     demo = demo_dir(tid) if tid else None
     if demo is None:
         return

@@ -26,7 +26,11 @@ Load `skill_view(name="design-taste-frontend")` for the anti-slop rules, and one
 overlay if the brief calls for it: `minimalist-ui`, `industrial-brutalist-ui`,
 or `high-end-visual-design`.
 
-## Step 3 — Tokens
+## Step 3 — Colour, layout and tokens
+
+Load `skill_view(name="ultimate-builder:color-and-ux")` and choose the palette,
+type scale and interaction defaults with it; its `scripts/palette.py check`
+must pass on the final palette (record the result in the brief).
 
 Load `skill_view(name="design-tokens")`. Every colour, size, radius and duration
 in the brief becomes a token. Hardcoded values in the build are a review finding,

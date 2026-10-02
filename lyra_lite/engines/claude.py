@@ -68,6 +68,19 @@ def claude_cli_status() -> dict:
 APPROVAL_TIMEOUT_S = 30 * 60
 REPO_ROOT = Path(__file__).resolve().parents[2]
 SKILLS_ROOT = REPO_ROOT / "plugins" / "ultimate-builder" / "skills"
+# The shared design skills the playbooks load by bare name
+# (skill_view(name="design-taste-frontend"), "design-tokens", "a11y-audit" …).
+DESIGN_SKILLS_ROOT = REPO_ROOT / "skills" / "ui-ux"
+
+
+def _skill_name(skill_md: Path) -> str:
+    try:
+        for line in skill_md.read_text(encoding="utf-8").splitlines()[:8]:
+            if line.startswith("name:"):
+                return line.split(":", 1)[1].strip().strip("'\"") or skill_md.parent.name
+    except OSError:
+        pass
+    return skill_md.parent.name
 
 # Claude Code tool names -> the names the Lyra screen already words nicely.
 TOOL_NAMES = {
@@ -114,6 +127,8 @@ def builder_plugin_dir() -> Path:
     skills = root / "skills"
     skills.mkdir(exist_ok=True)
     wanted = {path.parent.name: path.parent for path in SKILLS_ROOT.rglob("SKILL.md")}
+    for path in sorted(DESIGN_SKILLS_ROOT.rglob("SKILL.md")):
+        wanted.setdefault(_skill_name(path), path.parent)
     for link in skills.iterdir():
         if link.name not in wanted or not link.is_symlink() or link.resolve() != wanted[link.name].resolve():
             if link.is_symlink() or link.is_file():
@@ -137,7 +152,11 @@ Lyra's playbooks are installed as Claude Code skills named
 `{PLUGIN_NAME}:<name>`. Translate the playbooks' tool names:
 - `skill_view(name="{PLUGIN_NAME}:X")` → load it with the **Skill** tool as
   `{PLUGIN_NAME}:X`, then follow it exactly. Never improvise a phase whose
-  playbook you have not loaded.
+  playbook you have not loaded. A bare `skill_view(name="X")` (design skills
+  such as `design-taste-frontend`, `design-tokens`, `a11y-audit`) is
+  `{PLUGIN_NAME}:X` too.
+- Any interface: load `{PLUGIN_NAME}:color-and-ux` before choosing colours,
+  type or layout, and run its `palette.py check` on the final palette.
 - `delegate_task` → the Agent (Task) tool. Run agents in the foreground; to
   work in parallel, start several in one message. Tell each agent which
   `{PLUGIN_NAME}:` skill to load, its task, the files it owns and the test command.

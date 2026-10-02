@@ -28,6 +28,7 @@ _SPECIALIST_SKILLS = {
     "qa-experience": "Audit usability, layout and accessibility evidence.",
     "qa-evidence": "Record trustworthy evidence for a selected QA scope.",
     "web-cinematic": "Build premium scroll-driven, parallax websites.",
+    "color-and-ux": "Choose colours and UI/UX patterns that work.",
     "business-motion-film": "Make premium short business videos and explainers.",
     "security-auditor": "Security auditing",
     "devops-engineer": "Deployment and operations",

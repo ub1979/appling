@@ -78,13 +78,41 @@ oversized wordmark and a magnetic button.
    respect `prefers-reduced-motion` with a static version; on phones,
    simplify parallax and turn off mouse tilt. Target Lighthouse
    performance ≥ 85.
-5. **Taste pass.** Load `taste-skill` (and `frontend-design` when present)
+5. **Taste pass.** Load `ultimate-builder:color-and-ux` (run its palette
+   check on the site's colours), `design-taste-frontend` (and `frontend-design` when present)
    and remove anything that looks AI-made: generic gradients, centred
    everything, stock icon rows, purple-blue defaults.
 6. **Judge pass.** Critique the site as a senior Awwwards judge, list the top
    five issues, fix them, rebuild.
 7. **Finish.** `npm run build` clean, commit, refresh the Project Brain, and
    report what was built, the images still needed, and how to open it.
+
+## Photo-real sites (footage, layers, AI pictures)
+
+Templates marked photo-real get their look from real footage and layered
+photos, not code-drawn art. In a Lyra project three commands help (they run
+with Lyra's own Python; files the owner attaches are in `assets/uploads/`):
+
+| Command | Use |
+|---|---|
+| `.lyra/kit/frames clip.mp4 public/frames --count 120` | Video → numbered WebP frames + `frames.json` for a scroll-scrubbed canvas |
+| `.lyra/kit/cutout in.png out.webp --bg white\|black\|green [--from top]` | Cut a subject off a plain background for a parallax layer |
+| `.lyra/kit/imagine "prompt" --out assets/x.png [--ref first.png]` | AI picture on the owner's ChatGPT plan — only after they said yes |
+
+- **Frame player:** preload all frames, draw the current one on a canvas with
+  cover-fit, blend toward the next; drive it from ScrollTrigger progress. With
+  only 2–5 stills of one shot, wipe softly between them instead (the
+  Grand Reveal demo shows both modes).
+- **Layer recipes for AI pictures:** make each layer separately. Glowing
+  subjects (planets, fire, light) on pure black and blend with
+  `mix-blend-mode: screen`; landscapes with a pure black sky, cut `--from top`;
+  dark foregrounds on pure white; light subjects (people, white products) on
+  chroma green. Keep camera and light consistent: make the first picture, then
+  `--ref` it for the rest ("same room, same camera, sheet removed").
+- **Honesty:** AI pictures never stand in for a real product, place or person
+  the owner sells; tell the owner which pictures are AI-made and list them in
+  the report.
+- Budget: hero frames ≤ 8 MB, each layer ≤ 400 KB WebP; lazy-load the rest.
 
 ## Site check (developers and QA)
 

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+import os
 import re
+import subprocess
 from pathlib import Path
 
 import httpx
@@ -90,6 +92,9 @@ def test_website_project_hands_template_to_requirements(env):
             assert (kit / "site-check.mjs").read_bytes() == checker.read_bytes()
             demo = REPO / "lyra_lite/templates/cinematic-parallax/demo/index.html"
             assert (kit / "reference" / "index.html").read_bytes() == demo.read_bytes()
+            for tool in ("imagine", "cutout", "frames"):  # run with Lyra's own Python
+                assert os.access(kit / tool, os.X_OK), tool
+            assert "usage" in subprocess.run([str(kit / "cutout"), "--help"], capture_output=True, text=True).stdout
 
             # Later turns carry the website rule, even for projects set up
             # before it existed.
@@ -124,3 +129,21 @@ def test_web_cinematic_skill_follows_the_description_rule():
     text = (REPO / "plugins/ultimate-builder/skills/ultimate-app-builder/references/workflows/web-cinematic/SKILL.md").read_text()
     description = re.search(r"^description: (.*)$", text, re.MULTILINE).group(1)
     assert len(description) <= 60 and description.endswith(".")
+
+
+def test_photo_real_template_asks_for_the_owners_footage(env):
+    with FakeOpenAIServer([openai_text("Do you have a video of the reveal?")]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            path = env["home"] / "Lyra Projects" / "Launch"
+            res = daemon.post("/api/projects", {"path": str(path), "create": True, "team": [],
+                                                "kind": "website", "template": "grand-reveal", "brief": "Unveil our watch"})
+            assert res.status_code == 200, res.text
+            start = _wait_event(path, lambda e: e["type"] == "turn_start")
+            text = start["text"]
+            payload = json.loads(text[len("IDRAK_INTERNAL_SETUP_BEGIN"):text.rindex("IDRAK_INTERNAL_SETUP_END")])
+            assert "video" in payload["media_gate"] and ".lyra/kit/frames" in payload["media_gate"]
+            assert "never pass ai pictures off" in payload["media_gate"].lower()
+        finally:
+            daemon.stop()

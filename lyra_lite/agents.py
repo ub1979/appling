@@ -173,6 +173,15 @@ def setup_message(root: Path, team: list[str], models: dict | None, brief: str,
             "interview: confirm the template fits, then ask what to change (brand, words, "
             "colours, sections, images), one question per message. Do not re-ask what the "
             "template already decides. Record the template and the agreed changes in requirements.md.")
+        media = template.get("media") or {}
+        if media.get("ask"):
+            payload["media_gate"] = (
+                "This template is built on real footage or photos. In the requirements "
+                f"interview ask this as its own question: \"{media['ask']}\" Files the owner "
+                "attaches land in assets/uploads/. Video → `.lyra/kit/frames`; cut-outs → "
+                "`.lyra/kit/cutout`; AI pictures (only after the owner says yes; each uses "
+                "their ChatGPT plan) → `.lyra/kit/imagine`. Never pass AI pictures off as "
+                "real photos of a real product, place or person.")
     return f"{SETUP_BEGIN} {json.dumps(payload, ensure_ascii=False)} {SETUP_END}"
 
 
