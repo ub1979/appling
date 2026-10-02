@@ -39,7 +39,7 @@ Count the characters. A 76- or 78-wide rule is a defect, not a rounding.
 # File        : order_total_calculator.py
 # Date        : 2026-08-16
 # Description : Calculates order totals including tax and discounts.
-# Author      : Lyra
+# Author      : APP IT
 # =============================================================================
 # =============================================================================
 

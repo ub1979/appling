@@ -1,3 +1,26 @@
+# APP IT
+
+> **Describe it. Pick a design. Get a working app, website, deck or video — on your own machine.**
+
+APP IT is a personal AI product studio. You describe what you want; a team of
+AI agents asks the right questions, plans, builds, tests in a real browser and
+hands you something you can open. It runs locally on the AI subscriptions you
+already have (Claude, ChatGPT/Codex, Ollama and more).
+
+- **Start:** `./start.sh` → <http://127.0.0.1:9200/> · **Stop:** `./stop.sh`
+- **Make:** apps, websites (14 templates with live demos, two photo-real),
+  slide decks (4 templates) and short videos (8 templates)
+- **Checks:** websites are opened in Chrome on desktop and phone before QA
+  can pass; colours are measured, not guessed
+- **Your files:** everything lives in your project folder; 📎 attach videos,
+  frames or photos in the chat
+
+APP IT grew out of Lyra and runs on [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+by Nous Research (MIT). Internal folders still use the name `lyra`
+(`lyra_lite/`, each project's `.lyra/`). The original Lyra README follows.
+
+---
+
 # Lyra
 
 > **Describe it. Approve the design. Get a working app.**

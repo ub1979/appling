@@ -5,7 +5,7 @@ description: Choose colours and UI/UX patterns that work.
 
 # Colour and UX Skill
 
-The rules every screen Lyra builds must pass: how to pick a palette that
+The rules every screen APP IT builds must pass: how to pick a palette that
 fits the brand and reads well, and the interface and experience basics that
 keep people from getting lost. It decides colour, layout, type and
 interaction defaults; it does not replace the brand or an approved template.

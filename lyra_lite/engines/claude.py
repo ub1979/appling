@@ -1,8 +1,8 @@
-"""Claude Code (via the Claude Agent SDK) as a Lyra Lite engine.
+"""Claude Code (via the Claude Agent SDK) as an APP IT Lite engine.
 
 The model is chosen separately from the engine: an Anthropic API key runs
 Claude models; a custom Anthropic-compatible address (for example Ollama)
-runs other models through the same engine. Lyra never falls back to a
+runs other models through the same engine. APP IT never falls back to a
 Claude subscription login — the CLI gets its own config folder.
 
 Safety matches the Hermes engine: file edits inside the project are allowed,
@@ -112,7 +112,7 @@ PLUGIN_NAME = "ultimate-builder"
 
 
 def builder_plugin_dir() -> Path:
-    """Lyra's builder playbooks as a native Claude Code plugin.
+    """APP IT's builder playbooks as a native Claude Code plugin.
 
     The playbooks are already SKILL.md files. Linked into a plugin called
     ``ultimate-builder`` they load with Claude Code's own Skill tool under the
@@ -124,7 +124,7 @@ def builder_plugin_dir() -> Path:
     root = get_hermes_home() / "lyra-lite" / "claude-plugin" / PLUGIN_NAME
     (root / ".claude-plugin").mkdir(parents=True, exist_ok=True)
     manifest = {"name": PLUGIN_NAME, "version": "1.0.0",
-                "description": "Lyra's application-builder playbooks."}
+                "description": "APP IT's application-builder playbooks."}
     (root / ".claude-plugin" / "plugin.json").write_text(json.dumps(manifest, indent=2) + "\n")
     skills = root / "skills"
     skills.mkdir(exist_ok=True)
@@ -151,7 +151,7 @@ def engine_notes() -> str:
     return f"""
 ## Running on Claude Code
 
-Lyra's playbooks are installed as Claude Code skills named
+APP IT's playbooks are installed as Claude Code skills named
 `{PLUGIN_NAME}:<name>`. Translate the playbooks' tool names:
 - `skill_view(name="{PLUGIN_NAME}:X")` → load it with the **Skill** tool as
   `{PLUGIN_NAME}:X`, then follow it exactly. Never improvise a phase whose

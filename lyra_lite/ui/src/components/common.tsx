@@ -6,9 +6,9 @@ import { usePrefs } from "../prefs";
 export function Brand({ sub, onClick }: { sub: string; onClick?: () => void }) {
   return (
     <button className="brand" onClick={onClick} type="button">
-      <span className="brand-mark">L</span>
+      <span className="brand-mark">A</span>
       <span>
-        <span className="brand-name">Lyra Studio</span>
+        <span className="brand-name">APP IT</span>
         <br />
         <span className="brand-sub">{sub}</span>
       </span>

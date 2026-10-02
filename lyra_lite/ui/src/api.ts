@@ -164,7 +164,7 @@ export function uploadFile(id: string, file: File, onProgress: (p: number) => vo
       if (xhr.status >= 200 && xhr.status < 300 && data.path) resolve({ path: data.path, size: data.size ?? file.size });
       else reject(new Error(data.detail ?? `Upload failed (${xhr.status})`));
     };
-    xhr.onerror = () => reject(new Error("Upload failed — is Lyra still running?"));
+    xhr.onerror = () => reject(new Error("Upload failed — is APP IT still running?"));
     xhr.send(file);
   });
 }

@@ -1,10 +1,10 @@
-"""Starting templates: Lyra's own set plus the owner's private ones.
+"""Starting templates: APP IT's own set plus the owner's private ones.
 
 Built-in templates live in ``lyra_lite/templates/<id>/`` (``template.json``,
 ``spec.md``, optional ``demo/index.html``). The owner's own templates — for
 example prompts they bought — live only in
 ``<HERMES_HOME>/lyra-lite/templates/<id>/`` on their machine and are never
-copied into Lyra's source.
+copied into APP IT's source.
 """
 
 from __future__ import annotations
@@ -131,7 +131,7 @@ def _copy_if_changed(src: Path, dst: Path) -> None:
 
 
 def _write_tools(kit: Path) -> None:
-    """Small commands that run with Lyra's own Python (Pillow, the Codex image
+    """Small commands that run with APP IT's own Python (Pillow, the Codex image
     provider), whatever the project's own setup is."""
     import os
     import sys
@@ -147,7 +147,7 @@ def _write_tools(kit: Path) -> None:
     kit.mkdir(parents=True, exist_ok=True)
     for name, line in tools.items():
         path = kit / name
-        body = f"#!/bin/sh\n# Lyra kit: {name} — see the web-cinematic skill.\n{line}\n"
+        body = f"#!/bin/sh\n# APP IT kit: {name} — see the web-cinematic skill.\n{line}\n"
         try:
             if not path.is_file() or path.read_text() != body:
                 path.write_text(body)

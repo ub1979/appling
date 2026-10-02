@@ -37,8 +37,8 @@ export function Home() {
       <header className="topbar">
         <Brand sub="Your software workspace" />
         <div className="top-actions">
-          {problem ? <span className="pill need">Can't reach Lyra</span> : <span className="status-dot">Ready</span>}
-          <span className="version">Lyra Lite {version}</span>
+          {problem ? <span className="pill need">Can't reach APP IT</span> : <span className="status-dot">Ready</span>}
+          <span className="version">APP IT {version}</span>
           <PrefButtons onAi={() => go("/settings")} />
         </div>
       </header>
@@ -48,7 +48,7 @@ export function Home() {
           <p className="kicker">Your AI product studio</p>
           <h1>Turn an idea into software.</h1>
           <p className="lead">
-            Describe what you want to create. Lyra brings in the right agents, keeps the work moving, and shows you what
+            Describe what you want to create. APP IT brings in the right agents, keeps the work moving, and shows you what
             is ready—without the technical noise.
           </p>
           <div className="ticks">
@@ -83,7 +83,7 @@ export function Home() {
             <span className="num-badge">↺</span>
             <div>
               <h2>Continue a project</h2>
-              <p>Everything is saved — pick up where Lyra left off.</p>
+              <p>Everything is saved — pick up where APP IT left off.</p>
             </div>
           </div>
           <div className="recent-grid">
@@ -122,7 +122,7 @@ export function Home() {
           <span className="start-icon">+</span>
           <span>
             <b>Create a new project</b>
-            <span className="desc">Start with an idea and let Lyra guide the build.</span>
+            <span className="desc">Start with an idea and let APP IT guide the build.</span>
           </span>
           <span className="arrow">→</span>
         </button>
@@ -140,7 +140,7 @@ export function Home() {
         <span className="num-badge">02</span>
         <div>
           <h2>Choose a starting style</h2>
-          <p>Lyra can adjust the team later as your project takes shape.</p>
+          <p>APP IT can adjust the team later as your project takes shape.</p>
         </div>
       </div>
       <div className="style-grid">

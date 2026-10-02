@@ -12,7 +12,7 @@ How it works, step by step: flowcharts, cards and a clear finish. For [BRAND / P
 ## Blocks to start from (HyperFrames registry)
 `flowchart`, `orbit-card`, `cuboid-carousel`, `data-chart`
 
-## How Lyra builds it
+## How APP IT builds it
 HyperFrames (Apache-2.0, by HeyGen and contributors): plain HTML compositions
 rendered to MP4 in headless Chrome.
 

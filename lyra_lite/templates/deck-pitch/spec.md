@@ -14,7 +14,7 @@ A crisp 10–12 slide pitch: problem, product, traction, the ask. For [TOPIC / A
 10. Team — faces (or initials), names, one credential each.
 11. The ask on dark — amount, what it buys (bar), runway, contact.
 
-## How Lyra builds it
+## How APP IT builds it
 An HTML deck on reveal.js 5 (MIT): one `index.html`, 1280×720 slides,
 speaker notes (press S), fragments for build-ups, auto-animate between
 related slides. The live demo (`.lyra/kit/reference/index.html` when this

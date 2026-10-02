@@ -11,7 +11,7 @@ A bright 15–30 s app ad with floating phone screens. For [BRAND / PRODUCT — 
 ## Blocks to start from (HyperFrames registry)
 `app-showcase`, `vfx-iphone-device`, `liquid-glass-notification`, `ai-chat-reveal`
 
-## How Lyra builds it
+## How APP IT builds it
 HyperFrames (Apache-2.0, by HeyGen and contributors): plain HTML compositions
 rendered to MP4 in headless Chrome.
 

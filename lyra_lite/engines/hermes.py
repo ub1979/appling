@@ -1,4 +1,4 @@
-"""Hermes as a Lyra Lite engine.
+"""Hermes as an APP IT Lite engine.
 
 Builds ``run_agent.AIAgent`` directly — no TUI, no PTY, no JSON-RPC — using
 the same provider/model resolution as the Studio, so every linked
@@ -34,7 +34,7 @@ def enable_gateway_approvals() -> None:
     """Route risky-command approvals to the owner's inbox, never auto-approve.
 
     Outside a recognised gateway/ask context Hermes treats a run as an
-    unattended script and lets flagged commands through. Lyra Lite always has
+    unattended script and lets flagged commands through. APP IT always has
     an owner to ask, so mark the whole process as an asking gateway; a turn
     whose context is somehow lost then gets "approval required", not a pass.
     """
@@ -435,5 +435,5 @@ def _dispatch_secret(env_var, prompt, metadata=None):
         if engine is None and len(_ACTIVE) == 1:
             engine = next(iter(_ACTIVE.values()))
     if engine is None:
-        return {"success": False, "skipped": True, "message": "no active Lyra turn"}
+        return {"success": False, "skipped": True, "message": "no active APP IT turn"}
     return engine._on_secret(env_var, prompt, metadata)

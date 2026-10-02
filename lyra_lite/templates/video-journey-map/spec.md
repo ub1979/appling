@@ -11,7 +11,7 @@ A route flown across a real map, with stops and distances. For [BRAND / PRODUCT 
 ## Blocks to start from (HyperFrames registry)
 `nyc-paris-flight`, `world-map`, `us-map-bubble`
 
-## How Lyra builds it
+## How APP IT builds it
 HyperFrames (Apache-2.0, by HeyGen and contributors): plain HTML compositions
 rendered to MP4 in headless Chrome.
 

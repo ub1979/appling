@@ -5,7 +5,7 @@ description: Creates, repairs, condenses, or audits the bounded Project Brain at
 
 # Project Brain
 
-Maintain a compact, verified retrieval map so Lyra can resume a project without
+Maintain a compact, verified retrieval map so APP IT can resume a project without
 loading the full conversation or trusting stale notes.
 
 Use this skill after a meaningful verified milestone, before context

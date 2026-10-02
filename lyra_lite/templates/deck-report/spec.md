@@ -15,7 +15,7 @@ An editorial report deck: KPIs, charts that grow, honest tables. For [TOPIC / AU
 Every chart slide names its source at the bottom. Colour carries meaning
 only together with a word or sign (▲ ▼ + −).
 
-## How Lyra builds it
+## How APP IT builds it
 An HTML deck on reveal.js 5 (MIT): one `index.html`, 1280×720 slides,
 speaker notes (press S), fragments for build-ups, auto-animate between
 related slides. The live demo (`.lyra/kit/reference/index.html` when this

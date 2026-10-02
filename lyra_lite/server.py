@@ -1,4 +1,4 @@
-"""lyrad: the Lyra Lite daemon.
+"""lyrad: the APP IT daemon.
 
 A small HTTP API over the per-project files. Sending a message appends to the
 project's queue; the UI follows the project's ``events.jsonl`` over SSE.
@@ -63,7 +63,7 @@ APP_IT_SKILL = REPO_ROOT / "plugins" / "ultimate-builder" / "skills" / "app-it" 
 
 
 def current_rules_hash() -> str:
-    """Changes when Lyra's rules or the app-it playbook change."""
+    """Changes when APP IT's rules or the app-it playbook change."""
     from lyra_lite.settings import about_me
 
     digest = hashlib.sha1((rules_text() + about_me()).encode("utf-8"))
@@ -114,16 +114,18 @@ def placement(path: Path, *, creating: bool) -> str | None:
     inside_repo = path == REPO_ROOT or path.is_relative_to(REPO_ROOT)
     if inside_repo:
         if creating:
-            return f"New projects go outside Lyra's folder, e.g. {projects_root()}."
+            return f"New projects go outside APP IT's folder, e.g. {projects_root()}."
         if not any(path.is_relative_to(root) for root in ALLOWED_INSIDE_REPO):
-            return "That folder holds Lyra's own files."
+            return "That folder holds APP IT's own files."
     home = Path.home().resolve()
     if path == home or not path.is_relative_to(home):
         return "Choose a folder inside your home folder."
     return None
 
 
-HELD_PREFIX = "While Lyra was stopped, these reports arrived:"
+HELD_PREFIX = "While APP IT was stopped, these reports arrived:"
+# Chats saved before the rename still say Lyra.
+HELD_PREFIXES = (HELD_PREFIX, "While Lyra was stopped, these reports arrived:")
 HELD_SPLIT = "The owner's message:"
 
 
@@ -147,12 +149,12 @@ def display_messages(messages: list[dict]) -> list[dict]:
         if internal is not None:
             out.append(internal)
             continue
-        if role == "user" and text.startswith(HELD_PREFIX) and HELD_SPLIT in text:
+        if role == "user" and text.startswith(HELD_PREFIXES) and HELD_SPLIT in text:
             held, own = text.split(HELD_SPLIT, 1)
             out.append({"role": "user", "content": held.strip(), "kind": "system"})
             text = own.strip()
         elif role == "user" and text == NUDGE:
-            out.append({"role": "user", "content": "Lyra kept going on its own.", "kind": "auto"})
+            out.append({"role": "user", "content": "APP IT kept going on its own.", "kind": "auto"})
             continue
         elif role == "user" and text.startswith("["):
             kind = "system"
@@ -617,7 +619,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     def _check_cookie(request: Request) -> None:
         # Browser tabs can't send headers, so previews use Lyra's cookie.
         if not secrets.compare_digest(request.cookies.get("lyra_token", ""), token):
-            raise HTTPException(status_code=401, detail="Open this from Lyra")
+            raise HTTPException(status_code=401, detail="Open this from APP IT")
 
     # Declared before the project preview so "templates" is never read as a project id.
     @app.get("/preview/templates/{tid}/{path:path}")
@@ -760,7 +762,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     def _index() -> HTMLResponse:
         index = UI_DIST / "index.html"
         if not index.exists():
-            return HTMLResponse("<p>Lyra Lite UI is not built. Run <code>npm run build</code> "
+            return HTMLResponse("<p>APP IT UI is not built. Run <code>npm run build</code> "
                                 "in <code>lyra_lite/ui</code>.</p>")
         html = index.read_text(encoding="utf-8")
         tag = f"<script>window.__LYRA_TOKEN__={json.dumps(token)};</script>"

@@ -9,7 +9,13 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
-### Lyra Lite (next) — websites, templates, real checks
+### APP IT v0.03 beta — 2026-10-02
+
+Lyra Lite is now **APP IT**: a new name on every screen and in the assistant's
+own words (internal folder and code names stay `lyra` so existing projects
+keep working).
+
+Websites, templates and real checks:
 
 - **What are you making?** New projects choose App, Website, Slides or Video.
   Websites skip the build-size question.

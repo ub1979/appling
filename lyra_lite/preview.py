@@ -1,7 +1,7 @@
 """Open app: build the project's site when it needs it, then serve it like a host.
 
 A built site (Vite, React, …) asks for ``/assets/...`` from the root of its
-address, so it only works when served at ``/`` — under Lyra's own
+address, so it only works when served at ``/`` — under APP IT's own
 ``/preview/<id>/`` path its styles and scripts never load. Each project's app
 therefore gets its own small local server on a free port (localhost only).
 The first visit carries a one-time key in the address, which becomes a cookie
@@ -89,7 +89,7 @@ def _run(cmd: list[str], project: Path, timeout: int, what: str) -> None:
         raise PreviewError(f"{what} took longer than {timeout // 60} minutes and was stopped.")
     if done.returncode != 0:
         tail = "\n".join((done.stdout + "\n" + done.stderr).strip().splitlines()[-12:])
-        raise PreviewError(f"{what} failed, so there is nothing to open yet. Ask Lyra to fix it:\n{tail}")
+        raise PreviewError(f"{what} failed, so there is nothing to open yet. Ask APP IT to fix it:\n{tail}")
 
 
 _build_locks: dict[str, threading.Lock] = {}
@@ -145,7 +145,7 @@ class _Host:
                     return
                 sent = dict(p.strip().split("=", 1) for p in (self.headers.get("Cookie") or "").split(";") if "=" in p)
                 if not secrets.compare_digest(sent.get(cookie, ""), host.secret):
-                    return self._plain(401, "Open this app from Lyra's Open app button.")
+                    return self._plain(401, "Open this app from APP IT's Open app button.")
                 target = host.resolve(url.path)
                 if target is None:
                     return self._plain(404, "Not found")

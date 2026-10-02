@@ -1,4 +1,4 @@
-"""Start Lyra Lite: ``python -m lyra_lite [--port 9200] [--no-open]``."""
+"""Start APP IT: ``python -m lyra_lite [--port 9200] [--no-open]``."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ import webbrowser
 
 
 def _stable_token() -> str:
-    """One private token per Lyra home, so open tabs survive a restart."""
+    """One private token per APP IT home, so open tabs survive a restart."""
     from hermes_constants import get_hermes_home
 
     path = get_hermes_home() / "lyra-lite" / "token"
@@ -69,7 +69,7 @@ def main() -> None:
     url = f"http://{args.host}:{args.port}/"
     from lyra_lite import VERSION_LABEL
 
-    print(f"Lyra Lite {VERSION_LABEL} is running at {url}", flush=True)
+    print(f"APP IT {VERSION_LABEL} is running at {url}", flush=True)
     if not args.no_open:
         webbrowser.open(url)
     uvicorn.run(app, host=args.host, port=args.port, log_level="warning")

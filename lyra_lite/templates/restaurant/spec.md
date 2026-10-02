@@ -41,5 +41,5 @@ performance ≥ 85.
 ## Process
 Section plan + component tree first; build one section at a time and review;
 finish with a taste pass and a senior Awwwards-judge critique, fixing the top
-five issues. The live demo (`.lyra/kit/reference/index.html` in a Lyra
+five issues. The live demo (`.lyra/kit/reference/index.html` in an APP IT
 project) is the reference for every effect above.

@@ -12,7 +12,7 @@ Code that types, morphs and lifts off the screen in 3D. For [BRAND / PRODUCT —
 ## Blocks to start from (HyperFrames registry)
 `code-typing`, `code-diff`, `code-morph`, `code-3d-extrude`, `code-particle-assemble`
 
-## How Lyra builds it
+## How APP IT builds it
 HyperFrames (Apache-2.0, by HeyGen and contributors): plain HTML compositions
 rendered to MP4 in headless Chrome.
 

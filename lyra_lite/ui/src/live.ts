@@ -158,7 +158,7 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
       const status = str(evt.status);
       const problem =
         status === "error" || status === "crashed"
-          ? str(evt.error) || "Lyra hit a problem and stopped this reply."
+          ? str(evt.error) || "APP IT hit a problem and stopped this reply."
           : null;
       let next = state;
       const cost = (evt.usage as { cost_usd?: number } | undefined)?.cost_usd;

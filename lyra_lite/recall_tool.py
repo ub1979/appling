@@ -1,7 +1,7 @@
 """``project_recall`` for the Hermes engine.
 
-Registered by Lyra Lite into its own toolset (``lyra_memory``), so the tool
-exists only in Lyra Lite — never in the classic Studio or other Hermes
+Registered by APP IT into its own toolset (``lyra_memory``), so the tool
+exists only in APP IT — never in the classic Studio or other Hermes
 chats. Delegated agents inherit the toolset and can recall too.
 """
 
@@ -48,7 +48,7 @@ def _handler(args: dict, **kwargs) -> str:
         return json.dumps({"error": "Give a few words to search for."})
     root = _project_root(kwargs.get("task_id"))
     if root is None:
-        return json.dumps({"error": "No Lyra project is open here."})
+        return json.dumps({"error": "No APP IT project is open here."})
     limit = int((args or {}).get("limit") or 6)
     results = ProjectMemory(root).search(query, limit=max(1, min(limit, 10)))
     return json.dumps({"result": format_results(query, results)}, ensure_ascii=False)

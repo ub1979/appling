@@ -1,11 +1,11 @@
-"""Keep Lyra (the coordinator) light.
+"""Keep APP IT (the coordinator) light.
 
-Lyra talks with the owner and hands work to agents; the agents build, test
-and commit. On the calculator build Lyra made 128 model calls and her
+APP IT talks with the owner and hands work to agents; the agents build, test
+and commit. On the calculator build APP IT made 128 model calls and her
 conversation grew from 21k to 88k tokens per call because she ran tests and
-read raw output herself. Three limits stop that, applied to Lyra's agent only:
+read raw output herself. Three limits stop that, applied to APP IT's agent only:
 
-- no shell (terminal / process / code execution) in Lyra's own tool list,
+- no shell (terminal / process / code execution) in APP IT's own tool list,
   while her enabled toolsets stay complete so delegated agents keep them;
 - a small tool-output budget, so one large result cannot flood her context;
 - earlier summary compression (about 100k tokens).

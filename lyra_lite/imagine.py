@@ -4,7 +4,7 @@
         [--aspect landscape|square|portrait] [--ref picture.png ...]
 
 It uses Hermes' ``openai-codex`` image provider, so it needs only the Codex /
-ChatGPT sign-in Lyra already has — no API key. ``--ref`` sends existing
+ChatGPT sign-in APP IT already has — no API key. ``--ref`` sends existing
 pictures to edit or to keep a scene consistent ("same car, sheet removed").
 Every picture uses the owner's plan allowance: only run it when the owner
 agreed to AI pictures for this project.

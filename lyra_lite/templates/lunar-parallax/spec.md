@@ -7,7 +7,7 @@ layered photography.
 The hero is six separate layers, each its own picture:
 background (sky/space) · a glowing subject (planet, sun) · the title · the
 landscape · a figure · a foreground frame (rocks, leaves). Options:
-1. **The owner's photos** — Lyra cuts subjects out with `.lyra/kit/cutout`
+1. **The owner's photos** — APP IT cuts subjects out with `.lyra/kit/cutout`
    (plain or green-screen backgrounds work best).
 2. **AI pictures** with `.lyra/kit/imagine` on the owner's ChatGPT plan, each
    layer made separately: glowing subjects on pure black (blend with
@@ -51,5 +51,5 @@ performance ≥ 85.
 ## Process
 Section plan + component tree first; build one section at a time and review;
 finish with a taste pass and a senior Awwwards-judge critique, fixing the top
-five issues. The live demo (`.lyra/kit/reference/index.html` in a Lyra
+five issues. The live demo (`.lyra/kit/reference/index.html` in an APP IT
 project) is the reference for every effect above.

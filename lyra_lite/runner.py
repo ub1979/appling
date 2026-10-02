@@ -2,7 +2,7 @@
 
 Messages, helper completions and (later) watchdog nudges all arrive the same
 way — appended to the persisted queue in ``state.json`` — so anything can
-drive Lyra without touching a live connection.
+drive APP IT without touching a live connection.
 """
 
 from __future__ import annotations
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 RESTART_NOTE = (
-    "(Lyra was restarted before finishing this reply. Work done so far is in "
+    "(APP IT was restarted before finishing this reply. Work done so far is in "
     "the project files: check git status and .sdlc/progress.md before continuing.)"
 )
 
@@ -141,7 +141,7 @@ class ProjectRunner:
                 held = [q["text"] for q in queue]
                 if held:
                     item["text"] = (
-                        "While Lyra was stopped, these reports arrived:\n\n"
+                        "While APP IT was stopped, these reports arrived:\n\n"
                         + "\n\n---\n\n".join(held)
                         + "\n\n---\n\nThe owner's message:\n\n" + text
                     )
@@ -198,7 +198,7 @@ class ProjectRunner:
     def new_chat(self) -> str:
         with self._cond:
             if self._busy:
-                raise RuntimeError("Lyra is busy; stop the current turn first")
+                raise RuntimeError("APP IT is busy; stop the current turn first")
             if self.helpers():
                 raise RuntimeError("Agents are still working; press Stop first")
             self._drop_engine()
@@ -257,10 +257,10 @@ class ProjectRunner:
         self.store.append_event("setting", name="keep_going", value=bool(on))
 
     def set_engine(self, name: str | None, claude: dict | None = None) -> None:
-        """Pick this project's own engine, or None to follow Lyra's default."""
+        """Pick this project's own engine, or None to follow APP IT's default."""
         with self._cond:
             if self._busy or self.helpers():
-                raise RuntimeError("Lyra is busy; switch engines when it's idle")
+                raise RuntimeError("APP IT is busy; switch engines when it's idle")
             changes: dict[str, Any] = {"engine": name, "engine_override": name is not None}
             if claude is not None:
                 # A blank token field means "keep the saved one".
@@ -272,7 +272,7 @@ class ProjectRunner:
         self.store.append_event("setting", name="engine", value=name or "default")
 
     def request_reload(self) -> None:
-        """Lyra-wide settings changed: rebuild the engine before the next turn
+        """APP IT-wide settings changed: rebuild the engine before the next turn
         (a running turn finishes on the settings it started with)."""
         self._reload_pending = True
 
@@ -280,7 +280,7 @@ class ProjectRunner:
         """Rebuild the engine (new rules) at the next turn; refuses while busy."""
         with self._cond:
             if self._busy or self.helpers():
-                raise RuntimeError("Lyra is busy; try again when it's idle")
+                raise RuntimeError("APP IT is busy; try again when it's idle")
             self._drop_engine()
         self.store.append_event("rules_applied")
 
@@ -321,7 +321,7 @@ class ProjectRunner:
                     self.store.update_state(watchdog=wd)
                     self.store.append_event(
                         "watchdog", action="gave_up",
-                        text="Lyra stopped nudging itself: the last nudges made no progress.",
+                        text="APP IT stopped nudging itself: the last nudges made no progress.",
                     )
                     return "gave up: no progress"
             else:

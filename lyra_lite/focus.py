@@ -1,8 +1,8 @@
-"""The focus note: where the project stands, attached to Lyra's messages.
+"""The focus note: where the project stands, attached to APP IT's messages.
 
 Long chats get summarised and details fade. The project's own files do not:
 this note is rebuilt from them (the progress ledger and the Project Brain's
-next-actions and open-questions sections) and attached to the message Lyra
+next-actions and open-questions sections) and attached to the message APP IT
 receives, so she always sees the current state — however old the chat is.
 It costs no model call and is only re-sent when the state changes (or every
 few turns as a reminder).

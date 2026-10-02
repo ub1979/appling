@@ -16,7 +16,7 @@ A cinematic talk: full-bleed photos, big type, one idea per slide. For [TOPIC / 
 Photos slowly push in while their slide is on screen; speaker notes carry
 the script (press S).
 
-## How Lyra builds it
+## How APP IT builds it
 An HTML deck on reveal.js 5 (MIT): one `index.html`, 1280×720 slides,
 speaker notes (press S), fragments for build-ups, auto-animate between
 related slides. The live demo (`.lyra/kit/reference/index.html` when this
