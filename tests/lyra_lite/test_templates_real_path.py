@@ -57,7 +57,8 @@ def test_template_library_user_templates_and_live_demos(env):
 
 
 def test_website_project_hands_template_to_requirements(env):
-    with FakeOpenAIServer([openai_text("Love it. Shall we keep the travel mood?")]) as llm:
+    with FakeOpenAIServer([openai_text("Love it. Shall we keep the travel mood?"),
+                           openai_text("Noted: Aurelia Lodge.")]) as llm:
         _write_config(env["hermes_home"], llm.base_url)
         daemon = Daemon(env).start()
         try:
@@ -75,6 +76,27 @@ def test_website_project_hands_template_to_requirements(env):
             assert payload["template"]["id"] == "cinematic-parallax"
             assert "Pinned story" in payload["template_spec"] and "delta interview" in payload["template_gate"]
             assert start["display"] == "A site for my cabin retreat"
+            # Websites skip the size question: always the full functional + visual QA.
+            assert payload["build_profile"] == "reusable"
+            assert "BLOCKED, never APPROVED" in payload["website_gate"]
+
+            # The checker and the template's live demo are inside the project
+            # (git-ignored), so helpers on any engine can run and read them.
+            first = _wait_event(path, lambda e: e["type"] == "turn_end")
+            kit = path / ".lyra" / "kit"
+            checker = REPO / "plugins/ultimate-builder/skills/ultimate-app-builder/references/workflows/web-cinematic/scripts/site-check.mjs"
+            assert (kit / "site-check.mjs").read_bytes() == checker.read_bytes()
+            demo = REPO / "lyra_lite/templates/cinematic-parallax/demo/index.html"
+            assert (kit / "reference" / "index.html").read_bytes() == demo.read_bytes()
+
+            # Later turns carry the website rule, even for projects set up
+            # before it existed.
+            pid = res.json()["id"]
+            assert daemon.post(f"/api/projects/{pid}/messages", {"text": "Call it Aurelia Lodge"}).status_code == 200
+            _wait_event(path, lambda e: e["type"] == "turn_end" and e["turn"] != first["turn"])
+            last = llm.main_requests()[-1]["messages"]
+            user_text = next(m["content"] for m in reversed(last) if m["role"] == "user")
+            assert "Call it Aurelia Lodge" in str(user_text) and "site-check.mjs" in str(user_text)
         finally:
             daemon.stop()
 

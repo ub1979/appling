@@ -123,6 +123,18 @@ def project_listing(root: Path, limit: int = 40) -> str:
 PROFILES = ("personal", "reusable", "production")
 
 
+WEBSITE_GATE = (
+    "Websites are judged the way a visitor sees them. Developers: when "
+    ".lyra/kit/reference/index.html exists it is the template's live demo — the "
+    "approved look and motion; read it and reuse its techniques (or code) for each "
+    "effect instead of re-inventing them from the spec text. QA (every website, "
+    "every profile): after `npm run build`, run `node .lyra/kit/site-check.mjs dist "
+    "--compare .lyra/kit/reference/index.html` (drop --compare when there is no "
+    "reference), fix-route every problem it lists, then open each contact sheet it "
+    "names and check every section and effect against the reference and "
+    "requirements.md. Exit code 3 means no browser: the verdict is BLOCKED, never "
+    "APPROVED. A website that was not opened in a real browser cannot pass QA.")
+
 KIND_SKILLS = {
     "website": "ultimate-builder:web-cinematic",
     "video": "ultimate-builder:business-motion-film",
@@ -151,6 +163,8 @@ def setup_message(root: Path, team: list[str], models: dict | None, brief: str,
         payload["project_kind"] = kind
         if kind in KIND_SKILLS:
             payload["kind_skill"] = KIND_SKILLS[kind]
+        if kind == "website":
+            payload["website_gate"] = WEBSITE_GATE
     if template:
         payload["template"] = {"id": template["id"], "name": template.get("name", template["id"])}
         payload["template_spec"] = template.get("spec", "")

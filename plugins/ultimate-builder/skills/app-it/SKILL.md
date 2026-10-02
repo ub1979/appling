@@ -74,7 +74,11 @@ playbook for that kind (`kind_skill`) and a chosen `template` with its full
 `template_spec`:
 
 - **website** — the building agent loads `ultimate-builder:web-cinematic`; a
-  chosen template's spec is the starting design.
+  chosen template's spec is the starting design and its live demo
+  (`.lyra/kit/reference/index.html`) is the approved look and motion. Follow
+  `website_gate`: name the reference in every developer and QA delegation, and
+  QA always runs the site check in a real browser. Websites come with the
+  Reusable profile; do not ask the owner for a build size.
 - **video** — use `ultimate-builder:business-motion-film` (short business
   films and explainers).
 - **slides** — use the `powerpoint` skill for a deck the owner can open and

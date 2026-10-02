@@ -88,7 +88,9 @@
   @media (prefers-reduced-motion: reduce) {
     .cue i { animation: none; }
     .reveal .w { opacity: 1; }
-    .beat:first-child { opacity: 1; }
+    .story { height: auto; min-height: 100svh; }
+    .beats { position: relative; top: auto; translate: none; height: auto; margin: 0 0 0 auto; padding: 18vh 0; }
+    .beat { position: relative; opacity: 1; margin-bottom: 48px; }
   }
 </style>
 </head>
@@ -239,8 +241,9 @@
   const tl = gsap.timeline({ scrollTrigger: { trigger: "#story", start: "top top", end: "+=300%", pin: true, scrub: .6,
     onUpdate: (self) => { progress = self.progress; draw(); } } });
   beats.forEach((b, i) => {
-    tl.fromTo(b, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: .5, ease: "power3.out" }, i * 1.2)
-      .to(b, { opacity: 0, y: -40, duration: .5, ease: "power3.in" }, i * 1.2 + .9);
+    tl.fromTo(b, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: .5, ease: "power3.out" }, i * 1.2);
+    // The last beat stays up as the story un-pins.
+    if (i < beats.length - 1) tl.to(b, { opacity: 0, y: -40, duration: .5, ease: "power3.in" }, i * 1.2 + .9);
   });
 
   // 3 — horizontal gallery driven by vertical scroll, skewed by velocity.
@@ -253,7 +256,7 @@
 
   // 4 — words from 15% to 100%.
   gsap.to("#revealText .w", { opacity: 1, ease: "none", stagger: .05,
-    scrollTrigger: { trigger: "#reveal", start: "top 70%", end: "bottom 60%", scrub: true } });
+    scrollTrigger: { trigger: "#reveal", start: "top 75%", end: "center 50%", scrub: true } });
 
   // 5 — wordmark rise + magnetic button.
   gsap.from(".wordmark", { yPercent: 40, opacity: 0, ease: "power3.out", duration: 1.4, scrollTrigger: { trigger: "#book", start: "top 70%" } });

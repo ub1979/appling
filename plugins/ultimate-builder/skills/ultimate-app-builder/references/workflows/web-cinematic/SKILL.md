@@ -15,8 +15,9 @@ log-ins or databases — hand those to `sw-developer` with `sw-architect`.
 - The project kind is **Website**, or the owner asks for a landing page,
   portfolio, product page or "a site like Apple / Awwwards / Scrolltide".
 - A template was chosen at set-up: its `template_spec` (in the setup message
-  and `requirements.md`) is the starting design. Build that, with the changes
-  the owner approved.
+  and `requirements.md`) is the starting design, and its live demo — copied
+  to `.lyra/kit/reference/index.html` — is the approved look and motion.
+  Build that, with the changes the owner approved.
 
 ## Prerequisites
 
@@ -54,11 +55,13 @@ oversized wordmark and a magnetic button.
 
 ## Procedure
 
-1. **Plan first.** Read the spec and requirements. Write the section plan and
-   component tree to `.sdlc/site-plan.md` and report it before building.
-   Scale to the build profile: Personal = 3–4 sections; Reusable = the full
-   spec; Production = full spec plus SEO, analytics hooks and an accessibility
-   audit.
+1. **Plan first.** Read the spec, requirements and the reference demo (when
+   there is one). For each section, name the reference effect it copies and
+   how (the demo is our own code: reuse its GSAP/canvas/three.js techniques
+   directly). Write the section plan to `.sdlc/site-plan.md` and report it
+   before building. Build every section the spec has; add SEO, analytics
+   hooks and an accessibility audit only when the site is going public and
+   requirements ask.
 2. **Assets.** Use what requirements decided, in this order of preference:
    the owner's own images (`assets/` or what they sent); free stock photos
    (only with a configured key, credit the photographer); AI images via the
@@ -67,8 +70,9 @@ oversized wordmark and a magnetic button.
    transparent PNG; otherwise tasteful placeholders (gradients, SVG shapes)
    plus a list in the report of exactly which images to provide. Never ship
    hot-linked images or unlicensed stock.
-3. **Build one section at a time.** Scaffold, then section 1; build, open it,
-   check the motion, commit; then the next. Never one-shot the whole site.
+3. **Build one section at a time.** Scaffold, then section 1; build, run the
+   site check (below), look at its sheets, commit; then the next. Never
+   one-shot the whole site.
 4. **Performance and access.** Animate only `transform` and `opacity`;
    `will-change` sparingly; lazy-load media; dispose 3D scenes off-screen;
    respect `prefers-reduced-motion` with a static version; on phones,
@@ -82,6 +86,22 @@ oversized wordmark and a magnetic button.
 7. **Finish.** `npm run build` clean, commit, refresh the Project Brain, and
    report what was built, the images still needed, and how to open it.
 
+## Site check (developers and QA)
+
+`scripts/site-check.mjs` opens the build in the installed Chrome at desktop
+and phone size, scrolls it like a visitor, and lists console errors, failed
+requests, sideways overflow and text that never becomes readable. It writes
+screenshots and one contact sheet per size; with `--compare` each row shows
+the build next to the reference demo at the same scroll point. In a Lyra
+project it is copied to `.lyra/kit/site-check.mjs`:
+
+```
+node .lyra/kit/site-check.mjs dist --compare .lyra/kit/reference/index.html
+```
+
+Exit 0 = nothing automatic found, 1 = problems listed, 3 = BLOCKED (no
+browser). Automatic checks cannot judge taste: open every sheet it names.
+
 ## Pitfalls
 
 - Parallax without real layers looks cheap: separate background,
@@ -94,7 +114,8 @@ oversized wordmark and a magnetic button.
 
 ## Verification
 
-- `npm run build` succeeds and the built page opens with no console errors.
+- `npm run build` succeeds and the site check reports no problems; every
+  contact sheet was opened and each section matches the reference effect.
 - Scrolling top to bottom is smooth; each section's motion triggers once and
   in order; reduced-motion shows a static, readable page.
 - Narrow (390 px) and desktop widths both work without horizontal scroll.

@@ -269,6 +269,10 @@ class Lyra:
             chosen = agents.normalise_team(team)
             profile = profile if profile in agents.PROFILES else None
             kind = kind if kind in KINDS else None
+            if kind == "website":
+                # Websites skip the size question: they always get the full
+                # functional + visual QA that a public page needs.
+                profile = "reusable"
             template = get_template(template_id) if template_id else None
             runner.store.update_state(team=chosen, style=style or "app-it", models=models or {},
                                       profile=profile, project_kind=kind,

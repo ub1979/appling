@@ -76,6 +76,8 @@ export function Studio({ id }: { id: string }) {
   const [live, dispatch] = useReducer(liveReducer, undefined, emptyLive);
   const [problem, setProblem] = useState<string | null>(null);
   const [showTeam, setShowTeam] = useState(false);
+  // Bumped on every owner message so the chat jumps to the bottom to show it.
+  const [sent, setSent] = useState(0);
 
   const load = useCallback(async () => {
     const data = await api.project(id);
@@ -205,6 +207,7 @@ export function Studio({ id }: { id: string }) {
 
   const send = (text: string) => {
     askNotificationPermission();
+    setSent((n) => n + 1);
     return run(() => api.send(id, text));
   };
   const labelOf = (agentId: string) => agents.find((a) => a.id === agentId)?.label ?? agentId;
@@ -336,6 +339,7 @@ export function Studio({ id }: { id: string }) {
 
         <section className="chat-col">
           <ChatScroll
+            sent={sent}
             shown={shown}
             live={live}
             ids={ids}
@@ -573,6 +577,7 @@ function TeamDialog({ agents, team, onClose, onSave }: { agents: Agent[]; team: 
 }
 
 function ChatScroll(props: {
+  sent: number;
   shown: Shown[];
   live: LiveState;
   ids: string[];
@@ -588,6 +593,7 @@ function ChatScroll(props: {
   const { shown, live, ids } = props;
   const box = useRef<HTMLDivElement>(null);
   const stick = useRef(true);
+  const [away, setAway] = useState(false);
   const turn = live.turn;
   const liveText = turn ? clean(turn.reply, ids).text : "";
 
@@ -610,6 +616,21 @@ function ChatScroll(props: {
     const el = box.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [shown.length, liveText.length, live.queued.length, live.inbox.length, props.proposal]);
+  // The owner just sent something: always show it, even if they had scrolled
+  // up to read Lyra's last reply. Later layout keeps it pinned via `stick`.
+  useEffect(() => {
+    if (!props.sent) return;
+    stick.current = true;
+    setAway(false);
+    const el = box.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [props.sent]);
+  const jumpToLatest = () => {
+    const el = box.current;
+    stick.current = true;
+    setAway(false);
+    el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  };
 
   const lastLyraIndex = shown.map((s) => s.role).lastIndexOf("lyra");
 
@@ -620,8 +641,12 @@ function ChatScroll(props: {
       onScroll={(e) => {
         const el = e.currentTarget;
         stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+        setAway(!stick.current);
       }}
     >
+      {away && (
+        <button type="button" className="jump-latest" onClick={jumpToLatest}>↓ Latest</button>
+      )}
       <div className="chat-inner" ref={inner}>
         {shown.length === 0 && !turn && (
           <div className="empty-note">Let's start building. What's the idea? ✨</div>

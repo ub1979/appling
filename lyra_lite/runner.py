@@ -83,6 +83,13 @@ class _Hooks:
         self.runner._close_inbox(item_id, "expired")
 
 
+WEBSITE_FOCUS = (
+    "Website rule: the template's live demo at .lyra/kit/reference/index.html (when present) "
+    "is the approved look and motion — reuse its techniques. QA runs `node .lyra/kit/site-check.mjs "
+    "dist --compare .lyra/kit/reference/index.html` and checks every contact sheet it names; "
+    "no browser means BLOCKED, never APPROVED.")
+
+
 class ProjectRunner:
     def __init__(self, store: ProjectStore, engine_factory: EngineFactory):
         self.store = store.init()
@@ -452,6 +459,14 @@ class ProjectRunner:
                                 display=turn.get("display"))
         hooks = self._hooks
         hooks.turn_id = turn_id
+        state = self.store.state()
+        if state.get("project_kind") == "website":
+            try:
+                from lyra_lite.templates import ensure_website_kit
+
+                ensure_website_kit(self.root, state.get("template"))
+            except Exception:
+                logger.warning("lyra-lite: website kit copy failed", exc_info=True)
         engine = self._engine_for_chat()
         history = self.store.messages()
         engine_text = turn["text"] + self._focus_for(turn["kind"])
@@ -519,9 +534,11 @@ class ProjectRunner:
         except Exception:
             logger.debug("focus note failed", exc_info=True)
             return ""
+        state = self.store.state()
+        if state.get("project_kind") == "website":
+            note = (note or "[Project focus]") + "\n" + WEBSITE_FOCUS
         if not note:
             return ""
-        state = self.store.state()
         digest = hashlib.sha1(note.encode("utf-8")).hexdigest()[:12]
         since = int(state.get("focus_turns") or 0)
         if digest == state.get("focus_hash") and since < self.FOCUS_REMIND_EVERY:

@@ -30,6 +30,13 @@ tools if an appropriate runner is unavailable. Test the real entry point: actual
 web frontend, CLI command, packaged app or public library API. Scope setup to
 what the application actually has; a static calculator needs no backend server.
 
+**No browser, no pass.** A UI that was never opened in a real browser cannot be
+APPROVED at any profile. If no browser runs, the UI checks are BLOCKED and the
+verdict is BLOCKED with the reason. Websites: run the site check from
+`ultimate-builder:web-cinematic` (`node .lyra/kit/site-check.mjs dist`, with
+`--compare .lyra/kit/reference/index.html` when the template has a demo) and
+look at every contact sheet it writes; motion and layout bugs only show there.
+
 ## Quick Reference
 
 | Profile | Required depth |

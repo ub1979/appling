@@ -15,6 +15,10 @@ import shutil
 from pathlib import Path
 
 BUILTIN_ROOT = Path(__file__).resolve().parent / "templates"
+SITE_CHECK = (Path(__file__).resolve().parent.parent / "plugins" / "ultimate-builder" / "skills"
+              / "ultimate-app-builder" / "references" / "workflows" / "web-cinematic" / "scripts"
+              / "site-check.mjs")
+KIT_DIR = Path(".lyra") / "kit"
 KINDS = ("app", "website", "slides", "video")
 MAX_SPEC_CHARS = 20_000
 
@@ -109,3 +113,28 @@ def delete_user_template(tid: str) -> bool:
         return False
     shutil.rmtree(found[0])
     return True
+
+
+def _copy_if_changed(src: Path, dst: Path) -> None:
+    try:
+        if dst.is_file() and dst.read_bytes() == src.read_bytes():
+            return
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(src, dst)
+    except OSError:
+        pass
+
+
+def ensure_website_kit(root: Path, tid: str | None) -> None:
+    """Put the site checker, and the chosen template's live demo as the
+    reference design, inside the project (``.lyra/kit/``, git-ignored) so
+    every helper on any engine can run and read them."""
+    kit = Path(root) / KIT_DIR
+    if SITE_CHECK.is_file():
+        _copy_if_changed(SITE_CHECK, kit / "site-check.mjs")
+    demo = demo_dir(tid) if tid else None
+    if demo is None:
+        return
+    for src in demo.rglob("*"):
+        if src.is_file() and not any(part.startswith(".") for part in src.relative_to(demo).parts):
+            _copy_if_changed(src, kit / "reference" / src.relative_to(demo))

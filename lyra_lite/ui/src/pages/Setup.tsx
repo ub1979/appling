@@ -84,7 +84,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
     if (!path) return;
     setSaving(true);
     try {
-      const res = await api.addProject({ path, create: mode === "new", team: orderedTeam, style, brief, profile, kind, template: templateId });
+      const res = await api.addProject({ path, create: mode === "new", team: orderedTeam, style, brief, profile: kind === "website" ? "reusable" : profile, kind, template: templateId });
       go(`/p/${res.id}`);
     } catch (e) {
       setProblem(e instanceof Error ? e.message : String(e));
@@ -196,19 +196,29 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
             </section>
           )}
 
-          <section className="card card-pad">
-            <h3>How much should Lyra build?</h3>
-            <p className="muted small" style={{ margin: "4px 0 0" }}>This sets how big the plan, the checks and the team are. You can grow it later.</p>
-            <div className="profile-grid">
-              {PROFILES.map((p) => (
-                <button key={p.id} type="button" className={`profile-card ${profile === p.id ? "on" : ""}`} onClick={() => setProfile(p.id)}>
-                  <span className="radio" />
-                  <b>{p.name}</b>
-                  <span>{p.text}</span>
-                </button>
-              ))}
-            </div>
-          </section>
+          {kind === "website" ? (
+            <section className="card card-pad">
+              <h3>Checked like a visitor sees it</h3>
+              <p className="muted small" style={{ margin: "4px 0 0" }}>
+                Websites skip the size question. Lyra builds every section of the design and tests it in a real
+                browser on a computer and a phone, side by side with the template's demo, before calling it done.
+              </p>
+            </section>
+          ) : (
+            <section className="card card-pad">
+              <h3>How much should Lyra build?</h3>
+              <p className="muted small" style={{ margin: "4px 0 0" }}>This sets how big the plan, the checks and the team are. You can grow it later.</p>
+              <div className="profile-grid">
+                {PROFILES.map((p) => (
+                  <button key={p.id} type="button" className={`profile-card ${profile === p.id ? "on" : ""}`} onClick={() => setProfile(p.id)}>
+                    <span className="radio" />
+                    <b>{p.name}</b>
+                    <span>{p.text}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="card card-pad">
             <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>

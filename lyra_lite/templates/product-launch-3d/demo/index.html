@@ -173,7 +173,7 @@
     .to(state, { lift: .7, spin: Math.PI * 2.5, duration: 1 })                    // colours: centre stage
     .to(state, { lift: 1.2, spin: Math.PI * 3, glow: 2.2, duration: 1 });        // buy: above the offer, bright
 
-  gsap.utils.toArray(".feature").forEach((el) => {
+  if (!reduce) gsap.utils.toArray(".feature").forEach((el) => {
     gsap.from(el.children, { opacity: 0, y: 40, stagger: .08, duration: 1, ease: "power3.out",
       scrollTrigger: { trigger: el, start: "top 75%" } });
   });
