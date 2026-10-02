@@ -9,6 +9,26 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Lyra Lite (next) — websites, templates, real checks
+
+- **What are you making?** New projects choose App, Website, Slides or Video.
+  Websites skip the build-size question.
+- **Twelve website templates, each with a live demo** (Cinematic Parallax,
+  3D Product Launch, Editorial Scroll Story, Creative Portfolio, SaaS Launch,
+  Kinetic Type, Stacked Cards, AI / Tech Company, Restaurant & Food,
+  Architecture & Property, Charity & Impact, Beauty & Wellness Shop), plus
+  your own private templates. Requirements starts from the chosen design and
+  asks only what to change.
+- **Websites are checked like a visitor sees them.** A site check opens the
+  build in Chrome on a computer and a phone, scrolls it, flags errors,
+  sideways overflow and text that never appears, and puts it side by side with
+  the template's demo. QA can no longer approve a page it never opened.
+- **Open app actually opens the app.** Lyra builds the site when needed and
+  serves it at its own address, so built sites load their styles and scripts.
+- Chat jumps to your message when you send; "↓ Latest" when reading above.
+- New skills: web-cinematic (premium scroll sites) and business-motion-film
+  (from motion-video-kit, MIT).
+
 ### Lyra Lite v0.02 beta — 2026-10-01
 
 Memory that keeps each project focused — and stays inside that project.
