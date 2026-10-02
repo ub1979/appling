@@ -3,7 +3,7 @@
 // would (desktop + phone), scroll it top to bottom, and save what it saw.
 //
 //   node site-check.mjs [dist|index.html|http://url] [--compare reference.html]
-//                       [--out .sdlc/qa/site-check] [--steps 10]
+//                       [--out .lyra/qa/site-check] [--steps 10]
 //
 // It reports console/page errors, failed requests, sideways overflow, text
 // left faint after scrolling past it, and broken reduced-motion. It also writes
@@ -31,7 +31,9 @@ const opt = (name, fallback) => {
   args.splice(i, 2);
   return v;
 };
-const out = path.resolve(opt('--out', '.sdlc/qa/site-check'));
+// In a Lyra project the screenshots stay in .lyra/ (git-ignored) so QA runs
+// never bloat the project's history.
+const out = path.resolve(opt('--out', fs.existsSync('.lyra') ? '.lyra/qa/site-check' : 'site-check-report'));
 const compare = opt('--compare', null);
 const steps = Math.max(4, Math.min(24, Number(opt('--steps', 10)) || 10));
 let target = args[0] || (fs.existsSync('dist/index.html') ? 'dist' : 'index.html');
