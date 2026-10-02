@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Flowline — SaaS Launch demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink: #0b0d12; --ink-2: #12151d; --ink-3: #1a1f2b; --line: #ffffff14; --text: #e7eaf0; --muted: #8b93a7;
+    --blue: #3b82f6; --blue-2: #60a5fa; --green: #22c55e; --sans: "Geist", system-ui, sans-serif; --mono: "Geist Mono", ui-monospace, monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--ink); }
+  body { color: var(--text); font-family: var(--sans); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  .wrap { width: min(1180px, 100% - 32px); margin: 0 auto; }
+  .eyebrow { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--blue-2); }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 10px; font-weight: 600; font-size: 15px; border: 1px solid var(--line); background: var(--ink-3); color: var(--text); cursor: pointer; }
+  .btn.primary { background: var(--blue); border-color: transparent; color: #fff; box-shadow: 0 8px 30px #3b82f655; }
+  .nav { position: sticky; top: 0; z-index: 30; backdrop-filter: blur(14px); background: #0b0d12cc; border-bottom: 1px solid var(--line); }
+  .nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; }
+  .logo { display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 18px; }
+  .logo i { width: 22px; height: 22px; border-radius: 7px; background: conic-gradient(from 200deg, var(--blue), var(--green), var(--blue)); }
+  .nav nav { display: flex; gap: 26px; color: var(--muted); font-size: 14px; }
+
+  /* hero */
+  .hero { padding: 12svh 0 0; text-align: center; position: relative; }
+  .hero::before { content: ""; position: absolute; inset: 0 0 auto; height: 620px; background: radial-gradient(50% 60% at 50% 0%, #3b82f633, transparent 70%); pointer-events: none; }
+  .pill { display: inline-flex; gap: 8px; align-items: center; padding: 6px 12px; border: 1px solid var(--line); border-radius: 99px; font-size: 13px; color: var(--muted); background: var(--ink-2); }
+  .pill b { color: var(--green); font-weight: 600; }
+  .hero h1 { margin: 22px auto 0; max-width: 900px; font-size: clamp(42px, 6.6vw, 88px); line-height: 1; letter-spacing: -.045em; font-weight: 700; }
+  .hero h1 span { background: linear-gradient(90deg, var(--blue-2), var(--green)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero p { margin: 22px auto 0; max-width: 560px; color: var(--muted); font-size: 18px; line-height: 1.55; }
+  .hero .ctas { margin-top: 30px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+  /* product UI (drawn in HTML) */
+  .stage { margin: 9svh auto 0; width: min(1080px, 100% - 32px); perspective: 1600px; }
+  .app { position: relative; display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 14px; padding: 14px; border-radius: 18px; background: var(--ink-2); border: 1px solid var(--line); box-shadow: 0 40px 120px #000a, 0 0 0 1px #ffffff08 inset; transform-origin: 50% 0; text-align: left; }
+  .panel { background: var(--ink-3); border: 1px solid var(--line); border-radius: 12px; padding: 14px; position: relative; transition: box-shadow .5s, border-color .5s; }
+  .panel.hl { border-color: var(--blue); box-shadow: 0 0 0 4px #3b82f633; }
+  .side { display: grid; gap: 8px; align-content: start; }
+  .side .item { height: 30px; border-radius: 8px; background: #ffffff08; display: flex; align-items: center; gap: 8px; padding: 0 10px; font-size: 13px; color: var(--muted); }
+  .side .item.on { background: #3b82f622; color: var(--text); }
+  .side .item i { width: 10px; height: 10px; border-radius: 3px; background: currentColor; opacity: .6; }
+  .main { display: grid; gap: 14px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .stat small { color: var(--muted); font-size: 12px; }
+  .stat b { display: block; font-size: 26px; letter-spacing: -.03em; margin-top: 6px; }
+  .stat em { font-style: normal; font-size: 12px; color: var(--green); }
+  .chart { grid-column: 1 / -1; height: 220px; }
+  .chart svg { width: 100%; height: 100%; display: block; }
+  .flow { grid-column: 1 / -1; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .node { padding: 8px 12px; border-radius: 8px; background: #ffffff0a; font-family: var(--mono); font-size: 12px; }
+  .node.ok { color: var(--green); background: #22c55e18; }
+  .arrow { color: var(--muted); }
+
+  /* how it works */
+  .how { position: relative; margin-top: 18svh; }
+  .how-grid { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 48px; align-items: start; }
+  .steps { padding: 30svh 0; }
+  .step { min-height: 62svh; display: grid; align-content: center; opacity: .4; transition: opacity .5s; }
+  .step.on { opacity: 1; }
+  .step .n { font-family: var(--mono); color: var(--blue-2); font-size: 13px; }
+  .step h3 { font-size: clamp(28px, 3vw, 40px); letter-spacing: -.03em; margin: 10px 0; line-height: 1.08; }
+  .step p { color: var(--muted); font-size: 17px; line-height: 1.6; max-width: 420px; }
+  .pinbox { position: sticky; top: 15svh; }
+  .pinbox .app { grid-template-columns: 150px minmax(0, 1fr); }
+
+  /* features */
+  .features { margin-top: 16svh; }
+  .section-head { max-width: 680px; }
+  .section-head h2 { font-size: clamp(32px, 4.4vw, 56px); letter-spacing: -.04em; line-height: 1.04; margin-top: 12px; }
+  .bento { margin-top: 40px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .tile { background: var(--ink-2); border: 1px solid var(--line); border-radius: 16px; padding: 22px; min-height: 230px; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; }
+  .tile.wide { grid-column: span 2; }
+  .tile.full { grid-column: 1 / -1; min-height: 150px; flex-direction: row; align-items: center; justify-content: flex-start; gap: 24px; }
+  .tile.full .viz { height: auto; }
+  .tile h4 { font-size: 18px; letter-spacing: -.02em; }
+  .tile p { color: var(--muted); font-size: 14.5px; line-height: 1.5; margin-top: 6px; }
+  .viz { height: 96px; position: relative; }
+  .bars { display: flex; align-items: end; gap: 6px; height: 100%; }
+  .bars i { flex: 1; height: 100%; background: linear-gradient(var(--blue), #3b82f633); border-radius: 4px 4px 0 0; animation: grow 2.4s ease-in-out infinite alternate; transform-origin: bottom; }
+  .bars i:nth-child(2n) { animation-delay: -.6s; height: 70%; } .bars i:nth-child(3n) { animation-delay: -1.2s; height: 85%; }
+  .bars i:nth-child(5n) { height: 55%; }
+  @keyframes grow { from { transform: scaleY(.35); } to { transform: scaleY(1); } }
+  .ring { width: 90px; height: 90px; border-radius: 50%; background: conic-gradient(var(--green) 0 72%, #ffffff10 72%); display: grid; place-items: center; animation: spin 8s linear infinite; }
+  .ring::after { content: "72%"; width: 70px; height: 70px; border-radius: 50%; background: var(--ink-2); display: grid; place-items: center; font-weight: 700; animation: spin 8s linear infinite reverse; }
+  @keyframes spin { to { transform: rotate(1turn); } }
+  .pulse { position: absolute; left: 10px; top: 36px; width: 14px; height: 14px; border-radius: 50%; background: var(--green); box-shadow: 0 0 0 0 #22c55e88; animation: pulse 1.8s infinite; }
+  @keyframes pulse { to { box-shadow: 0 0 0 22px #22c55e00; } }
+  .typing { font-family: var(--mono); font-size: 13px; color: var(--blue-2); white-space: nowrap; overflow: hidden; border-right: 2px solid var(--blue-2); width: 0; animation: type 4s steps(28) infinite; }
+  @keyframes type { 40%, 90% { width: 28ch; } 100% { width: 0; } }
+  .avatars { display: flex; }
+  .avatars i { width: 38px; height: 38px; border-radius: 50%; border: 3px solid var(--ink-2); margin-left: -10px; animation: bob 3s ease-in-out infinite; }
+  .avatars i:nth-child(1) { background: #f59e0b; margin-left: 0; } .avatars i:nth-child(2) { background: #3b82f6; animation-delay: -.5s; }
+  .avatars i:nth-child(3) { background: #22c55e; animation-delay: -1s; } .avatars i:nth-child(4) { background: #e879f9; animation-delay: -1.5s; }
+  @keyframes bob { 50% { transform: translateY(-6px); } }
+  .lock { font-size: 40px; animation: bob 3s ease-in-out infinite; }
+
+  /* logos + quotes */
+  .logos { margin-top: 16svh; border-block: 1px solid var(--line); overflow: hidden; padding: 26px 0; }
+  .logos .track { display: flex; gap: 72px; width: max-content; animation: slide 30s linear infinite; color: #8b93a7aa; font-weight: 700; font-size: 22px; letter-spacing: -.02em; }
+  @keyframes slide { to { transform: translateX(-50%); } }
+  .quotes { margin-top: 64px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+  .quote { background: var(--ink-2); border: 1px solid var(--line); border-radius: 16px; padding: 22px; font-size: 16px; line-height: 1.55; }
+  .quote footer { margin-top: 16px; color: var(--muted); font-size: 13.5px; }
+
+  /* pricing */
+  .pricing { margin-top: 16svh; text-align: center; }
+  .toggle { margin: 24px auto 0; display: inline-flex; padding: 4px; border-radius: 12px; background: var(--ink-2); border: 1px solid var(--line); position: relative; }
+  .toggle button { position: relative; z-index: 1; border: 0; background: none; color: var(--muted); padding: 10px 18px; font: 600 14px var(--sans); cursor: pointer; }
+  .toggle button.on { color: #fff; }
+  .toggle .knob { position: absolute; top: 4px; bottom: 4px; left: 4px; border-radius: 9px; background: var(--blue); }
+  .plans { margin-top: 36px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; text-align: left; }
+  .plan { background: var(--ink-2); border: 1px solid var(--line); border-radius: 18px; padding: 26px; }
+  .plan.best { border-color: var(--blue); box-shadow: 0 20px 60px #3b82f622; }
+  .plan h4 { font-size: 16px; color: var(--muted); font-weight: 600; }
+  .price { margin: 12px 0 4px; font-size: 48px; font-weight: 700; letter-spacing: -.04em; }
+  .price small { font-size: 15px; color: var(--muted); font-weight: 500; letter-spacing: 0; }
+  .plan ul { margin-top: 18px; list-style: none; display: grid; gap: 10px; color: var(--muted); font-size: 14.5px; }
+  .plan li::before { content: "✓"; color: var(--green); margin-right: 10px; }
+  .plan .btn { margin-top: 22px; width: 100%; justify-content: center; }
+
+  /* cta */
+  .cta { margin: 16svh auto 0; text-align: center; padding: 72px 24px; border-radius: 28px; background: radial-gradient(60% 120% at 50% 0%, #3b82f644, transparent), var(--ink-2); border: 1px solid var(--line); }
+  .cta h2 { font-size: clamp(32px, 5vw, 64px); letter-spacing: -.045em; line-height: 1.02; }
+  .cta form { margin: 28px auto 0; display: flex; gap: 10px; max-width: 460px; }
+  .cta input { flex: 1; min-width: 0; padding: 12px 14px; border-radius: 10px; border: 1px solid var(--line); background: var(--ink); color: var(--text); font: 15px var(--sans); }
+  .cta .ok { margin-top: 14px; color: var(--green); font-size: 14px; min-height: 20px; }
+  .foot { margin: 72px 0 40px; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 16px; color: var(--muted); font-size: 13.5px; }
+
+  @media (max-width: 900px) {
+    .nav nav { display: none; }
+    .app { grid-template-columns: 1fr; }
+    .app .side { display: none; }
+    .main { grid-template-columns: 1fr 1fr; }
+    .main .stat:nth-child(3) { display: none; }
+    .how-grid { grid-template-columns: 1fr; }
+    .pinbox { top: 64px; z-index: 2; background: var(--ink); padding: 12px 0; }
+    .pinbox .app { grid-template-columns: 1fr; }
+    .pinbox .chart { height: 120px; }
+    .steps { padding: 6svh 0 20svh; }
+    .step { min-height: 55svh; }
+    .bento, .quotes, .plans { grid-template-columns: 1fr; }
+    .tile.wide, .tile.full { grid-column: auto; }
+    .cta form { flex-direction: column; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .bars i, .ring, .ring::after, .pulse, .avatars i, .lock, .logos .track { animation: none; }
+    .typing { animation: none; width: 28ch; border: 0; }
+    .step { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+<header class="nav"><div class="wrap"><a class="logo" href="#"><i></i>Flowline</a><nav><a href="#how">Product</a><a href="#features">Features</a><a href="#pricing">Pricing</a></nav><a class="btn primary" href="#start">Start free</a></div></header>
+
+<section class="hero">
+  <div class="wrap">
+    <span class="pill"><b>New</b> Flowline 2.0 — automations that explain themselves</span>
+    <h1>Your busywork, <span>running itself.</span></h1>
+    <p>Flowline connects the tools your team already uses and turns repeat work into calm, visible automations.</p>
+    <div class="ctas"><a class="btn primary" href="#start">Start free — no card</a><a class="btn" href="#how">See how it works →</a></div>
+  </div>
+  <div class="stage">
+    <div class="app" id="heroApp">
+      <div class="panel side" data-part="side">
+        <div class="item on"><i></i>Overview</div><div class="item"><i></i>Automations</div><div class="item"><i></i>Inbox</div><div class="item"><i></i>Reports</div><div class="item"><i></i>Settings</div>
+      </div>
+      <div class="main">
+        <div class="panel stat" data-part="stat"><small>Hours saved</small><b data-count="1284">0</b><em>▲ 18% this week</em></div>
+        <div class="panel stat" data-part="stat"><small>Runs today</small><b data-count="9420">0</b><em>▲ 4%</em></div>
+        <div class="panel stat" data-part="stat"><small>Success rate</small><b data-count="99" data-suffix="%">0</b><em>steady</em></div>
+        <div class="panel chart" data-part="chart">
+          <svg viewBox="0 0 600 200" preserveAspectRatio="none" aria-hidden="true">
+            <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3b82f6" stop-opacity=".35"/><stop offset="1" stop-color="#3b82f6" stop-opacity="0"/></linearGradient></defs>
+            <path class="area" d="M0 160 C80 150 120 110 200 115 C280 120 320 70 400 60 C480 50 520 30 600 20 L600 200 L0 200Z" fill="url(#g)"/>
+            <path class="line" d="M0 160 C80 150 120 110 200 115 C280 120 320 70 400 60 C480 50 520 30 600 20" fill="none" stroke="#60a5fa" stroke-width="3"/>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="how wrap" id="how">
+  <div class="how-grid">
+    <div class="steps">
+      <div class="step on" data-hl="side"><span class="n">01 — Connect</span><h3>Plug in the tools you already pay for.</h3><p>Slack, Gmail, Notion, Stripe and 200 more. Two clicks each, no code.</p></div>
+      <div class="step" data-hl="flow"><span class="n">02 — Describe</span><h3>Say what should happen, in plain words.</h3><p>“When a deal closes, invoice the client and tell the team.” Flowline drafts the automation and shows every step.</p></div>
+      <div class="step" data-hl="chart"><span class="n">03 — Watch it work</span><h3>See every run, and the hours you got back.</h3><p>A live chart, a readable history, and a pause button that actually pauses.</p></div>
+    </div>
+    <div class="pinbox">
+      <div class="app" id="howApp">
+        <div class="panel side" data-part="side"><div class="item on"><i></i>Slack</div><div class="item"><i></i>Gmail</div><div class="item"><i></i>Stripe</div><div class="item"><i></i>Notion</div></div>
+        <div class="main">
+          <div class="panel flow" data-part="flow"><span class="node">Deal closed</span><span class="arrow">→</span><span class="node">Create invoice</span><span class="arrow">→</span><span class="node ok">Post in #sales ✓</span></div>
+          <div class="panel chart" data-part="chart"><svg viewBox="0 0 600 200" preserveAspectRatio="none" aria-hidden="true"><path d="M0 170 C100 160 160 120 240 125 C320 130 380 80 460 70 C520 62 560 40 600 30" fill="none" stroke="#22c55e" stroke-width="3"/></svg></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="features wrap" id="features">
+  <div class="section-head"><span class="eyebrow">Features</span><h2>Everything you need to stop doing things twice.</h2></div>
+  <div class="bento">
+    <article class="tile wide"><div class="viz"><div class="bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div></div><div><h4>Live run history</h4><p>Every automation, every step, searchable for a year.</p></div></article>
+    <article class="tile"><div class="viz"><div class="ring"></div></div><div><h4>Goals</h4><p>Set a target, see progress at a glance.</p></div></article>
+    <article class="tile"><div class="viz"><span class="pulse"></span></div><div><h4>Always on</h4><p>99.99% uptime, retries built in.</p></div></article>
+    <article class="tile"><div class="viz"><div class="typing">invoice the client when…</div></div><div><h4>Plain-word builder</h4><p>Describe it; Flowline drafts the steps.</p></div></article>
+    <article class="tile"><div class="viz"><div class="avatars"><i></i><i></i><i></i><i></i></div></div><div><h4>Made for teams</h4><p>Shared automations, owners and approvals.</p></div></article>
+    <article class="tile full"><div class="viz"><div class="lock" aria-hidden="true">🔒</div></div><div><h4>Secure by default</h4><p>SSO, audit logs and data kept in your region.</p></div></article>
+  </div>
+</section>
+
+<section class="logos" aria-label="Customers"><div class="track" id="logos"></div></section>
+<section class="wrap">
+  <div class="quotes">
+    <blockquote class="quote">“We cut our month-end close from four days to one afternoon.”<footer>Priya Raman · Finance lead, Northbeam</footer></blockquote>
+    <blockquote class="quote">“The first automation tool our ops team actually trusts.”<footer>Marco Ventura · COO, Pellet</footer></blockquote>
+    <blockquote class="quote">“Set up in a coffee break. Saved two hires’ worth of busywork.”<footer>Lea Strand · Founder, Tidy</footer></blockquote>
+  </div>
+</section>
+
+<section class="pricing wrap" id="pricing">
+  <span class="eyebrow">Pricing</span>
+  <div class="section-head" style="margin: 0 auto"><h2>Simple plans. Cancel any time.</h2></div>
+  <div class="toggle" role="group" aria-label="Billing period"><span class="knob" id="knob"></span><button class="on" data-period="m">Monthly</button><button data-period="y">Yearly · save 20%</button></div>
+  <div class="plans">
+    <div class="plan"><h4>Starter</h4><div class="price"><span data-m="0" data-y="0">0</span><small> $/mo</small></div><p>For trying things out.</p><ul><li>3 automations</li><li>1,000 runs</li><li>Community help</li></ul><a class="btn" href="#start">Start free</a></div>
+    <div class="plan best"><h4>Team</h4><div class="price"><span data-m="24" data-y="19">24</span><small> $/user/mo</small></div><p>For teams that ship.</p><ul><li>Unlimited automations</li><li>50,000 runs</li><li>Approvals and owners</li></ul><a class="btn primary" href="#start">Start 14-day trial</a></div>
+    <div class="plan"><h4>Business</h4><div class="price"><span data-m="49" data-y="39">49</span><small> $/user/mo</small></div><p>For the whole company.</p><ul><li>SSO and audit logs</li><li>Unlimited runs</li><li>Priority support</li></ul><a class="btn" href="#start">Talk to us</a></div>
+  </div>
+</section>
+
+<section class="wrap" id="start">
+  <div class="cta">
+    <h2>Give your team its afternoons back.</h2>
+    <form id="signup"><input type="email" required placeholder="you@company.com" aria-label="Work email" /><button class="btn primary">Start free</button></form>
+    <p class="ok" id="ok" aria-live="polite"></p>
+  </div>
+  <div class="foot"><span>© 2026 Flowline — a Lyra template</span><span>Privacy · Terms · Status · Changelog</span></div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  gsap.registerPlugin(ScrollTrigger);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const names = ["Northbeam", "Pellet", "Tidy", "Orbit", "Kestrel", "Halcyon", "Brightline", "Mosaic"];
+  document.getElementById("logos").innerHTML = [...names, ...names].map((n) => `<span>${n}</span>`).join("");
+
+  // Counters (instant when motion is off).
+  const counters = document.querySelectorAll("[data-count]");
+  const showCount = (el, v) => { el.textContent = Math.round(v).toLocaleString() + (el.dataset.suffix || ""); };
+
+  // How it works: highlight the part each step talks about.
+  const steps = gsap.utils.toArray(".step");
+  const howApp = document.getElementById("howApp");
+  const highlight = (step) => {
+    steps.forEach((s) => s.classList.toggle("on", s === step));
+    howApp.querySelectorAll(".panel").forEach((p) => p.classList.toggle("hl", p.dataset.part === step.dataset.hl));
+  };
+  const phone = matchMedia("(max-width: 900px)").matches;
+  steps.forEach((s) => ScrollTrigger.create({ trigger: s, start: phone ? "top 85%" : "top 60%", end: phone ? "bottom 65%" : "bottom 40%", onToggle: (self) => self.isActive && highlight(s) }));
+  highlight(steps[0]);
+
+  // Pricing toggle with rolling numbers.
+  const knob = document.getElementById("knob");
+  const buttons = document.querySelectorAll(".toggle button");
+  const placeKnob = (btn) => gsap.to(knob, { x: btn.offsetLeft - 4, width: btn.offsetWidth, duration: reduce ? 0 : .5, ease: "power3.inOut" });
+  buttons.forEach((btn) => btn.addEventListener("click", () => {
+    buttons.forEach((b) => b.classList.toggle("on", b === btn));
+    placeKnob(btn);
+    document.querySelectorAll(".price span").forEach((el) => {
+      const to = +el.dataset[btn.dataset.period], n = { v: +el.textContent };
+      gsap.to(n, { v: to, duration: reduce ? 0 : .7, ease: "power3.out", onUpdate: () => { el.textContent = Math.round(n.v); } });
+    });
+  }));
+  gsap.set(knob, { width: buttons[0].offsetWidth });
+
+  document.getElementById("signup").addEventListener("submit", (e) => {
+    e.preventDefault();
+    document.getElementById("ok").textContent = "You're in — check your inbox for the next step.";
+  });
+
+  if (reduce) { counters.forEach((el) => showCount(el, +el.dataset.count)); return; }
+
+  const lenis = new Lenis({ lerp: .1 });
+  lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add((t) => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+
+  // Hero copy, then the product UI assembles from its panels.
+  gsap.from(".hero .pill, .hero h1, .hero p, .hero .ctas", { y: 24, opacity: 0, duration: 1, ease: "power3.out", stagger: .08 });
+  const app = document.getElementById("heroApp");
+  const tl = gsap.timeline({ delay: .45 });
+  tl.from(app, { rotateX: 18, y: 80, opacity: 0, duration: 1.3, ease: "expo.out" })
+    .from(app.querySelector(".side"), { x: -40, opacity: 0, duration: .8, ease: "power3.out" }, "-=.8")
+    .from(app.querySelectorAll(".stat"), { y: 30, opacity: 0, duration: .7, ease: "power3.out", stagger: .1 }, "-=.6")
+    .from(app.querySelector(".chart"), { y: 30, opacity: 0, duration: .7, ease: "power3.out" }, "-=.4");
+  const line = app.querySelector(".line"), len = line.getTotalLength();
+  gsap.set(line, { strokeDasharray: len, strokeDashoffset: len });
+  tl.to(line, { strokeDashoffset: 0, duration: 1.4, ease: "power2.inOut" }, "-=.3")
+    .from(app.querySelector(".area"), { opacity: 0, duration: .8 }, "-=.6");
+  counters.forEach((el) => { const n = { v: 0 }; tl.to(n, { v: +el.dataset.count, duration: 1.6, ease: "expo.out", onUpdate: () => showCount(el, n.v) }, 1.2); });
+  // As you scroll past, the product tilts back like a screen being set down.
+  gsap.to(app, { rotateX: 12, scale: .94, ease: "none", scrollTrigger: { trigger: ".stage", start: "top 30%", end: "bottom top", scrub: true } });
+
+  gsap.utils.toArray(".tile, .quote, .plan").forEach((el, i) => {
+    gsap.from(el, { y: 40, opacity: 0, duration: .9, ease: "power3.out", delay: (i % 3) * .06, scrollTrigger: { trigger: el, start: "top 88%" } });
+  });
+  gsap.from(".cta", { scale: .94, opacity: 0, duration: 1.1, ease: "expo.out", scrollTrigger: { trigger: ".cta", start: "top 80%" } });
+})();
+</script>
+</body>
+</html>

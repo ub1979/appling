@@ -14,6 +14,7 @@ import subprocess
 import sys
 import threading
 import time
+import shutil
 from pathlib import Path
 
 import httpx
@@ -482,24 +483,80 @@ def test_open_app_serves_the_project_page_but_never_hidden_files(env):
         try:
             pid, path = _new_project(daemon, env)
             assert daemon.get(f"/api/projects/{pid}/preview").json()["available"] is False
+            assert daemon.post(f"/api/projects/{pid}/preview/open", {}).status_code == 409
             (path / "index.html").write_text("<h1>Calc</h1>")
             (path / "src").mkdir()
             (path / "src" / "app.mjs").write_text("export const x = 1;")
             (path / ".env").write_text("SECRET=1")
-            assert daemon.get(f"/api/projects/{pid}/preview").json() == {"available": True, "url": f"/preview/{pid}/"}
+            assert daemon.get(f"/api/projects/{pid}/preview").json() == {"available": True, "build": False}
 
-            assert httpx.get(f"{daemon.base}/preview/{pid}/", timeout=5).status_code == 401
-            with httpx.Client(base_url=daemon.base, timeout=5) as browser:
-                assert browser.get("/").status_code == 200  # Lyra's page sets the cookie
-                page = browser.get(f"/preview/{pid}/")
-                assert page.status_code == 200 and "Calc" in page.text
-                module = browser.get(f"/preview/{pid}/src/app.mjs")
+            url = daemon.post(f"/api/projects/{pid}/preview/open", {}).json()["url"]
+            origin = url.split("/?")[0]
+            assert httpx.get(origin + "/", timeout=5).status_code == 401  # only via Lyra's link
+            with httpx.Client(base_url=origin, timeout=5, follow_redirects=True) as browser:
+                page = browser.get(url)
+                assert page.status_code == 200 and "Calc" in page.text and "lyra=" not in str(page.url)
+                module = browser.get("/src/app.mjs")
                 assert module.headers["content-type"].startswith("text/javascript")
-                assert browser.get(f"/preview/{pid}/.env").status_code == 404
-                assert browser.get(f"/preview/{pid}/.lyra/state.json").status_code == 404
+                assert browser.get("/.env").status_code == 404
+                assert browser.get("/.lyra/state.json").status_code == 404
                 (env["home"] / "secret.txt").write_text("TOPSECRET")
-                for escape in ("../../secret.txt", "%2e%2e/%2e%2e/secret.txt", "..%2f..%2fsecret.txt"):
-                    assert "TOPSECRET" not in browser.get(f"/preview/{pid}/{escape}").text, escape
+                for escape in ("/../../secret.txt", "/%2e%2e/%2e%2e/secret.txt", "/..%2f..%2fsecret.txt"):
+                    assert "TOPSECRET" not in browser.get(escape).text, escape
+        finally:
+            daemon.stop()
+
+
+BUILD_SCRIPT = """
+import fs from 'node:fs';
+fs.appendFileSync('builds.log', 'x');
+const src = fs.readFileSync('src/main.js', 'utf8');
+if (src.includes('BROKEN')) { console.error('src/main.js: unexpected token'); process.exit(1); }
+fs.mkdirSync('dist/assets', { recursive: true });
+fs.writeFileSync('dist/assets/app.js', src);
+fs.writeFileSync('dist/index.html', '<script type="module" src="/assets/app.js"></script><h1>Built</h1>');
+"""
+
+
+@pytest.mark.skipif(shutil.which("npm") is None, reason="needs Node.js")
+def test_open_app_builds_a_site_and_serves_it_from_the_root(env):
+    """A built site asks for /assets/... from the root of its address; Open app
+    must build it when stale and serve it where those paths work."""
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            (path / "package.json").write_text(json.dumps({"name": "site", "private": True, "type": "module",
+                                                           "scripts": {"build": "node build.mjs"}}))
+            (path / "build.mjs").write_text(BUILD_SCRIPT)
+            (path / "node_modules").mkdir()
+            (path / "src").mkdir()
+            (path / "src" / "main.js").write_text("console.log('v1')")
+            (path / "index.html").write_text("<script type=module src=/src/main.js></script>")  # source, not the app
+            assert daemon.get(f"/api/projects/{pid}/preview").json() == {"available": True, "build": True}
+
+            url = daemon.post(f"/api/projects/{pid}/preview/open", {}).json()["url"]
+            origin = url.split("/?")[0]
+            with httpx.Client(base_url=origin, timeout=5, follow_redirects=True) as browser:
+                assert "Built" in browser.get(url).text
+                asset = browser.get("/assets/app.js")  # the absolute path the page asks for
+                assert asset.status_code == 200 and "v1" in asset.text
+                assert "Built" in browser.get("/pricing").text  # app routes fall back to the page
+
+                # Up to date: no rebuild. Source changed: rebuilt before opening.
+                daemon.post(f"/api/projects/{pid}/preview/open", {})
+                assert (path / "builds.log").read_text() == "x"
+                time.sleep(1.1)
+                (path / "src" / "main.js").write_text("console.log('v2')")
+                daemon.post(f"/api/projects/{pid}/preview/open", {})
+                assert (path / "builds.log").read_text() == "xx"
+                assert "v2" in browser.get("/assets/app.js").text
+
+            time.sleep(1.1)
+            (path / "src" / "main.js").write_text("BROKEN")
+            res = daemon.post(f"/api/projects/{pid}/preview/open", {})
+            assert res.status_code == 409 and "unexpected token" in res.json()["detail"]
         finally:
             daemon.stop()
 

@@ -23,6 +23,7 @@ from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 
 from lyra_lite import agents
+from lyra_lite.preview import PREVIEW_TYPES, AppHosts, PreviewError
 from lyra_lite.runner import REPO_ROOT, ProjectRunner, project_key
 from lyra_lite.store import ProjectStore
 from lyra_lite.watchdog import NUDGE
@@ -101,25 +102,6 @@ def default_engine_factory(store: ProjectStore, session_key: str):
         kwargs["store"] = store
         kwargs["settings"] = effective_claude(state)
     return make_engine(name, **kwargs)
-
-
-# Built output first: a Vite project's root index.html is source, not the app.
-PREVIEW_DIRS = ("dist", "build", "", "public")
-PREVIEW_TYPES = {
-    ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",
-    ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg", ".gif": "image/gif", ".webp": "image/webp", ".ico": "image/x-icon",
-    ".woff": "font/woff", ".woff2": "font/woff2", ".txt": "text/plain", ".map": "application/json",
-}
-
-
-def preview_root(project: Path) -> Path | None:
-    """The folder holding the app's web page, if the project has one."""
-    for sub in PREVIEW_DIRS:
-        base = project / sub if sub else project
-        if (base / "index.html").is_file():
-            return base
-    return None
 
 
 def placement(path: Path, *, creating: bool) -> str | None:
@@ -372,6 +354,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         try:
             yield
         finally:
+            hosts.stop_all()
             lyra.shutdown()
 
     app = FastAPI(lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
@@ -559,10 +542,23 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
 
         return summarise_usage(lyra.get(pid).store)
 
+    hosts = AppHosts()
+    app.state.app_hosts = hosts
+
     @app.get("/api/projects/{pid}/preview")
     def preview_info(pid: str):
-        root = preview_root(lyra.get(pid).root)
-        return {"available": root is not None, "url": f"/preview/{pid}/" if root else None}
+        from lyra_lite import preview
+
+        root = lyra.get(pid).root
+        return {"available": preview.available(root), "build": preview.build_script(root) is not None}
+
+    @app.post("/api/projects/{pid}/preview/open")
+    def preview_open(pid: str):
+        """Build the site if it needs it, serve it at its own address, return that address."""
+        try:
+            return {"url": hosts.open(lyra.get(pid).root)}
+        except PreviewError as exc:
+            raise HTTPException(status_code=409, detail=str(exc))
 
     def _serve_static(base: Path, path: str):
         parts = [p for p in (path or "index.html").split("/") if p]
@@ -592,14 +588,6 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         base = demo_dir(tid)
         if base is None:
             raise HTTPException(status_code=404, detail="This template has no live demo")
-        return _serve_static(base, path)
-
-    @app.get("/preview/{pid}/{path:path}")
-    def preview(pid: str, path: str, request: Request):
-        _check_cookie(request)
-        base = preview_root(lyra.get(pid).root)
-        if base is None:
-            raise HTTPException(status_code=404, detail="This project has no web page yet")
         return _serve_static(base, path)
 
     # -- templates -----------------------------------------------------------

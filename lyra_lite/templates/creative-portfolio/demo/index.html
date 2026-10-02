@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Noa Reyes — Creative Portfolio demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --black: #111111; --bone: #f2f0ea; --red: #ff3d2e; --grey: #9a9a9a; --line: #ffffff1f;
+    --display: "Bricolage Grotesque", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--black); }
+  body { color: var(--bone); font-family: var(--display); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  .meta { font-family: var(--mono); font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--grey); }
+  .nav { position: fixed; inset: 0 0 auto; z-index: 30; display: flex; justify-content: space-between; align-items: center; padding: 20px clamp(16px, 3vw, 40px); mix-blend-mode: difference; }
+  .nav b { font-weight: 800; letter-spacing: -.02em; font-size: 18px; }
+  .nav nav { display: flex; gap: 22px; }
+  .nav nav a { text-decoration: none; }
+  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--red); margin-right: 8px; animation: blink 1.6s ease-in-out infinite; }
+  @keyframes blink { 50% { opacity: .2; } }
+
+  /* intro */
+  .intro { position: relative; min-height: 100svh; display: grid; align-content: end; padding: 0 clamp(16px, 3vw, 40px) 6svh; overflow: hidden; }
+  .name { font-weight: 800; font-size: clamp(88px, 21vw, 360px); line-height: .8; letter-spacing: -.055em; white-space: nowrap; margin-left: -.04em; }
+  .name .ch { display: inline-block; will-change: transform; }
+  .name .red { color: var(--red); }
+  .statement { margin-top: 4svh; display: grid; grid-template-columns: 1fr minmax(0, 520px); gap: 24px; align-items: end; }
+  .typed { font-size: clamp(20px, 2vw, 28px); line-height: 1.3; min-height: 2.6em; }
+  .typed .caret { display: inline-block; width: .5em; height: 1em; background: var(--red); vertical-align: -.12em; margin-left: 2px; animation: blink 1s steps(1) infinite; }
+
+  /* work index */
+  .work { padding: 16svh clamp(16px, 3vw, 40px) 10svh; }
+  .work h2 { font-weight: 600; font-size: clamp(14px, 1vw, 16px); margin-bottom: 20px; }
+  .row { position: relative; display: grid; grid-template-columns: 70px minmax(0, 1fr) 200px 80px; gap: 16px; align-items: center; padding: 26px 0; border-top: 1px solid var(--line); cursor: pointer; }
+  .row:last-child { border-bottom: 1px solid var(--line); }
+  .row h3 { font-weight: 600; font-size: clamp(30px, 5vw, 80px); line-height: 1; letter-spacing: -.035em; transition: transform .6s cubic-bezier(.2,.8,.2,1), color .3s; }
+  .row:hover h3, .row:focus-visible h3 { transform: translateX(24px); color: var(--red); }
+  .row:focus-visible { outline: 2px solid var(--red); outline-offset: 4px; }
+  .row .thumb { display: none; }
+  .preview { position: fixed; left: 0; top: 0; z-index: 25; width: 340px; aspect-ratio: 4 / 5; border-radius: 4px; pointer-events: none; opacity: 0; scale: .6; overflow: hidden; }
+  .art { width: 100%; height: 100%; }
+
+  /* case overlay */
+  .case { position: fixed; inset: 0; z-index: 40; background: var(--bone); color: var(--black); overflow-y: auto; visibility: hidden; clip-path: inset(50% 50% 50% 50%); }
+  .case .hero-art { height: 70svh; }
+  .case .inner { padding: 6svh clamp(16px, 3vw, 40px) 12svh; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 4vw; }
+  .case h2 { font-weight: 800; font-size: clamp(48px, 8vw, 140px); line-height: .85; letter-spacing: -.05em; }
+  .case p { font-size: 19px; line-height: 1.55; max-width: 560px; }
+  .case p + p { margin-top: 1em; }
+  .case .meta { color: #666; }
+  .case .shots { grid-column: 1 / -1; display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 6svh; }
+  .case .shots div { aspect-ratio: 4 / 3; border-radius: 4px; }
+  .close { position: fixed; right: clamp(16px, 3vw, 40px); top: 18px; z-index: 41; width: 52px; height: 52px; border-radius: 50%; border: 0; background: var(--black); color: var(--bone); font-size: 22px; cursor: pointer; opacity: 0; pointer-events: none; }
+  body.open .close { opacity: 1; pointer-events: auto; }
+
+  /* about */
+  .about { padding: 12svh clamp(16px, 3vw, 40px); display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 5vw; align-items: center; }
+  .portrait { aspect-ratio: 4 / 5; border-radius: 4px; overflow: hidden; position: relative; }
+  .portrait .p-inner { position: absolute; inset: -12% 0; will-change: transform; }
+  .about h2 { font-weight: 600; font-size: clamp(32px, 4vw, 60px); line-height: 1.02; letter-spacing: -.03em; }
+  .about h2 span { color: var(--red); }
+  .about p { margin-top: 26px; color: #cfcbc2; font-size: 18px; line-height: 1.6; max-width: 560px; }
+  .marquee { overflow: hidden; border-block: 1px solid var(--line); padding: 26px 0; }
+  .marquee .track { display: flex; width: max-content; gap: 64px; font-weight: 800; font-size: clamp(36px, 6vw, 96px); letter-spacing: -.04em; color: transparent; -webkit-text-stroke: 1px var(--bone); }
+  .marquee .track span:nth-child(3n) { color: var(--bone); -webkit-text-stroke: 0; }
+
+  /* contact */
+  .contact { min-height: 90svh; display: grid; align-content: center; padding: 0 clamp(16px, 3vw, 40px); }
+  .mail { display: inline-block; font-weight: 800; font-size: clamp(40px, 9vw, 150px); letter-spacing: -.05em; line-height: .95; text-decoration: none; will-change: transform; }
+  .mail:hover { color: var(--red); }
+  footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 24px clamp(16px, 3vw, 40px); border-top: 1px solid var(--line); }
+
+  @media (max-width: 820px) {
+    .nav nav { display: none; }
+    .statement { grid-template-columns: 1fr; }
+    .row { grid-template-columns: 44px minmax(0, 1fr); }
+    .row .type, .row .year { display: none; }
+    .row .thumb { grid-column: 1 / -1; aspect-ratio: 16 / 10; border-radius: 4px; overflow: hidden; }
+    .row.tapped .thumb { display: block; }
+    .preview { display: none; }
+    .case .inner, .about { grid-template-columns: 1fr; }
+    .case .shots { grid-template-columns: 1fr; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .dot, .typed .caret { animation: none; }
+    .row h3 { transition: none; }
+  }
+</style>
+</head>
+<body>
+<header class="nav"><b>Noa Reyes</b><nav class="meta"><a href="#work">Work</a><a href="#about">About</a><a href="#contact">Contact</a></nav><span class="meta"><span class="dot"></span>Open for Q3</span></header>
+
+<section class="intro" id="intro">
+  <h1 class="name" id="name" aria-label="Noa Reyes">NOA REYES<span class="red">.</span></h1>
+  <div class="statement">
+    <p class="meta">Independent designer · Lisbon · Est. 2014</p>
+    <p class="typed" id="typed" data-text="I design identities and digital products that people remember for the right reasons."><span id="typedText">I design identities and digital products that people remember for the right reasons.</span><span class="caret"></span></p>
+  </div>
+</section>
+
+<section class="work" id="work">
+  <h2 class="meta">Selected work — 2019 / 2026</h2>
+  <div id="rows"></div>
+</section>
+
+<section class="marquee" aria-label="Clients"><div class="track" id="marquee"></div></section>
+
+<section class="about" id="about">
+  <div class="portrait"><div class="p-inner" id="portrait"></div></div>
+  <div>
+    <p class="meta">About</p>
+    <h2>Ten years of turning <span>messy briefs</span> into clear, loud, useful things.</h2>
+    <p>I work with founders, museums and the occasional bakery. Small team, direct line, no account managers. Most projects start with a long walk and end with a brand that can stand on its own.</p>
+  </div>
+</section>
+
+<section class="contact" id="contact">
+  <p class="meta">Have something in mind?</p>
+  <a class="mail" id="mail" href="mailto:hello@noareyes.studio">hello@noareyes<br>.studio</a>
+</section>
+<footer class="meta"><span>© 2026 Noa Reyes</span><span>A Lyra template — all artwork drawn in code</span><span>Instagram · Are.na · LinkedIn</span></footer>
+
+<div class="preview" id="preview" aria-hidden="true"></div>
+<article class="case" id="case" aria-modal="true" role="dialog" aria-labelledby="caseTitle">
+  <div class="hero-art" id="caseArt"></div>
+  <div class="inner">
+    <div><p class="meta" id="caseMeta"></p><h2 id="caseTitle"></h2></div>
+    <div><p id="caseText"></p><p>The work: naming, a wordmark that flexes, a colour system built for screens first, and a launch site. Results after six months: twice the sign-ups and a brand people now draw from memory.</p></div>
+    <div class="shots"><div id="shotA"></div><div id="shotB"></div></div>
+  </div>
+</article>
+<button class="close" id="close" aria-label="Close case study">✕</button>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  gsap.registerPlugin(ScrollTrigger);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const phone = matchMedia("(max-width: 820px)").matches;
+
+  // Procedural artwork stands in for project photos.
+  const art = (a, b, c, shape) => `<svg class="art" viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <rect width="400" height="500" fill="${a}"/>${
+    shape === 0 ? `<circle cx="200" cy="230" r="150" fill="${b}"/><rect x="40" y="330" width="320" height="120" fill="${c}"/>` :
+    shape === 1 ? `<path d="M0 500 L200 80 L400 500Z" fill="${b}"/><circle cx="300" cy="120" r="60" fill="${c}"/>` :
+    shape === 2 ? `<rect x="60" y="60" width="280" height="380" rx="140" fill="${b}"/><rect x="0" y="230" width="400" height="40" fill="${c}"/>` :
+                  `<path d="M0 120 Q200 -40 400 120 L400 500 L0 500Z" fill="${b}"/><path d="M0 330 Q200 170 400 330 L400 500 L0 500Z" fill="${c}"/>`}
+    <text x="24" y="476" font-family="JetBrains Mono, monospace" font-size="14" fill="${c}">NR—${shape + 1}</text></svg>`;
+  const projects = [
+    { name: "Fieldhouse", type: "Identity · Web", year: "2026", colors: ["#e8e2d0", "#ff3d2e", "#111"], shape: 0,
+      text: "A climbing gym chain wanted to stop looking like a gym. We made it look like a field guide." },
+    { name: "Mareas", type: "Museum · Wayfinding", year: "2025", colors: ["#163a4a", "#7cc4c9", "#f2f0ea"], shape: 3,
+      text: "Wayfinding for a maritime museum, drawn from tide charts and harbour flags." },
+    { name: "Ota Bakery", type: "Packaging", year: "2024", colors: ["#f6d6b5", "#9a3412", "#fff7ed"], shape: 2,
+      text: "Paper bags as posters: every loaf goes home wrapped in the week's illustration." },
+    { name: "Signal/Noise", type: "Editorial · Type", year: "2023", colors: ["#111", "#f2f0ea", "#ff3d2e"], shape: 1,
+      text: "A quarterly magazine about sound, with a custom typeface that vibrates at large sizes." },
+  ];
+  const rows = document.getElementById("rows");
+  projects.forEach((p, i) => {
+    const row = document.createElement("div");
+    row.className = "row"; row.tabIndex = 0; row.setAttribute("role", "button");
+    row.innerHTML = `<span class="meta">0${i + 1}</span><h3>${p.name}</h3><span class="meta type">${p.type}</span><span class="meta year">${p.year}</span><div class="thumb">${art(...p.colors, p.shape)}</div>`;
+    rows.appendChild(row);
+    p.el = row;
+  });
+
+  // Clients marquee (drawn twice for a seamless loop).
+  const clients = ["Fieldhouse", "Mareas", "Ota", "Signal/Noise", "Lumen", "Kite & Co", "Porto Design Week", "Hollow"];
+  document.getElementById("marquee").innerHTML = [...clients, ...clients].map((c) => `<span>${c}</span>`).join("");
+  document.getElementById("portrait").innerHTML = `<svg class="art" viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <rect width="400" height="500" fill="#2a2522"/>
+    <path d="M96 210 C80 110 150 70 210 74 C290 78 330 140 312 230 C318 300 300 330 280 340 L120 340 C100 320 92 280 96 210Z" fill="#111"/>
+    <rect x="178" y="250" width="44" height="70" rx="18" fill="#b98a6c"/>
+    <ellipse cx="200" cy="200" rx="74" ry="88" fill="#c99a7a"/>
+    <path d="M124 186 C130 120 180 104 230 112 C270 120 286 150 280 190 C250 150 200 140 150 160 C140 166 130 176 124 186Z" fill="#111"/>
+    <path d="M60 520 C70 380 130 320 200 318 C270 320 330 380 340 520Z" fill="#ff3d2e"/>
+    <circle cx="300" cy="96" r="22" fill="#ff3d2e" opacity=".9"/></svg>`;
+
+  // Case study open/close: the overlay grows out of the clicked row.
+  const caseEl = document.getElementById("case");
+  let openRow = null;
+  const openCase = (p) => {
+    document.getElementById("caseArt").innerHTML = art(...p.colors, p.shape);
+    document.getElementById("shotA").innerHTML = art(p.colors[1], p.colors[0], p.colors[2], (p.shape + 1) % 4);
+    document.getElementById("shotB").innerHTML = art(p.colors[2], p.colors[1], p.colors[0], (p.shape + 2) % 4);
+    document.getElementById("caseTitle").textContent = p.name;
+    document.getElementById("caseMeta").textContent = `${p.type} — ${p.year}`;
+    document.getElementById("caseText").textContent = p.text;
+    const r = p.el.getBoundingClientRect();
+    const from = `inset(${r.top}px ${innerWidth - r.right}px ${innerHeight - r.bottom}px ${r.left}px)`;
+    openRow = p;
+    caseEl.scrollTop = 0;
+    document.body.classList.add("open");
+    gsap.fromTo(caseEl, { visibility: "visible", clipPath: from }, { clipPath: "inset(0px 0px 0px 0px)", duration: reduce ? 0 : 1, ease: "expo.inOut" });
+    if (!reduce) gsap.from("#case .inner > *", { y: 40, opacity: 0, duration: .9, ease: "power3.out", stagger: .08, delay: .5 });
+    lenis?.stop();
+    document.getElementById("close").focus();
+  };
+  const closeCase = () => {
+    if (!openRow) return;
+    const r = openRow.el.getBoundingClientRect();
+    gsap.to(caseEl, { clipPath: `inset(${r.top}px ${innerWidth - r.right}px ${innerHeight - r.bottom}px ${r.left}px)`,
+      duration: reduce ? 0 : .8, ease: "expo.inOut", onComplete: () => gsap.set(caseEl, { visibility: "hidden" }) });
+    document.body.classList.remove("open");
+    lenis?.start();
+    openRow.el.focus();
+    openRow = null;
+  };
+  document.getElementById("close").addEventListener("click", closeCase);
+  addEventListener("keydown", (e) => e.key === "Escape" && closeCase());
+  projects.forEach((p) => {
+    p.el.addEventListener("click", () => {
+      if (phone && !p.el.classList.contains("tapped")) { // first tap shows the picture, second opens
+        projects.forEach((q) => q.el.classList.toggle("tapped", q === p));
+        ScrollTrigger.refresh();
+        return;
+      }
+      openCase(p);
+    });
+    p.el.addEventListener("keydown", (e) => (e.key === "Enter" || e.key === " ") && (e.preventDefault(), openCase(p)));
+  });
+
+  let lenis = null;
+  if (reduce) return;
+
+  lenis = new Lenis({ lerp: .1 });
+  lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add((t) => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+
+  // Intro: letters rise one by one, then drift apart as you scroll away.
+  const name = document.getElementById("name");
+  name.innerHTML = [...name.textContent.replace(/\.$/, "")].map((c) => `<span class="ch">${c === " " ? "&nbsp;" : c}</span>`).join("") + `<span class="ch red">.</span>`;
+  const chars = name.querySelectorAll(".ch");
+  gsap.from(chars, { yPercent: 110, rotate: 8, duration: 1.3, ease: "expo.out", stagger: .045, delay: .1 });
+  gsap.to(chars, { yPercent: (i) => -(30 + (i % 3) * 28 + i * 4), ease: "none",
+    scrollTrigger: { trigger: "#intro", start: "top top", end: "bottom top", scrub: true } });
+
+  // Statement types itself in.
+  const typedText = document.getElementById("typedText"), full = typedText.textContent;
+  typedText.textContent = "";
+  const counter = { n: 0 };
+  gsap.to(counter, { n: full.length, duration: 2.6, ease: "none", delay: .9, onUpdate: () => { typedText.textContent = full.slice(0, Math.round(counter.n)); } });
+
+  // Work rows slide in; the floating preview follows the cursor.
+  gsap.from(".row", { y: 50, opacity: 0, duration: 1, ease: "power3.out", stagger: .08, scrollTrigger: { trigger: "#rows", start: "top 80%" } });
+  if (!phone) {
+    const preview = document.getElementById("preview");
+    const px = gsap.quickTo(preview, "x", { duration: .6, ease: "power3.out" });
+    const py = gsap.quickTo(preview, "y", { duration: .6, ease: "power3.out" });
+    const pr = gsap.quickTo(preview, "rotate", { duration: .8, ease: "power3.out" });
+    let lastX = 0;
+    addEventListener("pointermove", (e) => { px(e.clientX + 30); py(e.clientY - 210); pr(gsap.utils.clamp(-10, 10, (e.clientX - lastX) * .6)); lastX = e.clientX; });
+    projects.forEach((p) => {
+      p.el.addEventListener("pointerenter", () => { preview.innerHTML = art(...p.colors, p.shape); gsap.to(preview, { opacity: 1, scale: 1, duration: .5, ease: "power3.out" }); });
+      p.el.addEventListener("pointerleave", () => gsap.to(preview, { opacity: 0, scale: .6, duration: .4, ease: "power3.in" }));
+    });
+  }
+
+  // Marquee: always moving, faster and reversible with scroll velocity.
+  const track = document.getElementById("marquee");
+  const loop = gsap.to(track, { xPercent: -50, duration: 28, ease: "none", repeat: -1 });
+  ScrollTrigger.create({ onUpdate: (self) => {
+    const v = self.getVelocity() / 300;
+    gsap.to(loop, { timeScale: gsap.utils.clamp(-6, 6, v || (self.direction < 0 ? -1 : 1)), duration: .3, overwrite: true });
+    gsap.to(loop, { timeScale: self.direction < 0 ? -1 : 1, duration: 1.2, delay: .3, overwrite: false });
+  } });
+
+  // Portrait parallax and heading reveal.
+  gsap.to("#portrait", { yPercent: 14, ease: "none", scrollTrigger: { trigger: ".about", start: "top bottom", end: "bottom top", scrub: true } });
+  gsap.from(".about h2, .about p", { y: 40, opacity: 0, duration: 1.1, ease: "power3.out", stagger: .1, scrollTrigger: { trigger: ".about", start: "top 70%" } });
+
+  // Magnetic email.
+  const mail = document.getElementById("mail");
+  const mx = gsap.quickTo(mail, "x", { duration: .8, ease: "elastic.out(1, .4)" });
+  const my = gsap.quickTo(mail, "y", { duration: .8, ease: "elastic.out(1, .4)" });
+  mail.addEventListener("pointermove", (e) => { const r = mail.getBoundingClientRect(); mx((e.clientX - r.left - r.width / 2) * .15); my((e.clientY - r.top - r.height / 2) * .25); });
+  mail.addEventListener("pointerleave", () => { mx(0); my(0); });
+  gsap.from(mail, { yPercent: 40, opacity: 0, duration: 1.3, ease: "expo.out", scrollTrigger: { trigger: "#contact", start: "top 70%" } });
+})();
+</script>
+</body>
+</html>

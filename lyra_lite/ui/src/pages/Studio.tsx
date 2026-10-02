@@ -125,9 +125,10 @@ export function Studio({ id }: { id: string }) {
     };
   }, [id, live.turnsEnded]);
 
-  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [canOpen, setCanOpen] = useState(false);
+  const [opening, setOpening] = useState(false);
   useEffect(() => {
-    void api.preview(id).then((p) => setPreviewUrl(p.url)).catch(() => undefined);
+    void api.preview(id).then((p) => setCanOpen(p.available)).catch(() => undefined);
   }, [id, live.turnsEnded, live.helperChanges]);
 
   useAttentionSignals(detail?.name ?? "Lyra", live);
@@ -205,6 +206,28 @@ export function Studio({ id }: { id: string }) {
           ? { text: "Stopped", tone: "" }
           : { text: "Ready", tone: "good" };
 
+  // Lyra builds the site if it needs it and serves it at its own address.
+  // The tab opens right away (browsers block tabs opened after a wait).
+  const openApp = () => {
+    const tab = window.open("about:blank", "_blank");
+    if (tab) {
+      tab.document.title = "Opening your app…";
+      tab.document.body.innerHTML = '<p style="font:16px system-ui;padding:40px;color:#555">Lyra is getting your app ready — building it first if needed…</p>';
+    }
+    setOpening(true);
+    void run(async () => {
+      try {
+        const { url } = await api.openApp(id);
+        if (tab) tab.location.href = url;
+        else window.open(url, "_blank");
+      } catch (e) {
+        tab?.close();
+        throw e;
+      } finally {
+        setOpening(false);
+      }
+    });
+  };
   const send = (text: string) => {
     askNotificationPermission();
     setSent((n) => n + 1);
@@ -242,8 +265,8 @@ export function Studio({ id }: { id: string }) {
               <Square size={14} fill="currentColor" />
             </IconButton>
           )}
-          {previewUrl && (
-            <IconButton label="Open the app Lyra built" tone="accent" onClick={() => window.open(previewUrl, "_blank")}>
+          {canOpen && (
+            <IconButton label={opening ? "Getting your app ready…" : "Open the app Lyra built"} tone="accent" disabled={opening} onClick={openApp}>
               <Play size={16} fill="currentColor" />
             </IconButton>
           )}
@@ -272,7 +295,7 @@ export function Studio({ id }: { id: string }) {
         {!busy && helpers.length === 0 && allDone && (
           <div className="banner good">
             🎉 {detail.name} is ready — every step is done.
-            {previewUrl && <button className="btn primary small" onClick={() => window.open(previewUrl, "_blank")}>▶ Open app</button>}
+            {canOpen && <button className="btn primary small" disabled={opening} onClick={openApp}>{opening ? "Getting it ready…" : "▶ Open app"}</button>}
           </div>
         )}
       </div>

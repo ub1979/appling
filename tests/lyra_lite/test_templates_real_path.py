@@ -26,8 +26,10 @@ def test_template_library_user_templates_and_live_demos(env):
             web = daemon.get("/api/templates?kind=website").json()["templates"]
             ids = {t["id"] for t in web}
             assert {"cinematic-parallax", "product-launch-3d", "scroll-story", "creative-portfolio", "saas-motion"} <= ids
-            demos = {t["id"]: t["demo_url"] for t in web if t["has_demo"]}
-            assert set(demos) == {"cinematic-parallax", "product-launch-3d"}
+            # Every built-in website template ships a live demo to preview.
+            builtin = [t for t in web if not t["own"]]
+            assert builtin and all(t["has_demo"] and t["demo_url"] for t in builtin)
+            demos = {t["id"]: t["demo_url"] for t in builtin}
 
             mine = daemon.post("/api/templates", {"name": "Glass Agency", "kind": "website",
                                                   "tagline": "frosted", "spec": "PRIVATE-PROMPT build a glass site"}).json()

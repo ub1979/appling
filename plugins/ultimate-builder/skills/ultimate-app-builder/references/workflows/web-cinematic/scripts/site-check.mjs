@@ -145,8 +145,14 @@ function probeText() {
       if (s.visibility === 'hidden' || s.display === 'none') return 0;
       opacity *= Number(s.opacity);
     }
-    const alpha = /rgba?\(([^)]+)\)/.exec(getComputedStyle(el).color)?.[1].split(/[ ,/]+/).filter(Boolean)[3];
-    return opacity * (alpha === undefined ? 1 : Number(alpha));
+    const alphaOf = (c) => {
+      const a = /rgba?\(([^)]+)\)/.exec(c || '')?.[1].split(/[ ,/]+/).filter(Boolean)[3];
+      return a === undefined ? 1 : Number(a);
+    };
+    const st = getComputedStyle(el);
+    // Outlined text (transparent fill + text stroke) is visible through its stroke.
+    const stroke = parseFloat(st.webkitTextStrokeWidth) > 0 ? alphaOf(st.webkitTextStrokeColor) : 0;
+    return opacity * Math.max(alphaOf(st.color), stroke);
   };
   while (walker.nextNode()) {
     const node = walker.currentNode;
