@@ -1,0 +1,25 @@
+{
+  "kind": "video",
+  "id": "video-product-launch",
+  "name": "Product Launch Film",
+  "tagline": "A cinematic 30–45 s launch: glass titles, device shots, UI reveal, logo.",
+  "best_for": "Product launches, new features, announcements",
+  "palette": [
+    "#05060a",
+    "#e8ecf5",
+    "#9b7bff",
+    "#3dd9eb"
+  ],
+  "preview": {
+    "video": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/glass-shard-title.mp4",
+    "poster": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/glass-shard-title.png",
+    "credit": "Preview: HyperFrames block “glass-shard-title” (Apache-2.0)"
+  },
+  "blocks": [
+    "glass-shard-title",
+    "vfx-iphone-device",
+    "ui-3d-reveal",
+    "liquid-glass-widgets",
+    "logo-outro"
+  ]
+}

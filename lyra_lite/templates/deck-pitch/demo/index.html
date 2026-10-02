@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Northstar — Investor Pitch deck demo</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reset.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink: #0e0f13; --paper: #f5f3ee; --accent: #d9431f; --accent-soft: #ff8a6b; --blue: #5566e8; --muted: #6c6a66; --line: #0e0f1322;
+    --r-background-color: var(--paper); --r-main-color: var(--ink); --r-heading-color: var(--ink);
+    --r-main-font: "Instrument Sans", system-ui, sans-serif; --r-heading-font: "Instrument Sans", system-ui, sans-serif; --r-main-font-size: 30px; }
+  .reveal { font-family: var(--r-main-font); color: var(--ink); font-size: 30px; }
+  .reveal .slides { text-align: left; }
+  .reveal .slides section { height: 100%; padding: 56px 72px !important; box-sizing: border-box; }
+  .reveal h1, .reveal h2 { font-weight: 600; letter-spacing: -.035em; line-height: 1.02; margin: 0 0 24px; text-transform: none; }
+  .reveal h1 { font-size: 104px; }
+  .reveal h2 { font-size: 64px; }
+  .reveal em { font-family: "Instrument Serif", Georgia, serif; font-style: italic; font-weight: 400; color: var(--accent); }
+  .kicker { font-size: 18px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 18px; }
+  .foot { position: absolute; left: 72px; right: 72px; bottom: 36px; display: flex; justify-content: space-between; font-size: 16px; color: var(--muted); }
+  .dark { --r-background-color: var(--ink); }
+  .reveal .dark-slide, .reveal .dark-slide h1, .reveal .dark-slide h2 { color: var(--paper); }
+  .reveal p { margin: 0 0 18px; line-height: 1.45; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 28px; margin-top: 30px; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 22px; padding: 28px; }
+  .card b { display: block; font-size: 30px; letter-spacing: -.02em; margin-bottom: 10px; }
+  .card span { color: var(--muted); font-size: 22px; line-height: 1.45; }
+  .big-num { font-size: 120px; font-weight: 600; letter-spacing: -.05em; line-height: 1; color: var(--accent); }
+  .ui { background: #fff; border-radius: 24px; border: 1px solid var(--line); box-shadow: 0 30px 60px #0e0f1314; padding: 22px; display: grid; grid-template-columns: 200px 1fr; gap: 18px; height: 380px; }
+  .ui .side { background: var(--paper); border-radius: 14px; padding: 14px; display: grid; gap: 10px; align-content: start; font-size: 16px; }
+  .ui .side i { display: block; height: 14px; border-radius: 6px; background: #0e0f1314; }
+  .ui .map { border-radius: 14px; background: linear-gradient(#eef1f8, #e7ebf5); position: relative; overflow: hidden; }
+  .ui .map svg { width: 100%; height: 100%; }
+  .rings { position: relative; width: 460px; height: 460px; }
+  .ring { position: absolute; border-radius: 50%; display: grid; place-items: start center; padding-top: 24px; font-size: 20px; font-weight: 600; }
+  .layout2 { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; height: 80%; }
+  table.price { width: 100%; border-collapse: collapse; font-size: 24px; margin-top: 24px; }
+  table.price th, table.price td { text-align: left; padding: 16px 12px; border-bottom: 1px solid var(--line); }
+  table.price th { font-size: 18px; color: var(--muted); font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+  .matrix { position: relative; width: 560px; height: 460px; border-left: 2px solid var(--ink); border-bottom: 2px solid var(--ink); }
+  .matrix .dot { position: absolute; width: 22px; height: 22px; border-radius: 50%; background: #0e0f1355; translate: -50% 50%; }
+  .matrix .dot.us { background: var(--accent); width: 34px; height: 34px; box-shadow: 0 0 0 10px #d9431f22; }
+  .matrix .lbl { position: absolute; font-size: 18px; color: var(--muted); translate: 14px 50%; }
+  .team { display: grid; grid-template-columns: repeat(4, 1fr); gap: 28px; margin-top: 40px; }
+  .team div { text-align: center; }
+  .team .av { width: 150px; height: 150px; border-radius: 50%; margin: 0 auto 16px; display: grid; place-items: center; font-size: 44px; font-weight: 600; color: #fff; }
+  .team b { display: block; font-size: 26px; } .team span { color: var(--muted); font-size: 19px; }
+  .bar { display: flex; height: 56px; border-radius: 14px; overflow: hidden; margin: 26px 0 14px; }
+  .bar i { display: grid; place-items: center; color: #fff; font-style: normal; font-size: 18px; font-weight: 600; }
+  .legend { display: flex; gap: 26px; font-size: 20px; color: var(--muted); }
+  html, body, .reveal-viewport { background: #f5f3ee; }
+</style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+  <section data-background-color="#0e0f13" class="dark-slide">
+    <div class="kicker">Seed round · 2026</div>
+    <h1>Every van, <em>on time.</em></h1>
+    <p style="font-size:34px;color:#f5f3eeb3;max-width:900px">Northstar plans routes for small delivery fleets — in seconds, from a phone.</p>
+    <svg viewBox="0 0 1136 260" style="position:absolute;left:72px;right:72px;bottom:90px;width:1136px" aria-hidden="true">
+      <path class="draw" d="M0 220 C 160 220, 220 120, 380 140 S 600 230, 760 150 S 980 40, 1120 60" fill="none" stroke="#d9431f" stroke-width="5" stroke-linecap="round" stroke-dasharray="1 14"/>
+      <g fill="#f5f3ee"><circle cx="0" cy="220" r="8"/><circle cx="380" cy="140" r="8"/><circle cx="760" cy="150" r="8"/><circle cx="1120" cy="60" r="12" fill="#d9431f"/></g>
+    </svg>
+    <div class="foot" style="color:#f5f3ee80"><span>Northstar</span><span>Confidential · a Lyra template (fictional company)</span></div>
+  </section>
+
+  <section>
+    <div class="kicker">The problem</div>
+    <h2>Small fleets plan <em>by hand.</em></h2>
+    <div class="grid3">
+      <div class="card fragment fade-up"><b>3 hours a day</b><span>spent by owners juggling spreadsheets and maps.</span></div>
+      <div class="card fragment fade-up"><b>1 in 5 drops</b><span>arrive outside the promised window.</span></div>
+      <div class="card fragment fade-up"><b>£4,800 a year</b><span>wasted per van on fuel and overtime.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="layout2">
+      <div><div class="kicker">The product</div><h2>Paste the orders. <em>Press go.</em></h2><p style="color:var(--muted)">Routes for every driver in under ten seconds, re-planned live when the day changes.</p></div>
+      <div class="ui">
+        <div class="side"><b style="font-size:18px">Today · 6 vans</b><i></i><i style="width:80%"></i><i style="width:60%"></i><i></i><i style="width:70%"></i></div>
+        <div class="map"><svg viewBox="0 0 400 340" aria-hidden="true">
+          <path d="M40 300 C 90 220, 140 260, 180 180 S 280 120, 340 60" fill="none" stroke="#d9431f" stroke-width="5" stroke-linecap="round"/>
+          <path d="M40 300 C 120 300, 200 280, 250 230 S 320 220, 360 250" fill="none" stroke="#5566e8" stroke-width="5" stroke-linecap="round"/>
+          <g fill="#0e0f13"><circle cx="40" cy="300" r="9"/><circle cx="180" cy="180" r="7"/><circle cx="340" cy="60" r="7"/><circle cx="250" cy="230" r="7"/><circle cx="360" cy="250" r="7"/></g></svg></div>
+      </div>
+    </div>
+  </section>
+
+  <section data-auto-animate>
+    <div class="kicker">How it works</div>
+    <h2 data-id="hiw">Three steps.</h2>
+    <div class="grid3">
+      <div class="card" data-id="s1"><b>1 · Import</b><span>Orders from Shopify, email or a CSV.</span></div>
+      <div class="card" data-id="s2" style="opacity:.35"><b>2 · Plan</b><span>&nbsp;</span></div>
+      <div class="card" data-id="s3" style="opacity:.35"><b>3 · Drive</b><span>&nbsp;</span></div>
+    </div>
+  </section>
+  <section data-auto-animate>
+    <div class="kicker">How it works</div>
+    <h2 data-id="hiw">Three steps. <em>Ten seconds.</em></h2>
+    <div class="grid3">
+      <div class="card" data-id="s1"><b>1 · Import</b><span>Orders from Shopify, email or a CSV.</span></div>
+      <div class="card" data-id="s2"><b>2 · Plan</b><span>Traffic, time windows and van sizes — solved together.</span></div>
+      <div class="card" data-id="s3"><b>3 · Drive</b><span>Drivers get turn-by-turn and proof of delivery.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="layout2">
+      <div><div class="kicker">Market</div><h2>2.1 million small fleets in Europe.</h2><p style="color:var(--muted)">We start with UK food and parcel couriers, then expand.</p></div>
+      <div class="rings">
+        <div class="ring" style="inset:0;background:#d9431f1a">TAM £9.4bn</div>
+        <div class="ring fragment" style="inset:70px;background:#d9431f33">SAM £2.2bn</div>
+        <div class="ring fragment" style="inset:150px;background:var(--accent);color:#fff">SOM £180m</div>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">Traction</div>
+    <h2>Growing <em>18% a month.</em></h2>
+    <div class="layout2" style="height:auto;align-items:end">
+      <div><div class="big-num"><span class="count" data-to="412">0</span></div><p style="color:var(--muted)">paying fleets · £61k MRR · 2% monthly churn</p></div>
+      <svg viewBox="0 0 560 300" style="width:100%" aria-label="Monthly revenue rising steadily over twelve months">
+        <line x1="0" y1="290" x2="560" y2="290" stroke="#0e0f1333"/>
+        <path class="draw" d="M0 280 L50 272 L100 266 L150 255 L200 246 L250 228 L300 214 L350 190 L400 160 L450 128 L500 84 L550 30" fill="none" stroke="#d9431f" stroke-width="6" stroke-linejoin="round" stroke-linecap="round"/>
+      </svg>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">Business model</div>
+    <h2>Per van, per month.</h2>
+    <table class="price">
+      <tr><th>Plan</th><th>For</th><th>Price</th></tr>
+      <tr class="fragment"><td><b>Starter</b></td><td>1–3 vans</td><td>£29 / van</td></tr>
+      <tr class="fragment"><td><b>Fleet</b></td><td>4–25 vans</td><td>£24 / van</td></tr>
+      <tr class="fragment"><td><b>Enterprise</b></td><td>25+ vans, API</td><td>Talk to us</td></tr>
+    </table>
+  </section>
+
+  <section>
+    <div class="layout2">
+      <div><div class="kicker">Competition</div><h2>Simple <em>and</em> smart.</h2><p style="color:var(--muted)">Enterprise tools are powerful but slow to set up; free tools can't plan a fleet.</p></div>
+      <div class="matrix">
+        <span style="position:absolute;left:-10px;top:-34px;font-size:16px;color:var(--muted)">Smart planning ↑</span>
+        <span style="position:absolute;right:0;bottom:-34px;font-size:16px;color:var(--muted)">Easy to start →</span>
+        <i class="dot" style="left:18%;bottom:80%"></i><span class="lbl" style="left:18%;bottom:80%">Enterprise suites</span>
+        <i class="dot" style="left:80%;bottom:22%"></i><span class="lbl" style="left:80%;bottom:22%">Free map apps</span>
+        <i class="dot" style="left:45%;bottom:40%"></i><span class="lbl" style="left:45%;bottom:40%">Spreadsheets</span>
+        <i class="dot us fragment" style="left:82%;bottom:82%"></i><span class="lbl fragment" style="left:84%;bottom:82%;color:var(--accent);font-weight:600">Northstar</span>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <div class="kicker">Team</div>
+    <h2>Built by people who drove the vans.</h2>
+    <div class="team">
+      <div><div class="av" style="background:#d9431f">AM</div><b>Amara Mensah</b><span>CEO · ran a 14-van courier</span></div>
+      <div><div class="av" style="background:#5566e8">JL</div><b>Jonas Lind</b><span>CTO · routing at a scale-up</span></div>
+      <div><div class="av" style="background:#0e0f13">PR</div><b>Priya Rao</b><span>Design · ex-fintech</span></div>
+      <div><div class="av" style="background:#8a6d3b">TO</div><b>Tom O'Neill</b><span>Sales · 10 yrs logistics</span></div>
+    </div>
+  </section>
+
+  <section data-background-color="#0e0f13" class="dark-slide">
+    <div class="kicker">The ask</div>
+    <h2>Raising <em>£1.5M</em> to reach 2,000 fleets.</h2>
+    <div class="bar"><i style="width:45%;background:#d9431f">Product 45%</i><i style="width:35%;background:#5566e8">Growth 35%</i><i style="width:20%;background:#6c6a66">Ops 20%</i></div>
+    <div class="legend" style="color:#f5f3eeb3"><span>18 months runway</span><span>Break-even at 1,600 fleets</span></div>
+    <div class="foot" style="color:#f5f3ee80"><span>amara@northstar.example</span><span>Thank you</span></div>
+  </section>
+
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/plugin/notes/notes.min.js"></script>
+<script>
+  Reveal.initialize({ hash: true, width: 1280, height: 720, margin: 0, transition: "slide", backgroundTransition: "fade",
+    controls: true, progress: true, center: false, plugins: [RevealNotes] });
+  // Numbers count up and lines draw when their slide arrives.
+  Reveal.on("slidechanged", ({ currentSlide }) => {
+    currentSlide.querySelectorAll(".count").forEach((el) => {
+      const to = +el.dataset.to, t0 = performance.now();
+      const step = (t) => { const p = Math.min(1, (t - t0) / 1200); el.textContent = Math.round(to * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(step); };
+      requestAnimationFrame(step);
+    });
+    currentSlide.querySelectorAll("path.draw").forEach((path) => {
+      const len = path.getTotalLength();
+      path.style.transition = "none"; path.style.strokeDasharray = len; path.style.strokeDashoffset = len;
+      path.getBoundingClientRect();
+      path.style.transition = "stroke-dashoffset 1.6s cubic-bezier(.2,.8,.2,1)"; path.style.strokeDashoffset = 0;
+    });
+  });
+</script>
+</body>
+</html>

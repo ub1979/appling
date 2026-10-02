@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Build Your First Website — Workshop deck demo</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reset.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Nunito+Sans:wght@400;600;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --r-background-color: #fff8ec; --cream: #fff8ec; --ink: #20193a; --violet: #5b3fd6; --sun: #ffc93c; --mint: #2bb58f; --coral: #e5534b; --muted: #6a6380; }
+  html, body { background: var(--cream); }
+  .reveal { font-family: "Nunito Sans", system-ui, sans-serif; color: var(--ink); font-size: 30px; }
+  .reveal .slides { text-align: left; }
+  .reveal .slides section { height: 100%; padding: 56px 72px !important; box-sizing: border-box; }
+  .reveal h1, .reveal h2 { font-family: "Bricolage Grotesque", system-ui, sans-serif; font-weight: 800; letter-spacing: -.03em; line-height: 1; color: var(--ink); text-transform: none; margin: 0 0 22px; }
+  .reveal h1 { font-size: 110px; } .reveal h2 { font-size: 64px; }
+  .tag { display: inline-block; align-self: flex-start; font: 700 18px "Nunito Sans"; padding: 6px 14px; border-radius: 99px; background: var(--sun); margin-bottom: 18px; }
+  .blob { position: absolute; border-radius: 50%; z-index: -1; }
+  .agenda { display: grid; gap: 14px; margin-top: 26px; }
+  .agenda div { display: grid; grid-template-columns: 110px 1fr; align-items: center; background: #fff; border-radius: 18px; padding: 16px 22px; box-shadow: 0 6px 0 #20193a14; font-size: 28px; }
+  .agenda b { font-family: "JetBrains Mono", monospace; font-size: 22px; color: var(--violet); }
+  .goals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; margin-top: 30px; }
+  .goal { border-radius: 24px; padding: 28px; color: #fff; min-height: 250px; display: flex; flex-direction: column; justify-content: space-between; }
+  .goal b { font-family: "Bricolage Grotesque"; font-size: 34px; line-height: 1.1; }
+  .goal span { font-size: 22px; opacity: .92; }
+  pre.code { background: var(--ink); color: #f4f1ff; border-radius: 20px; padding: 26px 30px; font: 400 26px/1.5 "JetBrains Mono", monospace; margin-top: 24px; box-shadow: none; width: auto; }
+  pre.code .k { color: var(--sun); } pre.code .s { color: #8ef0c9; } pre.code .c { color: #a49cc4; }
+  .split { display: grid; grid-template-columns: 1.1fr .9fr; gap: 40px; align-items: center; }
+  .browser { background: #fff; border-radius: 16px; box-shadow: 0 20px 40px #20193a1f; overflow: hidden; }
+  .browser .bar { height: 36px; background: #ece7ff; display: flex; gap: 8px; align-items: center; padding: 0 14px; }
+  .browser .bar i { width: 12px; height: 12px; border-radius: 50%; background: #20193a33; }
+  .browser .page { padding: 30px; min-height: 250px; }
+  .browser .page h3 { font-family: "Bricolage Grotesque"; font-size: 44px; margin: 0 0 10px; color: var(--violet); text-transform: none; }
+  .quiz { display: grid; gap: 14px; margin-top: 24px; }
+  .quiz div { background: #fff; border: 3px solid #20193a1f; border-radius: 18px; padding: 16px 22px; font-size: 28px; }
+  .quiz div.right.visible { border-color: var(--mint); background: #2bb58f14; }
+  .timer { font: 600 160px "JetBrains Mono", monospace; color: var(--violet); line-height: 1; }
+  .steps li { margin: 12px 0; font-size: 30px; }
+  html, body, .reveal-viewport { background: #fff8ec; }
+</style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+  <section>
+    <div class="blob" style="width:520px;height:520px;right:-120px;top:-140px;background:var(--sun)"></div>
+    <div class="blob" style="width:300px;height:300px;right:220px;bottom:-120px;background:#5b3fd633"></div>
+    <div style="height:100%;display:flex;flex-direction:column;justify-content:center">
+      <span class="tag">Workshop · 90 minutes</span>
+      <h1>Build your first <span style="color:var(--violet)">website.</span></h1>
+      <p style="font-size:30px;color:var(--muted)">No experience needed. Bring a laptop and a cup of tea.</p>
+    </div>
+  </section>
+
+  <section>
+    <span class="tag">Today</span>
+    <h2>The plan</h2>
+    <div class="agenda">
+      <div class="fragment"><b>00:00</b>What a web page really is</div>
+      <div class="fragment"><b>00:20</b>Your first page, line by line</div>
+      <div class="fragment"><b>00:50</b>Make it yours — colour and type</div>
+      <div class="fragment"><b>01:15</b>Put it online, then questions</div>
+    </div>
+  </section>
+
+  <section>
+    <span class="tag">By the end</span>
+    <h2>You will be able to…</h2>
+    <div class="goals">
+      <div class="goal fragment" style="background:var(--violet)"><b>Read HTML</b><span>and know what each part of a page does.</span></div>
+      <div class="goal fragment" style="background:#1f7f66"><b>Style a page</b><span>with colours, fonts and spacing that work.</span></div>
+      <div class="goal fragment" style="background:#c43c35"><b>Publish it</b><span>and send the link to a friend.</span></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="split">
+      <div>
+        <span class="tag">Step 1</span>
+        <h2>Write it</h2>
+        <pre class="code"><span class="c">&lt;!-- index.html --&gt;</span>
+<span class="k">&lt;h1&gt;</span>Hello, I'm Sam<span class="k">&lt;/h1&gt;</span>
+<span class="k">&lt;p&gt;</span>I bake bread on Sundays.<span class="k">&lt;/p&gt;</span>
+<span class="k">&lt;a</span> href=<span class="s">"mailto:sam@x.com"</span><span class="k">&gt;</span>Say hi<span class="k">&lt;/a&gt;</span></pre>
+      </div>
+      <div class="browser fragment"><div class="bar"><i></i><i></i><i></i></div><div class="page"><h3>Hello, I'm Sam</h3><p style="font-size:24px">I bake bread on Sundays.</p><p style="font-size:24px;color:var(--violet);text-decoration:underline">Say hi</p></div></div>
+    </div>
+  </section>
+
+  <section>
+    <span class="tag">Quick check</span>
+    <h2>Which tag makes the biggest heading?</h2>
+    <div class="quiz">
+      <div>&lt;p&gt;</div>
+      <div class="right fragment highlight-current-blue" data-fragment-index="1">&lt;h1&gt; ✓ — headings go from h1 (biggest) to h6</div>
+      <div>&lt;big&gt;</div>
+    </div>
+  </section>
+
+  <section>
+    <span class="tag">Your turn</span>
+    <h2>Make it yours</h2>
+    <div class="split">
+      <ol class="steps">
+        <li>Change the heading to your name.</li>
+        <li>Add one sentence about you.</li>
+        <li>Pick a colour for the link.</li>
+      </ol>
+      <div style="text-align:center"><div class="timer" id="timer">10:00</div><p style="color:var(--muted);font-size:22px">press T to start the timer</p></div>
+    </div>
+  </section>
+
+  <section>
+    <div class="blob" style="width:460px;height:460px;left:-140px;bottom:-160px;background:#2bb58f33"></div>
+    <div style="height:100%;display:flex;flex-direction:column;justify-content:center">
+      <span class="tag">Recap</span>
+      <h2>You built a website.</h2>
+      <p style="font-size:30px;color:var(--muted);max-width:900px">Next week: layouts with Flexbox. Slides and the starter file are at <b style="color:var(--violet)">workshop.example/web-101</b>.</p>
+      <p style="font-size:18px;color:var(--muted)">A Lyra template</p>
+    </div>
+  </section>
+
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.js"></script>
+<script>
+  Reveal.initialize({ hash: true, width: 1280, height: 720, margin: 0, transition: "convex", controls: true, progress: true, center: false,
+    keyboard: { 84: () => startTimer() } });
+  // A countdown for exercises (press T).
+  let left = 600, id = null;
+  function startTimer() {
+    clearInterval(id);
+    left = 600;
+    const el = document.getElementById("timer");
+    id = setInterval(() => { left = Math.max(0, left - 1); el.textContent = `${String(Math.floor(left / 60)).padStart(2, "0")}:${String(left % 60).padStart(2, "0")}`; if (!left) clearInterval(id); }, 1000);
+  }
+</script>
+</body>
+</html>

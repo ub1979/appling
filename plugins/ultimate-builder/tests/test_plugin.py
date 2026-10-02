@@ -180,3 +180,17 @@ def test_registers_checkpoint_hook_for_finished_helpers():
     module.register(ctx)
     assert [name for name, _ in ctx.hooks] == ["subagent_stop"]
 
+
+
+def test_every_workflow_playbook_is_a_registered_skill():
+    """Hermes loads playbooks by name; a workflow folder that is not
+    registered is invisible to it (Claude Code links every folder)."""
+    import importlib.util
+    from pathlib import Path
+
+    root = Path(__file__).resolve().parents[1]
+    spec = importlib.util.spec_from_file_location("ub_plugin_under_test", root / "__init__.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    folders = {p.parent.name for p in (root / "skills" / "ultimate-app-builder" / "references" / "workflows").glob("*/SKILL.md")}
+    assert folders <= set(module._SPECIALIST_SKILLS), folders - set(module._SPECIALIST_SKILLS)

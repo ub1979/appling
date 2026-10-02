@@ -1,0 +1,24 @@
+{
+  "kind": "video",
+  "id": "video-glass-showcase",
+  "name": "Glass UI Showcase",
+  "tagline": "Frosted-glass widgets over a living aurora — modern SaaS polish.",
+  "best_for": "SaaS dashboards, product updates, tech brands",
+  "palette": [
+    "#0a0a1a",
+    "#ffffff",
+    "#ff7a59",
+    "#5ee7df"
+  ],
+  "preview": {
+    "video": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/liquid-glass-widgets.mp4",
+    "poster": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/liquid-glass-widgets.png",
+    "credit": "Preview: HyperFrames block “liquid-glass-widgets” (Apache-2.0)"
+  },
+  "blocks": [
+    "liquid-glass-widgets",
+    "liquid-glass-notification",
+    "ui-3d-reveal",
+    "vfx-liquid-background"
+  ]
+}

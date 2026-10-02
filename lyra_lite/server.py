@@ -27,6 +27,7 @@ from lyra_lite import agents
 from lyra_lite.preview import PREVIEW_TYPES, AppHosts, PreviewError
 
 UPLOADS = Path("assets") / "uploads"
+BUILTIN_TEMPLATES = Path(__file__).resolve().parent / "templates"
 MAX_UPLOAD = 2 * 1024 ** 3
 from lyra_lite.runner import REPO_ROOT, ProjectRunner, project_key
 from lyra_lite.store import ProjectStore
@@ -637,7 +638,14 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
 
         items = list_templates(kind or None)
         for t in items:
-            t["demo_url"] = f"/preview/templates/{t['id']}/" if t["has_demo"] else None
+            preview = t.get("preview") or {}
+            if t.pop("local_demo", False):
+                t["demo_url"] = f"/preview/templates/{t['id']}/"
+                has_thumb = (BUILTIN_TEMPLATES / t["id"] / "demo" / "thumb.jpg").is_file()
+                t["thumb_url"] = t["demo_url"] + "thumb.jpg" if has_thumb else None
+            else:
+                t["demo_url"] = preview.get("video")
+                t["thumb_url"] = preview.get("poster")
         return {"templates": items}
 
     @app.post("/api/templates")

@@ -79,10 +79,14 @@ playbook for that kind (`kind_skill`) and a chosen `template` with its full
   `website_gate`: name the reference in every developer and QA delegation, and
   QA always runs the site check in a real browser. Websites come with the
   Reusable profile; do not ask the owner for a build size.
-- **video** — use `ultimate-builder:business-motion-film` (short business
-  films and explainers).
-- **slides** — use the `powerpoint` skill for a deck the owner can open and
-  present.
+- **video** — with a template, build it with HyperFrames from the blocks
+  its spec names (the spec has the exact commands); without one, use
+  `ultimate-builder:business-motion-film`. Ask for footage, logo and music.
+- **slides** — with a template, an HTML deck on reveal.js copied from its
+  live demo (PDF export included); use the `powerpoint` skill when the owner
+  needs a `.pptx`, keeping the template's layout and palette.
+- **any interface or deck** — choose and check colours with
+  `ultimate-builder:color-and-ux`.
 
 With a template, Requirements does not start from a blank page: it confirms
 the template fits, then asks what to change — brand, words, colours,

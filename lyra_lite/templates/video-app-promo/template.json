@@ -1,0 +1,24 @@
+{
+  "kind": "video",
+  "id": "video-app-promo",
+  "name": "App Promo",
+  "tagline": "A bright 15–30 s app ad with floating phone screens.",
+  "best_for": "Mobile apps, consumer products, social ads",
+  "palette": [
+    "#eef2e4",
+    "#1a1d16",
+    "#c9e86a",
+    "#ffffff"
+  ],
+  "preview": {
+    "video": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/app-showcase.mp4",
+    "poster": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/app-showcase.png",
+    "credit": "Preview: HyperFrames block “app-showcase” (Apache-2.0)"
+  },
+  "blocks": [
+    "app-showcase",
+    "vfx-iphone-device",
+    "liquid-glass-notification",
+    "ai-chat-reveal"
+  ]
+}

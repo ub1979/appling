@@ -1,0 +1,14 @@
+{
+  "kind": "slides",
+  "id": "deck-workshop",
+  "name": "Workshop & Teaching",
+  "tagline": "A friendly class deck: agenda, goals, code, quiz, timed exercise.",
+  "best_for": "Workshops, courses, school lessons, onboarding",
+  "palette": [
+    "#fff8ec",
+    "#20193a",
+    "#5b3fd6",
+    "#ffc93c"
+  ],
+  "has_demo": true
+}

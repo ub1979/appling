@@ -1,0 +1,24 @@
+{
+  "kind": "video",
+  "id": "video-explainer",
+  "name": "Explainer",
+  "tagline": "How it works, step by step: flowcharts, cards and a clear finish.",
+  "best_for": "Onboarding, how-it-works, training, services",
+  "palette": [
+    "#fafaf7",
+    "#222222",
+    "#f2c94c",
+    "#9b51e0"
+  ],
+  "preview": {
+    "video": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/flowchart.mp4",
+    "poster": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/flowchart.png",
+    "credit": "Preview: HyperFrames block “flowchart” (Apache-2.0)"
+  },
+  "blocks": [
+    "flowchart",
+    "orbit-card",
+    "cuboid-carousel",
+    "data-chart"
+  ]
+}

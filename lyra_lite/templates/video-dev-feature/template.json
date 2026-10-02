@@ -1,0 +1,25 @@
+{
+  "kind": "video",
+  "id": "video-dev-feature",
+  "name": "Developer Feature Reel",
+  "tagline": "Code that types, morphs and lifts off the screen in 3D.",
+  "best_for": "Developer tools, APIs, open-source releases, changelogs",
+  "palette": [
+    "#0d1117",
+    "#e6edf3",
+    "#7ee787",
+    "#d2a8ff"
+  ],
+  "preview": {
+    "video": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-3d-extrude.mp4",
+    "poster": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/code-3d-extrude.png",
+    "credit": "Preview: HyperFrames block “code-3d-extrude” (Apache-2.0)"
+  },
+  "blocks": [
+    "code-typing",
+    "code-diff",
+    "code-morph",
+    "code-3d-extrude",
+    "code-particle-assemble"
+  ]
+}

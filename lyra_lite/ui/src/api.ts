@@ -124,6 +124,7 @@ export interface Template {
   palette: string[];
   has_demo: boolean;
   demo_url: string | null;
+  thumb_url?: string | null;
   own: boolean;
 }
 

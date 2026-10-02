@@ -40,7 +40,10 @@ def _load(folder: Path, own: bool) -> dict | None:
         return None
     meta["id"] = folder.name
     meta["own"] = own
-    meta["has_demo"] = (folder / "demo" / "index.html").is_file()
+    meta["local_demo"] = (folder / "demo" / "index.html").is_file()
+    preview = meta.get("preview") if isinstance(meta.get("preview"), dict) else {}
+    # Video templates show the published preview of the blocks they build on.
+    meta["has_demo"] = meta["local_demo"] or bool(preview.get("video"))
     meta.setdefault("kind", "website")
     meta.setdefault("palette", [])
     return meta

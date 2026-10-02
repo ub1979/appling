@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Horizon — Keynote Story deck demo</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reset.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=Inter:wght@300;400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --r-background-color: #05060a; --night: #05060a; --frost: #eef1f6; --gold: #f2c46d; --muted: #aab1c0; }
+  html, body { background: var(--night); }
+  .reveal { font-family: "Inter", system-ui, sans-serif; font-weight: 300; color: var(--frost); font-size: 30px; }
+  .reveal .slides { text-align: left; }
+  .reveal .slides section { height: 100%; padding: 64px 80px !important; box-sizing: border-box; }
+  .reveal h1, .reveal h2 { font-family: "Fraunces", Georgia, serif; font-weight: 300; letter-spacing: -.02em; line-height: 1; color: var(--frost); text-transform: none; margin: 0 0 24px; }
+  .reveal h1 { font-size: 132px; }
+  .reveal h2 { font-size: 76px; }
+  .reveal em { font-style: italic; color: var(--gold); }
+  .label { font-size: 16px; letter-spacing: .3em; text-transform: uppercase; color: var(--gold); margin-bottom: 20px; font-weight: 500; }
+  .shade { position: absolute; inset: 0; background: linear-gradient(90deg, #05060ae6 0%, #05060a99 40%, transparent 75%); }
+  .shade.bottom { background: linear-gradient(transparent 40%, #05060af2 100%); }
+  .inner { position: relative; z-index: 2; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+  .inner.end { justify-content: flex-end; }
+  .lead { font-size: 32px; line-height: 1.5; color: #eef1f6d9; max-width: 720px; }
+  .stat { font-family: "Fraunces", serif; font-size: 220px; font-weight: 300; line-height: .9; color: var(--frost); }
+  .stat small { font-size: 60px; color: var(--gold); }
+  .quote { font-family: "Fraunces", serif; font-size: 64px; line-height: 1.15; font-style: italic; max-width: 1050px; }
+  .who { margin-top: 26px; font-size: 22px; color: var(--muted); }
+  .chapters { display: grid; grid-template-columns: repeat(3, 1fr); gap: 32px; margin-top: 36px; }
+  .chapters div { border-top: 1px solid #eef1f655; padding-top: 18px; }
+  .chapters b { font-family: "Fraunces", serif; font-weight: 300; font-size: 64px; display: block; color: var(--gold); }
+  .chapters span { font-size: 28px; line-height: 1.4; color: #eef1f6d9; }
+  /* Slow push-in on the photo of the current slide. */
+  .reveal .slide-background-content { transition: transform 9s linear; transform: scale(1.0); }
+  .reveal .slide-background.present .slide-background-content { transform: scale(1.08); }
+  html, body, .reveal-viewport { background: #05060a; }
+</style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+  <section data-background-image="img/space.webp" data-background-size="cover">
+    <div class="shade"></div>
+    <div class="inner">
+      <div class="label">Horizon · Annual keynote</div>
+      <h1>The next <em>hundred</em> years.</h1>
+      <p class="lead">What we learned building for the edge of the map — and where we go next.</p>
+    </div>
+    <aside class="notes">Pause on the title. Let the picture breathe for a second before speaking.</aside>
+  </section>
+
+  <section data-background-color="#05060a">
+    <div class="inner">
+    <div class="label">Tonight</div>
+    <h2>Three chapters.</h2>
+    <div class="chapters">
+      <div class="fragment fade-up"><b>I</b><span>Where we started — a pad, a dawn, a promise.</span></div>
+      <div class="fragment fade-up"><b>II</b><span>What it took — the people and the long middle.</span></div>
+      <div class="fragment fade-up"><b>III</b><span>What comes next — the far side.</span></div>
+    </div>
+    </div>
+  </section>
+
+  <section data-background-image="img/reel-1.webp" data-background-size="cover" data-transition="fade">
+    <div class="shade bottom"></div>
+    <div class="inner end">
+      <div class="label">Chapter I</div>
+      <h2>It started at <em>dawn.</em></h2>
+      <p class="lead">Four people, one launch pad and a deadline nobody believed.</p>
+    </div>
+  </section>
+
+  <section data-background-color="#05060a" data-auto-animate>
+    <div class="inner">
+      <div class="label" data-id="l">The long middle</div>
+      <div class="stat" data-id="n">1,204 <small>days</small></div>
+    </div>
+  </section>
+  <section data-background-color="#05060a" data-auto-animate>
+    <div class="inner">
+      <div class="label" data-id="l">The long middle</div>
+      <div class="stat" data-id="n" style="font-size:150px">1,204 <small>days</small></div>
+      <p class="lead fragment">from the first sketch to the first flight — and every one of them mattered.</p>
+    </div>
+  </section>
+
+  <section data-background-image="img/reel-2.webp" data-background-size="cover" data-transition="fade">
+    <div class="shade"></div>
+    <div class="inner">
+      <div class="label">Chapter II</div>
+      <h2>It took <em>people.</em></h2>
+      <p class="lead">Three hundred engineers, two thousand suppliers, and families who waited.</p>
+    </div>
+  </section>
+
+  <section data-background-color="#0b0d14">
+    <div class="inner">
+      <p class="quote">“We didn't build a rocket. We built a team that could build one again, faster.”</p>
+      <p class="who">— Chief engineer, mission debrief</p>
+    </div>
+  </section>
+
+  <section data-background-image="img/reel-4.webp" data-background-size="cover" data-transition="fade">
+    <div class="shade"></div>
+    <div class="inner">
+      <div class="label">Chapter III</div>
+      <h2>Next: the <em>far side.</em></h2>
+      <p class="lead">A permanent relay, a landing every season, and seats for people who are not astronauts.</p>
+    </div>
+  </section>
+
+  <section data-background-image="img/reel-3.webp" data-background-size="cover">
+    <div class="shade bottom"></div>
+    <div class="inner end">
+      <h2>Thank <em>you.</em></h2>
+      <p class="lead">horizon.example · a Lyra template (fictional) · imagery AI-generated</p>
+    </div>
+  </section>
+
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/plugin/notes/notes.min.js"></script>
+<script>
+  Reveal.initialize({ hash: true, width: 1280, height: 720, margin: 0, transition: "fade", transitionSpeed: "slow",
+    backgroundTransition: "fade", controls: true, progress: true, center: false, plugins: [RevealNotes] });
+</script>
+</body>
+</html>

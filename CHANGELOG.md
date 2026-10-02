@@ -28,6 +28,19 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 - Chat jumps to your message when you send; "↓ Latest" when reading above.
 - New skills: web-cinematic (premium scroll sites) and business-motion-film
   (from motion-video-kit, MIT).
+- **Photo-real website templates** (Grand Reveal, Lunar Parallax): your
+  video played frame by frame as you scroll, or six layers of photos. Lyra
+  asks for your video, frames or photos, or makes AI pictures on your
+  ChatGPT plan (`.lyra/kit/imagine`, `cutout`, `frames`).
+- **📎 Attach files in chat** (button, drag and drop, paste) — saved in the
+  project's `assets/uploads/`.
+- **Presentation templates** (Investor Pitch, Keynote Story, Data Report,
+  Workshop): HTML decks on reveal.js with live demos and PDF export.
+- **Video templates** (8 film styles) built from the HyperFrames registry
+  (Apache-2.0) with preview videos; rendered locally with telemetry off.
+- **Colour & UX skill** with a palette checker (contrast, colour-blind
+  clashes, shade ramps). Claude Code now also gets the shared design skills;
+  Hermes now gets the UI designer, UX writer and accessibility playbooks.
 
 ### Lyra Lite v0.02 beta — 2026-10-01
 

@@ -172,8 +172,8 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
                 {templates.map((t) => (
                   <div key={t.id} className={`template-card ${templateId === t.id ? "on" : ""}`} role="button" tabIndex={0}
                     onClick={() => setTemplateId(t.id)} onKeyDown={(e) => { if (e.key === "Enter") setTemplateId(t.id); }}>
-                    <span className="template-thumb" style={{ background: t.demo_url ? `center / cover no-repeat url("${t.demo_url}thumb.jpg"), ${thumb(t.palette)}` : thumb(t.palette) }}>
-                      {t.has_demo && <span className="demo-badge">Live demo</span>}
+                    <span className="template-thumb" style={{ background: t.thumb_url ? `center / cover no-repeat url("${t.thumb_url}"), ${thumb(t.palette)}` : thumb(t.palette) }}>
+                      {t.has_demo && <span className="demo-badge">{t.kind === "website" ? "Live demo" : "Preview"}</span>}
                       {t.own && <span className="demo-badge own">Yours</span>}
                     </span>
                     <b>{t.name}</b>

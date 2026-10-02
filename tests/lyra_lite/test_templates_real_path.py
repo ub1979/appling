@@ -32,6 +32,13 @@ def test_template_library_user_templates_and_live_demos(env):
             builtin = [t for t in web if not t["own"]]
             assert builtin and all(t["has_demo"] and t["demo_url"] for t in builtin)
             demos = {t["id"]: t["demo_url"] for t in builtin}
+            assert all(t["thumb_url"] for t in builtin)
+            # Decks ship live HTML demos; video templates show the published
+            # preview of the HyperFrames blocks they are built from.
+            slides = daemon.get("/api/templates?kind=slides").json()["templates"]
+            assert slides and all(t["demo_url"].startswith("/preview/templates/") for t in slides)
+            videos = daemon.get("/api/templates?kind=video").json()["templates"]
+            assert videos and all(t["demo_url"].startswith("https://") and t["thumb_url"] and t["blocks"] for t in videos)
 
             mine = daemon.post("/api/templates", {"name": "Glass Agency", "kind": "website",
                                                   "tagline": "frosted", "spec": "PRIVATE-PROMPT build a glass site"}).json()
@@ -40,7 +47,7 @@ def test_template_library_user_templates_and_live_demos(env):
             assert "PRIVATE-PROMPT" in saved.read_text()
             assert not (REPO / "lyra_lite" / "templates" / mine["id"]).exists()  # never in Lyra's source
             assert mine["id"] in {t["id"] for t in daemon.get("/api/templates?kind=website").json()["templates"]}
-            assert daemon.get("/api/templates?kind=video").json()["templates"] == []
+            assert mine["id"] not in {t["id"] for t in daemon.get("/api/templates?kind=video").json()["templates"]}
 
             url = demos["cinematic-parallax"]
             assert httpx.get(daemon.base + url, timeout=5).status_code == 401  # cookie-gated

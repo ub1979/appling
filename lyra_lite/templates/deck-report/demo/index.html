@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Impact Report 2026 — Data Report deck demo</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reset.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,600;1,6..72,400&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400&display=swap" rel="stylesheet" />
+<style>
+  :root { --r-background-color: #fbfaf7; --paper: #fbfaf7; --ink: #1f1f1f; --muted: #66625c; --blue: #2e6f9e; --red: #c23b4a; --green: #3b7d4f; --grid: #1f1f1f1a; }
+  html, body { background: var(--paper); }
+  .reveal { font-family: "IBM Plex Sans", system-ui, sans-serif; color: var(--ink); font-size: 28px; }
+  .reveal .slides { text-align: left; }
+  .reveal .slides section { height: 100%; padding: 56px 72px !important; box-sizing: border-box; }
+  .reveal h1, .reveal h2 { font-family: "Newsreader", Georgia, serif; font-weight: 600; letter-spacing: -.02em; line-height: 1.04; color: var(--ink); text-transform: none; margin: 0 0 14px; }
+  .reveal h1 { font-size: 96px; } .reveal h2 { font-size: 54px; max-width: 1050px; }
+  .reveal h2 em, .reveal h1 em { font-style: italic; font-weight: 400; color: var(--blue); }
+  .src { position: absolute; left: 72px; bottom: 34px; font: 400 15px "IBM Plex Mono", monospace; color: var(--muted); }
+  .eyebrow { font: 500 16px "IBM Plex Sans"; letter-spacing: .12em; text-transform: uppercase; color: var(--blue); margin-bottom: 16px; }
+  .sub { color: var(--muted); font-size: 26px; line-height: 1.45; max-width: 900px; }
+  .kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 0; margin-top: 46px; border-top: 2px solid var(--ink); }
+  .kpis div { padding: 22px 22px 0 0; border-right: 1px solid var(--grid); }
+  .kpis div:last-child { border-right: 0; }
+  .kpis b { display: block; font-family: "Newsreader", serif; font-weight: 600; font-size: 76px; line-height: 1; }
+  .kpis span { color: var(--muted); font-size: 21px; }
+  .kpis .up { color: var(--green); font-size: 20px; font-weight: 600; }
+  svg text { font-family: "IBM Plex Sans", sans-serif; }
+  .chart { width: 100%; height: 470px; margin-top: 18px; }
+  .bar { transform-box: fill-box; transform-origin: bottom; }
+  .present .bar { animation: grow .9s cubic-bezier(.2,.8,.2,1) both; }
+  @keyframes grow { from { transform: scaleY(0); } }
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; margin-top: 20px; }
+  table.data { width: 100%; border-collapse: collapse; font-size: 24px; margin-top: 24px; }
+  table.data th { text-align: left; font-size: 16px; letter-spacing: .08em; text-transform: uppercase; color: var(--muted); border-bottom: 2px solid var(--ink); padding: 10px 8px; }
+  table.data td { padding: 14px 8px; border-bottom: 1px solid var(--grid); }
+  table.data td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  .chip { display: inline-block; padding: 2px 10px; border-radius: 99px; font-size: 17px; font-weight: 600; }
+  .chip.g { background: #3b7d4f1f; color: var(--green); } .chip.r { background: #c23b4a1f; color: var(--red); }
+  .finding { display: grid; grid-template-columns: 70px 1fr; gap: 18px; padding: 18px 0; border-bottom: 1px solid var(--grid); }
+  .finding b { font-family: "Newsreader", serif; font-size: 48px; color: var(--blue); line-height: 1; }
+  .finding span { font-size: 26px; line-height: 1.4; }
+  html, body, .reveal-viewport { background: #fbfaf7; }
+</style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+  <section>
+    <div style="height:100%;display:flex;flex-direction:column;justify-content:center">
+      <div class="eyebrow">Annual report · 2026</div>
+      <h1>A year of <em>clean water.</em></h1>
+      <p class="sub">What Tidewell Trust delivered, what it cost, and what we will do differently.</p>
+    </div>
+    <div class="src">Tidewell Trust (fictional) · a Lyra template</div>
+  </section>
+
+  <section>
+    <div class="eyebrow">At a glance</div>
+    <h2>More people reached, for <em>less per person.</em></h2>
+    <div class="kpis">
+      <div class="fragment"><b>212k</b><span>people with safe water</span><br><span class="up">▲ 38%</span></div>
+      <div class="fragment"><b>£14</b><span>cost per person</span><br><span class="up">▼ 22%</span></div>
+      <div class="fragment"><b>96%</b><span>pumps working after a year</span><br><span class="up">▲ 7 pts</span></div>
+      <div class="fragment"><b>41</b><span>villages, 3 new regions</span></div>
+    </div>
+    <div class="src">Source: field monitoring, Jan–Dec 2026</div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Reach</div>
+    <h2>Growth came in the <em>second half.</em></h2>
+    <svg class="chart" viewBox="0 0 1136 470" role="img" aria-label="People reached per quarter: 32k, 41k, 62k, 77k">
+      <g stroke="#1f1f1f1a"><line x1="60" y1="60" x2="1136" y2="60"/><line x1="60" y1="190" x2="1136" y2="190"/><line x1="60" y1="320" x2="1136" y2="320"/></g>
+      <line x1="60" y1="430" x2="1136" y2="430" stroke="#1f1f1f" stroke-width="2"/>
+      <g font-size="18" fill="#66625c"><text x="0" y="66">80k</text><text x="0" y="196">50k</text><text x="0" y="326">20k</text></g>
+      <g fill="#2e6f9e">
+        <rect class="bar" x="130" y="291" width="150" height="139" style="animation-delay:.05s"/>
+        <rect class="bar" x="390" y="252" width="150" height="178" style="animation-delay:.15s"/>
+        <rect class="bar" x="650" y="161" width="150" height="269" style="animation-delay:.25s" fill="#1f5a85"/>
+        <rect class="bar" x="910" y="96" width="150" height="334" style="animation-delay:.35s" fill="#1f5a85"/>
+      </g>
+      <g font-size="26" font-weight="600" fill="#1f1f1f" text-anchor="middle"><text x="205" y="279">32k</text><text x="465" y="240">41k</text><text x="725" y="149">62k</text><text x="985" y="84">77k</text></g>
+      <g font-size="20" fill="#66625c" text-anchor="middle"><text x="205" y="462">Q1</text><text x="465" y="462">Q2</text><text x="725" y="462">Q3</text><text x="985" y="462">Q4</text></g>
+    </svg>
+    <div class="src">People newly reached per quarter</div>
+  </section>
+
+  <section>
+    <div class="eyebrow">Money</div>
+    <h2>Where every <em>£1</em> went.</h2>
+    <div class="two">
+      <svg viewBox="0 0 400 400" style="width:420px;height:420px" role="img" aria-label="Spending: programmes 78%, fundraising 14%, running costs 8%">
+        <circle r="150" cx="200" cy="200" fill="none" stroke="#1f1f1f14" stroke-width="64"/>
+        <circle class="arc" r="150" cx="200" cy="200" fill="none" stroke="#2e6f9e" stroke-width="64" data-from="0" data-to=".78" transform="rotate(-90 200 200)"/>
+        <circle class="arc" r="150" cx="200" cy="200" fill="none" stroke="#c23b4a" stroke-width="64" data-from=".78" data-to=".92" transform="rotate(-90 200 200)"/>
+        <circle class="arc" r="150" cx="200" cy="200" fill="none" stroke="#9a948b" stroke-width="64" data-from=".92" data-to="1" transform="rotate(-90 200 200)"/>
+        <text x="200" y="208" text-anchor="middle" font-size="64" font-weight="600" fill="#1f1f1f">78p</text>
+        <text x="200" y="246" text-anchor="middle" font-size="20" fill="#66625c">to programmes</text>
+      </svg>
+      <div>
+        <div class="finding"><b style="color:#2e6f9e">78p</b><span>Wells, pumps, training and repairs in the villages.</span></div>
+        <div class="finding"><b style="color:#c23b4a">14p</b><span>Raising the next pound.</span></div>
+        <div class="finding"><b style="color:#9a948b">8p</b><span>Office, audit and insurance.</span></div>
+      </div>
+    </div>
+    <div class="src">Audited accounts, year to 31 Dec 2026</div>
+  </section>
+
+  <section>
+    <div class="eyebrow">By region</div>
+    <h2>Two regions beat the plan; <em>one did not.</em></h2>
+    <table class="data">
+      <tr><th>Region</th><th style="text-align:right">People</th><th style="text-align:right">Pumps working</th><th style="text-align:right">vs plan</th></tr>
+      <tr class="fragment"><td>Northern Valley</td><td class="num">88,400</td><td class="num">98%</td><td class="num"><span class="chip g">+12%</span></td></tr>
+      <tr class="fragment"><td>Lake District West</td><td class="num">71,900</td><td class="num">97%</td><td class="num"><span class="chip g">+6%</span></td></tr>
+      <tr class="fragment"><td>Southern Hills</td><td class="num">51,700</td><td class="num">91%</td><td class="num"><span class="chip r">−9%</span></td></tr>
+    </table>
+    <p class="sub fragment" style="margin-top:22px">Southern Hills: the rainy season came early and closed two roads for six weeks.</p>
+  </section>
+
+  <section>
+    <div class="eyebrow">Next year</div>
+    <h2>Three things we will <em>change.</em></h2>
+    <div class="finding fragment"><b>1</b><span>Stock spare parts in each region before the rains.</span></div>
+    <div class="finding fragment"><b>2</b><span>Train two pump mechanics in every village, not one.</span></div>
+    <div class="finding fragment"><b>3</b><span>Publish working-pump data every month, not every year.</span></div>
+  </section>
+
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.js"></script>
+<script>
+  Reveal.initialize({ hash: true, width: 1280, height: 720, margin: 0, transition: "slide", controls: true, progress: true, center: false });
+  // Donut arcs sweep in when their slide arrives.
+  const C = 2 * Math.PI * 150;
+  const sweep = (slide) => slide.querySelectorAll(".arc").forEach((arc, i) => {
+    const from = +arc.dataset.from, to = +arc.dataset.to;
+    arc.style.transition = "none"; arc.style.strokeDasharray = `0 ${C}`; arc.style.strokeDashoffset = -from * C;
+    arc.getBoundingClientRect();
+    arc.style.transition = `stroke-dasharray .9s cubic-bezier(.2,.8,.2,1) ${i * .25}s`;
+    arc.style.strokeDasharray = `${(to - from) * C} ${C}`;
+  });
+  Reveal.on("ready", (e) => sweep(e.currentSlide));
+  Reveal.on("slidechanged", (e) => sweep(e.currentSlide));
+</script>
+</body>
+</html>

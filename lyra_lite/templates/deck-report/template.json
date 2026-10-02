@@ -1,0 +1,14 @@
+{
+  "kind": "slides",
+  "id": "deck-report",
+  "name": "Data Report",
+  "tagline": "An editorial report deck: KPIs, charts that grow, honest tables.",
+  "best_for": "Annual reports, board updates, research findings, results",
+  "palette": [
+    "#fbfaf7",
+    "#1f1f1f",
+    "#2e6f9e",
+    "#c23b4a"
+  ],
+  "has_demo": true
+}
