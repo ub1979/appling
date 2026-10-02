@@ -152,7 +152,9 @@ function probeText() {
     const st = getComputedStyle(el);
     // Outlined text (transparent fill + text stroke) is visible through its stroke.
     const stroke = parseFloat(st.webkitTextStrokeWidth) > 0 ? alphaOf(st.webkitTextStrokeColor) : 0;
-    return opacity * Math.max(alphaOf(st.color), stroke);
+    // Gradient text (transparent fill + background clipped to the letters).
+    const clipped = (st.webkitBackgroundClip === 'text' || st.backgroundClip === 'text') && st.backgroundImage !== 'none' ? 1 : 0;
+    return opacity * Math.max(alphaOf(st.color), stroke, clipped);
   };
   while (walker.nextNode()) {
     const node = walker.currentNode;
@@ -233,18 +235,26 @@ async function walk(browser, url, vp, prefix, findings, record) {
   const shots = [];
   const faintSeen = [];
   let overflow = await page.evaluate(probeOverflow);
-  for (let i = 0; i < steps; i++) {
-    const total = await maxScroll(page); // pins add height as they set up
-    const y = Math.round((total * i) / (steps - 1));
+  // Screenshots at `steps` evenly spaced points; text is read far more often
+  // (every 0.4 screens) so short-lived captions in pinned sections are seen.
+  const total = await maxScroll(page);
+  const stride = Math.max(120, Math.round(vp.height * 0.4));
+  const points = new Map();
+  for (let i = 0; i < steps; i++) points.set(Math.round((total * i) / (steps - 1)), i);
+  if (record) for (let y = stride; y < total; y += stride) if (!points.has(y)) points.set(y, -1);
+  let lastShot = 0;
+  for (const [y, shot] of [...points.entries()].sort((a, b) => a[0] - b[0])) {
     await scrollToY(page, y, vp.mobile);
-    const file = path.join(out, `${prefix}-${vp.name}-${String(i).padStart(2, '0')}.png`);
-    await page.screenshot({ path: file });
-    shots.push(file);
+    if (shot >= 0) {
+      const file = path.join(out, `${prefix}-${vp.name}-${String(shot).padStart(2, '0')}.png`);
+      await page.screenshot({ path: file });
+      shots.push(file);
+      lastShot = shot;
+    }
     if (record) {
       const o = await page.evaluate(probeOverflow);
       if (o.sideways && !overflow.sideways) overflow = o;
-      // Only judge text once the visitor has had time to scroll past it.
-      for (const f of await page.evaluate(probeText)) faintSeen.push({ ...f, step: i });
+      for (const f of await page.evaluate(probeText)) faintSeen.push({ ...f, step: lastShot });
     }
   }
   if (record) {

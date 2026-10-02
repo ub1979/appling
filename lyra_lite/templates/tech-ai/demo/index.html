@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Kairo — AI / Tech Company demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg: #05070d; --panel: #0b0f1a; --line: #ffffff14; --text: #e8ecf5; --muted: #8b93a8; --blue: #7c9cff; --teal: #2ee6c5;
+    --sans: "Outfit", system-ui, sans-serif; --mono: "IBM Plex Mono", ui-monospace, monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--bg); }
+  body { color: var(--text); font-family: var(--sans); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  .wrap { width: min(1200px, 100% - 32px); margin: 0 auto; }
+  .mono { font-family: var(--mono); font-size: 12px; letter-spacing: .12em; text-transform: uppercase; color: var(--teal); }
+  .nav { position: fixed; inset: 0 0 auto; z-index: 30; background: linear-gradient(#05070de6, #05070d00); }
+  .nav .wrap { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .logo { font-weight: 700; font-size: 20px; letter-spacing: .02em; display: flex; gap: 10px; align-items: center; }
+  .logo i { width: 18px; height: 18px; border-radius: 50%; border: 2px solid var(--teal); box-shadow: 0 0 18px var(--teal); }
+  .nav nav { display: flex; gap: 28px; font-size: 14px; color: var(--muted); }
+  .nav a { color: inherit; text-decoration: none; }
+  .btn { display: inline-flex; align-items: center; gap: 10px; padding: 13px 22px; border-radius: 99px; font-weight: 600; font-size: 15px; text-decoration: none; color: var(--bg); background: linear-gradient(90deg, var(--teal), var(--blue)); }
+  .btn.ghost { background: transparent; color: var(--text); border: 1px solid #ffffff33; }
+
+  /* sticky 3D stage: hero + three chapters share one canvas */
+  .journey { position: relative; height: 420svh; }
+  .stage { position: sticky; top: 0; height: 100svh; overflow: hidden; }
+  #gl { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+  .stage::after { content: ""; position: absolute; inset: 0; background: radial-gradient(70% 60% at 50% 50%, transparent 40%, var(--bg) 100%); pointer-events: none; }
+  .hero-copy { position: absolute; z-index: 2; left: 0; right: 0; top: 50%; translate: 0 -50%; text-align: center; padding: 0 16px; }
+  .hero-copy h1 { font-weight: 300; font-size: clamp(44px, 7.4vw, 120px); line-height: .98; letter-spacing: -.04em; }
+  .hero-copy h1 b { font-weight: 600; background: linear-gradient(90deg, var(--teal), var(--blue)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+  .hero-copy p { margin: 22px auto 0; max-width: 520px; color: #c5cbda; font-size: 18px; line-height: 1.55; }
+  .hero-copy .ctas { margin-top: 30px; display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .chapter { position: absolute; z-index: 2; left: clamp(16px, 6vw, 96px); bottom: 14svh; max-width: 440px; opacity: 0; }
+  .chapter h2 { font-weight: 600; font-size: clamp(30px, 3.6vw, 52px); line-height: 1.04; letter-spacing: -.03em; margin: 12px 0; }
+  .chapter p { color: #c5cbda; font-size: 17px; line-height: 1.6; }
+  .progress { position: absolute; z-index: 2; right: clamp(16px, 4vw, 56px); top: 50%; translate: 0 -50%; display: grid; gap: 10px; }
+  .progress i { width: 3px; height: 34px; border-radius: 3px; background: #ffffff22; }
+  .progress i.on { background: var(--teal); box-shadow: 0 0 12px var(--teal); }
+
+  /* services */
+  .services { padding: 16svh 0 10svh; }
+  .services h2, .results h2 { font-weight: 300; font-size: clamp(36px, 4.6vw, 68px); letter-spacing: -.04em; line-height: 1.02; max-width: 760px; margin-top: 14px; }
+  .acc { margin-top: 48px; border-top: 1px solid var(--line); }
+  .item { border-bottom: 1px solid var(--line); }
+  .item button { width: 100%; display: grid; grid-template-columns: 60px minmax(0, 1fr) 40px; align-items: center; gap: 12px; padding: 26px 0; background: none; border: 0; color: inherit; text-align: left; cursor: pointer; font: inherit; }
+  .item button span:nth-child(2) { font-size: clamp(24px, 3vw, 40px); font-weight: 400; letter-spacing: -.02em; }
+  .item .plus { width: 34px; height: 34px; border-radius: 50%; border: 1px solid #ffffff33; display: grid; place-items: center; transition: transform .5s, background .3s; }
+  .item.open .plus { transform: rotate(45deg); background: var(--teal); color: var(--bg); border-color: transparent; }
+  .item .body { height: 0; overflow: hidden; }
+  .item .body > div { padding: 0 0 28px 72px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 24px; color: #c5cbda; line-height: 1.6; }
+  .tags { display: flex; flex-wrap: wrap; gap: 8px; align-content: start; }
+  .tags span { font-family: var(--mono); font-size: 12px; padding: 6px 10px; border: 1px solid var(--line); border-radius: 99px; color: var(--muted); }
+
+  /* stats */
+  .stats { border-block: 1px solid var(--line); }
+  .stats .wrap { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .stat { padding: 40px 0; border-left: 1px solid var(--line); padding-left: 22px; }
+  .stat:first-child { border-left: 0; padding-left: 0; }
+  .stat b { display: block; font-weight: 300; font-size: clamp(40px, 5vw, 72px); letter-spacing: -.04em; }
+  .stat span { color: var(--muted); font-size: 14px; }
+
+  /* results with cursor glow */
+  .results { padding: 16svh 0; }
+  .cards { margin-top: 44px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .rcard { position: relative; padding: 28px; border-radius: 20px; background: var(--panel); border: 1px solid var(--line); overflow: hidden; min-height: 260px; display: flex; flex-direction: column; justify-content: space-between; }
+  .rcard::before { content: ""; position: absolute; inset: 0; background: radial-gradient(360px circle at var(--x, 50%) var(--y, 50%), #2ee6c522, transparent 60%); opacity: 0; transition: opacity .4s; }
+  .rcard:hover::before { opacity: 1; }
+  .rcard b { font-size: 48px; font-weight: 300; letter-spacing: -.04em; color: var(--teal); }
+  .rcard p { color: #c5cbda; line-height: 1.55; }
+  .rcard small { color: var(--muted); font-family: var(--mono); font-size: 12px; }
+
+  /* cta */
+  .cta { padding: 14svh 0 6svh; text-align: center; position: relative; overflow: hidden; }
+  .cta h2 { font-weight: 300; font-size: clamp(44px, 8vw, 130px); letter-spacing: -.05em; line-height: .95; }
+  .cta h2 b { font-weight: 600; color: var(--teal); }
+  .cta .btn { margin-top: 36px; }
+  footer { margin-top: 12svh; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 13px; border-top: 1px solid var(--line); padding: 24px 0; }
+
+  @media (max-width: 860px) {
+    .nav nav { display: none; }
+    .item .body > div { grid-template-columns: 1fr; padding-left: 0; }
+    .item button { grid-template-columns: 40px minmax(0, 1fr) 40px; }
+    .stats .wrap, .cards { grid-template-columns: 1fr 1fr; }
+    .stat:nth-child(3) { border-left: 0; padding-left: 0; }
+    .progress { display: none; }
+    .chapter { right: 16px; bottom: 8svh; }
+  }
+  @media (max-width: 560px) { .cards { grid-template-columns: 1fr; } }
+  @media (prefers-reduced-motion: reduce) {
+    .journey { height: auto; }
+    .stage { position: relative; }
+    .chapters-static { display: grid !important; }
+    .chapter, .progress { display: none; }
+  }
+  .chapters-static { display: none; gap: 40px; padding: 10svh 0; }
+  .chapters-static h2 { font-weight: 600; font-size: 32px; margin: 8px 0; }
+  .chapters-static p { color: #c5cbda; line-height: 1.6; }
+</style>
+</head>
+<body>
+<header class="nav"><div class="wrap"><span class="logo"><i></i>KAIRO</span><nav><a href="#services">Services</a><a href="#results">Results</a><a href="#contact">Contact</a></nav><a class="btn ghost" href="#contact">Talk to us</a></div></header>
+
+<section class="journey" id="journey">
+  <div class="stage">
+    <canvas id="gl" aria-hidden="true"></canvas>
+    <div class="hero-copy" id="heroCopy">
+      <p class="mono">Applied AI · Voice · Vision</p>
+      <h1>Intelligence that <b>listens</b>,<br>learns and answers.</h1>
+      <p>We build AI systems that talk to your customers, read your documents and see what your cameras see — and we run them in production.</p>
+      <div class="ctas"><a class="btn" href="#contact">Start a project →</a><a class="btn ghost" href="#services">What we do</a></div>
+    </div>
+    <div class="chapter" data-i="0"><span class="mono">01 — Listen</span><h2>Every call, understood.</h2><p>Speech models tuned to your accents, products and jargon — transcribed, summarised and acted on in real time.</p></div>
+    <div class="chapter" data-i="1"><span class="mono">02 — Learn</span><h2>Models that fit your data.</h2><p>We fine-tune on what you already have, measure what matters, and ship only what beats your baseline.</p></div>
+    <div class="chapter" data-i="2"><span class="mono">03 — Answer</span><h2>At scale, every day.</h2><p>Millions of requests a day on infrastructure we monitor around the clock, with humans one click away.</p></div>
+    <div class="progress" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+  </div>
+</section>
+<div class="wrap chapters-static" aria-hidden="false">
+  <div><span class="mono">01 — Listen</span><h2>Every call, understood.</h2><p>Speech models tuned to your accents, products and jargon.</p></div>
+  <div><span class="mono">02 — Learn</span><h2>Models that fit your data.</h2><p>Fine-tuned on what you already have, measured against your baseline.</p></div>
+  <div><span class="mono">03 — Answer</span><h2>At scale, every day.</h2><p>Millions of requests a day, monitored around the clock.</p></div>
+</div>
+
+<section class="services wrap" id="services">
+  <span class="mono">Services</span>
+  <h2>Four things we do very well.</h2>
+  <div class="acc" id="acc">
+    <div class="item open"><button aria-expanded="true"><span class="mono">01</span><span>Conversational AI</span><span class="plus">+</span></button><div class="body"><div><p>Voice and chat agents that handle bookings, support and sales calls end to end — and hand over gracefully.</p><div class="tags"><span>Voice bots</span><span>Live assist</span><span>Call summaries</span></div></div></div></div>
+    <div class="item"><button aria-expanded="false"><span class="mono">02</span><span>Speech intelligence</span><span class="plus">+</span></button><div class="body"><div><p>Transcription, sentiment and topic detection across every recorded conversation, searchable in seconds.</p><div class="tags"><span>ASR</span><span>Sentiment</span><span>Compliance</span></div></div></div></div>
+    <div class="item"><button aria-expanded="false"><span class="mono">03</span><span>Computer vision</span><span class="plus">+</span></button><div class="body"><div><p>Detection and counting from ordinary cameras, running on the edge with privacy built in.</p><div class="tags"><span>Detection</span><span>Edge</span><span>Privacy</span></div></div></div></div>
+    <div class="item"><button aria-expanded="false"><span class="mono">04</span><span>Research partnerships</span><span class="plus">+</span></button><div class="body"><div><p>Joint projects with universities and charities, from conservation acoustics to clinical speech.</p><div class="tags"><span>Universities</span><span>NGOs</span><span>Grants</span></div></div></div></div>
+  </div>
+</section>
+
+<section class="stats"><div class="wrap">
+  <div class="stat"><b data-to="2" data-suf="M+">0</b><span>calls handled every day</span></div>
+  <div class="stat"><b data-to="40" data-suf="+">0</b><span>languages and accents</span></div>
+  <div class="stat"><b data-to="99.95" data-dec="2" data-suf="%">0</b><span>uptime last year</span></div>
+  <div class="stat"><b data-to="12">0</b><span>research partners</span></div>
+</div></section>
+
+<section class="results wrap" id="results">
+  <span class="mono">Results</span>
+  <h2>What changes when it works.</h2>
+  <div class="cards">
+    <article class="rcard"><small>Healthcare · booking line</small><b>−63%</b><p>Hold time after a voice agent took routine appointment changes.</p></article>
+    <article class="rcard"><small>Finance · collections</small><b>+31%</b><p>Promises-to-pay kept, with calls summarised for every agent.</p></article>
+    <article class="rcard"><small>Retail · stores</small><b>9 days</b><p>From first camera to live footfall counts across 40 shops.</p></article>
+  </div>
+</section>
+
+<section class="cta wrap" id="contact">
+  <span class="mono">Contact</span>
+  <h2>Let's build the <b>next</b> one.</h2>
+  <a class="btn" href="mailto:hello@kairo.ai">hello@kairo.ai →</a>
+  <footer><span>© 2026 Kairo — a Lyra template</span><span>London · Derby · Remote</span><span>LinkedIn · GitHub</span></footer>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(() => {
+  gsap.registerPlugin(ScrollTrigger);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const phone = matchMedia("(max-width: 860px)").matches;
+
+  // Accordion (works without motion too).
+  const items = [...document.querySelectorAll(".item")];
+  const setOpen = (item, open) => {
+    item.classList.toggle("open", open);
+    item.querySelector("button").setAttribute("aria-expanded", open);
+    const body = item.querySelector(".body");
+    gsap.to(body, { height: open ? "auto" : 0, duration: reduce ? 0 : .6, ease: "power3.inOut" });
+  };
+  items.forEach((item) => item.querySelector("button").addEventListener("click", () => {
+    const open = !item.classList.contains("open");
+    items.forEach((other) => other !== item && other.classList.contains("open") && setOpen(other, false));
+    setOpen(item, open);
+  }));
+  gsap.set(items[0].querySelector(".body"), { height: "auto" });
+
+  // Cursor glow on result cards.
+  document.querySelectorAll(".rcard").forEach((card) => card.addEventListener("pointermove", (e) => {
+    const r = card.getBoundingClientRect();
+    card.style.setProperty("--x", `${e.clientX - r.left}px`);
+    card.style.setProperty("--y", `${e.clientY - r.top}px`);
+  }));
+
+  // ---- Particle field: one cloud of points that morphs between four shapes.
+  const canvas = document.getElementById("gl");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(50, 1, .1, 100);
+  camera.position.set(0, 0, 7);
+  const N = phone ? 2600 : 6000;
+  const shapes = [new Float32Array(N * 3), new Float32Array(N * 3), new Float32Array(N * 3), new Float32Array(N * 3)];
+  const golden = Math.PI * (3 - Math.sqrt(5));
+  const side = Math.ceil(Math.sqrt(N));
+  for (let i = 0; i < N; i++) {
+    const y = 1 - (i / (N - 1)) * 2, rad = Math.sqrt(1 - y * y), th = golden * i;
+    shapes[0].set([Math.cos(th) * rad * 2.2, y * 2.2, Math.sin(th) * rad * 2.2], i * 3);            // sphere: hero
+    const gx = (i % side) / side - .5, gz = Math.floor(i / side) / side - .5;
+    shapes[1].set([gx * 9, Math.sin(gx * 9) * .5 + Math.cos(gz * 7) * .4, gz * 6], i * 3);             // sound wave: listen
+    const a = Math.random() * Math.PI * 2, b = Math.acos(2 * Math.random() - 1), r = 1.2 + Math.random() * 1.6 * Math.random();
+    shapes[2].set([Math.cos(a) * Math.sin(b) * r * 1.5, Math.cos(b) * r, Math.sin(a) * Math.sin(b) * r], i * 3); // neural cloud: learn
+    const ring = i % 3, t = (i / N) * Math.PI * 2 * 3;
+    const R = 1 + ring * .9, jitter = (Math.random() - .5) * .12;
+    shapes[3].set([Math.cos(t) * R, Math.sin(t) * R * .42 + jitter, Math.sin(t) * R * .9], i * 3); // tilted orbits: scale
+  }
+  const pos = new Float32Array(shapes[0]);
+  const colors = new Float32Array(N * 3);
+  const c1 = new THREE.Color("#2ee6c5"), c2 = new THREE.Color("#7c9cff");
+  for (let i = 0; i < N; i++) { const c = c1.clone().lerp(c2, Math.random()); colors.set([c.r, c.g, c.b], i * 3); }
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  geo.setAttribute("color", new THREE.BufferAttribute(colors, 3));
+  const mat = new THREE.PointsMaterial({ size: phone ? .05 : .035, vertexColors: true, transparent: true, opacity: .9, depthWrite: false, blending: THREE.AdditiveBlending });
+  const cloud = new THREE.Points(geo, mat);
+  scene.add(cloud);
+
+  const resize = () => {
+    const w = canvas.clientWidth, h = canvas.clientHeight;
+    renderer.setSize(w, h, false);
+    camera.aspect = w / h;
+    camera.position.z = w < 700 ? 9.5 : 7;
+    camera.updateProjectionMatrix();
+  };
+  addEventListener("resize", resize);
+  resize();
+
+  const state = { morph: 0 }; // 0..3 across the four shapes
+  const pointer = { x: 0, y: 0 };
+  addEventListener("pointermove", (e) => { pointer.x = e.clientX / innerWidth - .5; pointer.y = e.clientY / innerHeight - .5; });
+  const ease = (t) => t * t * (3 - 2 * t);
+  const applyMorph = () => {
+    const k = Math.min(2.999, Math.max(0, state.morph)), a = Math.floor(k), t = ease(k - a), A = shapes[a], B = shapes[a + 1];
+    for (let i = 0; i < N * 3; i++) pos[i] = A[i] + (B[i] - A[i]) * t;
+    geo.attributes.position.needsUpdate = true;
+  };
+  let visible = true;
+  new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(canvas);
+  const clock = new THREE.Clock();
+  const frame = () => {
+    if (visible) {
+      const t = clock.getElapsedTime();
+      applyMorph();
+      cloud.rotation.y = t * .08 + pointer.x * .4;
+      cloud.rotation.x = pointer.y * .25 + Math.sin(t * .3) * .05;
+      renderer.render(scene, camera);
+    }
+    requestAnimationFrame(frame);
+  };
+
+  const stats = document.querySelectorAll(".stat b");
+  const fmt = (el, v) => { el.textContent = v.toFixed(+el.dataset.dec || 0) + (el.dataset.suf || ""); };
+  if (reduce) { applyMorph(); renderer.render(scene, camera); stats.forEach((el) => fmt(el, +el.dataset.to)); return; }
+  frame();
+
+  const lenis = new Lenis({ lerp: .1 });
+  lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add((t) => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+
+  gsap.from("#heroCopy > *", { y: 40, opacity: 0, duration: 1.2, ease: "expo.out", stagger: .1, delay: .2 });
+  gsap.from(cloud.scale, { x: .2, y: .2, z: .2, duration: 2.2, ease: "expo.out" });
+
+  // The journey: hero fades, the cloud morphs, each chapter takes its turn.
+  const chapters = gsap.utils.toArray(".chapter"), bars = document.querySelectorAll(".progress i");
+  const tl = gsap.timeline({ scrollTrigger: { trigger: "#journey", start: "top top", end: "bottom bottom", scrub: .8,
+    onUpdate: (self) => bars.forEach((b, i) => b.classList.toggle("on", Math.round(self.progress * 3) === i)) } });
+  tl.to("#heroCopy", { opacity: 0, y: -60, duration: .5 }, .2);
+  chapters.forEach((ch, i) => {
+    tl.to(state, { morph: i + 1, duration: 1, ease: "none" }, i)
+      .fromTo(ch, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: .3 }, i + .55);
+    if (i < chapters.length - 1) tl.to(ch, { opacity: 0, y: -40, duration: .25 }, i + 1.25);
+  });
+
+  stats.forEach((el) => { const n = { v: 0 }; gsap.to(n, { v: +el.dataset.to, duration: 2, ease: "expo.out", onUpdate: () => fmt(el, n.v), scrollTrigger: { trigger: el, start: "top 88%" } }); });
+  gsap.from(".item", { y: 30, opacity: 0, duration: .9, ease: "power3.out", stagger: .08, scrollTrigger: { trigger: "#acc", start: "top 80%" } });
+  gsap.from(".rcard", { y: 50, opacity: 0, duration: 1, ease: "power3.out", stagger: .1, scrollTrigger: { trigger: ".cards", start: "top 82%" } });
+  gsap.from(".cta h2", { y: 60, opacity: 0, duration: 1.3, ease: "expo.out", scrollTrigger: { trigger: ".cta", start: "top 75%" } });
+})();
+</script>
+</body>
+</html>

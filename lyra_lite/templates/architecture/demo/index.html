@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Monolith Residences — Architecture demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter+Tight:wght@300;400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --stone: #e9e7e2; --ink: #1b1b1b; --grey: #a39e93; --brass: #c2a878; --line: #1b1b1b26;
+    --serif: "Instrument Serif", Georgia, serif; --sans: "Inter Tight", system-ui, sans-serif; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--stone); }
+  body { color: var(--ink); font-family: var(--sans); font-weight: 400; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  .pad { padding-inline: clamp(16px, 4vw, 56px); }
+  .label { font-size: 11px; letter-spacing: .22em; text-transform: uppercase; color: #6f6a60; }
+  .nav { position: fixed; inset: 0 0 auto; z-index: 30; display: flex; justify-content: space-between; align-items: center; height: 64px; color: #fff; mix-blend-mode: difference; }
+  .nav b { font-weight: 600; letter-spacing: .3em; font-size: 13px; }
+  .nav a { color: inherit; text-decoration: none; font-size: 13px; }
+
+  /* hero */
+  .hero { height: 100svh; min-height: 620px; position: relative; overflow: hidden; background: var(--ink); }
+  .hero .img { position: absolute; inset: 0; clip-path: inset(18% 30% 18% 30%); }
+  .hero svg { width: 100%; height: 100%; display: block; }
+  .hero::after { content: ""; position: absolute; inset: 40% 0 0; z-index: 1; background: linear-gradient(transparent, #1b1b1bcc); pointer-events: none; }
+  .hero h1 { position: absolute; z-index: 2; left: clamp(16px, 4vw, 56px); bottom: 8svh; color: #fff; font-family: var(--serif); font-weight: 400; font-size: clamp(56px, 10vw, 170px); line-height: .9; letter-spacing: -.02em; }
+  .hero h1 .ln { display: block; overflow: hidden; }
+  .hero h1 .ln > span { display: block; }
+  .hero h1 em { color: var(--brass); }
+  .hero .meta { position: absolute; z-index: 2; right: clamp(16px, 4vw, 56px); bottom: 9svh; color: #ffffffcc; text-align: right; line-height: 1.8; }
+
+  /* split screen */
+  .split { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 5vw; padding-block: 16svh; }
+  .split .left { position: sticky; top: 0; height: 100svh; display: grid; align-content: center; align-self: start; }
+  .feature { grid-area: 1 / 1; max-width: 440px; opacity: 0; }
+  .feature.on { opacity: 1; }
+  .feature h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(38px, 4.4vw, 68px); line-height: 1; margin: 16px 0 18px; }
+  .feature p { font-size: 17px; line-height: 1.7; color: #4b4740; font-weight: 300; }
+  .feature .n { font-family: var(--serif); font-size: 22px; color: var(--brass); }
+  .frames { display: grid; gap: 14svh; padding-block: 20svh; }
+  .frame { aspect-ratio: 4 / 5; overflow: hidden; position: relative; }
+  .frame:nth-child(2) { aspect-ratio: 5 / 4; width: 82%; margin-left: auto; }
+  .frame .inner { position: absolute; inset: -14% 0; }
+  .frame svg { width: 100%; height: 100%; display: block; }
+
+  /* plans */
+  .plans { padding-block: 14svh; background: #f3f1ec; border-block: 1px solid var(--line); }
+  .plans-head { display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap; }
+  .plans h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(40px, 5vw, 80px); line-height: 1; margin-top: 12px; }
+  .types { display: flex; gap: 6px; }
+  .types button { border: 1px solid var(--ink); background: none; padding: 10px 16px; font: 500 13px var(--sans); letter-spacing: .06em; cursor: pointer; color: var(--ink); }
+  .types button.on { background: var(--ink); color: var(--stone); }
+  .plan-grid { margin-top: 44px; display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 4fr); gap: 5vw; align-items: start; }
+  .plan svg { width: 100%; height: auto; display: block; }
+  .plan path, .plan rect, .plan line { fill: none; stroke: var(--ink); stroke-width: 3; }
+  .plan .thin { stroke-width: 1.2; stroke: #8b857a; }
+  .plan text { font: 500 13px var(--sans); fill: #6f6a60; letter-spacing: .08em; text-transform: uppercase; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  td { padding: 14px 0; border-bottom: 1px solid var(--line); }
+  td:last-child { text-align: right; font-family: var(--serif); font-size: 22px; }
+  .price { margin-top: 24px; font-family: var(--serif); font-size: 44px; }
+  .price small { font-family: var(--sans); font-size: 13px; color: #6f6a60; display: block; letter-spacing: .1em; text-transform: uppercase; }
+
+  /* gallery */
+  .gallery { padding-block: 16svh; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 16px; }
+  .gallery .frame:nth-child(1) { grid-column: 1 / 8; aspect-ratio: 16 / 10; width: auto; margin: 0; }
+  .gallery .frame:nth-child(2) { grid-column: 9 / 13; aspect-ratio: 3 / 4; margin-top: 18svh; width: auto; }
+  .gallery .frame:nth-child(3) { grid-column: 3 / 10; aspect-ratio: 16 / 9; width: auto; margin: 0; }
+  .gallery .cap { grid-column: 1 / -1; font-family: var(--serif); font-size: clamp(28px, 3vw, 44px); max-width: 760px; line-height: 1.15; margin: 8svh 0 0; }
+
+  /* enquire */
+  .enquire { padding-block: 16svh 8svh; background: var(--ink); color: var(--stone); }
+  .enquire h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(48px, 8vw, 140px); line-height: .9; }
+  .enquire h2 em { color: var(--brass); }
+  .enquire form { margin-top: 48px; display: flex; gap: 0; max-width: 620px; border-bottom: 1px solid #ffffff55; }
+  .enquire input { flex: 1; min-width: 0; background: none; border: 0; color: #fff; font: 300 20px var(--sans); padding: 16px 0; outline: none; }
+  .enquire input::placeholder { color: #ffffff77; }
+  .enquire button { background: none; border: 0; color: var(--brass); font: 500 15px var(--sans); letter-spacing: .1em; text-transform: uppercase; cursor: pointer; }
+  .enquire .ok { margin-top: 14px; color: var(--brass); min-height: 22px; }
+  .enquire footer { margin-top: 14svh; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: #ffffff88; font-size: 13px; }
+
+  @media (max-width: 860px) {
+    .split { grid-template-columns: 1fr; padding-block: 8svh; }
+    .split .left { position: relative; height: auto; }
+    .feature { grid-area: auto; opacity: 1; margin-bottom: 40px; }
+    .frames { padding-block: 0; gap: 24px; }
+    .frame:nth-child(2) { width: 100%; }
+    .plan-grid { grid-template-columns: 1fr; }
+    .gallery .frame:nth-child(n) { grid-column: 1 / -1; margin-top: 0; }
+    .hero .meta { display: none; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .hero .img { clip-path: none; }
+    .split .left { position: relative; height: auto; }
+    .feature { grid-area: auto; opacity: 1; margin-bottom: 40px; }
+  }
+</style>
+</head>
+<body>
+<header class="nav pad"><b>MONOLITH</b><a href="#enquire">Register interest</a></header>
+
+<section class="hero">
+  <div class="img" id="heroImg">
+    <svg viewBox="0 0 1600 1000" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#8f9aa3"/><stop offset="1" stop-color="#d9d4ca"/></linearGradient>
+        <linearGradient id="face" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#3a3835"/><stop offset="1" stop-color="#55524d"/></linearGradient></defs>
+      <rect width="1600" height="1000" fill="url(#sky)"/>
+      <rect x="560" y="90" width="430" height="910" fill="url(#face)"/><rect x="990" y="150" width="150" height="850" fill="#2a2826"/>
+      <g fill="#c2a878" opacity=".85">
+        <rect x="600" y="140" width="350" height="6"/><rect x="600" y="260" width="350" height="6"/><rect x="600" y="380" width="350" height="6"/><rect x="600" y="500" width="350" height="6"/><rect x="600" y="620" width="350" height="6"/><rect x="600" y="740" width="350" height="6"/>
+      </g>
+      <g fill="#1d1c1b"><rect x="610" y="160" width="330" height="90"/><rect x="610" y="280" width="330" height="90"/><rect x="610" y="400" width="330" height="90"/><rect x="610" y="520" width="330" height="90"/><rect x="610" y="640" width="330" height="90"/><rect x="610" y="760" width="330" height="90"/></g>
+      <g fill="#f3d9a0" opacity=".7"><rect x="660" y="300" width="70" height="70"/><rect x="820" y="420" width="90" height="70"/><rect x="700" y="660" width="80" height="70"/></g>
+      <rect x="0" y="880" width="1600" height="120" fill="#bdb6a8"/><rect x="0" y="870" width="1600" height="14" fill="#a39e93"/>
+      <circle cx="300" cy="820" r="70" fill="#5f6a52"/><rect x="295" y="820" width="10" height="70" fill="#3a3530"/>
+      <circle cx="1350" cy="800" r="90" fill="#56604a"/><rect x="1344" y="800" width="12" height="90" fill="#3a3530"/>
+    </svg>
+  </div>
+  <h1><span class="ln"><span>Quiet homes,</span></span><span class="ln"><span><em>solid</em> ground.</span></span></h1>
+  <p class="meta label" style="color:#ffffffcc">42 residences · Hackney Wick<br>Completion spring 2027</p>
+</section>
+
+<section class="split pad" id="split">
+  <div class="left">
+    <div class="feature on" data-i="0"><span class="n">i.</span><h2>Built from one material.</h2><p>Board-marked concrete inside and out, warm oak floors, brass where your hand lands. Nothing to paint, nothing to peel.</p></div>
+    <div class="feature" data-i="1"><span class="n">ii.</span><h2>Light from two sides.</h2><p>Every home is dual aspect, with deep window seats facing the canal and the garden courtyard.</p></div>
+    <div class="feature" data-i="2"><span class="n">iii.</span><h2>Quiet by design.</h2><p>Thick walls, triple glazing and a planted courtyard that turns the city down to a hum.</p></div>
+  </div>
+  <div class="frames">
+    <div class="frame" data-i="0"><div class="inner"><svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="500" fill="#b9b2a5"/><rect x="0" y="330" width="400" height="170" fill="#9a7b56"/><rect x="40" y="60" width="150" height="260" fill="#e9e4d8"/><rect x="230" y="60" width="130" height="260" fill="#d8d2c5"/><rect x="60" y="250" width="280" height="40" fill="#5a4636"/><circle cx="300" cy="200" r="30" fill="#c2a878"/></svg></div></div>
+    <div class="frame" data-i="1"><div class="inner"><svg viewBox="0 0 500 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="500" height="400" fill="#efe9dc"/><rect x="0" y="0" width="200" height="400" fill="#f8f2e2"/><rect x="300" y="0" width="200" height="400" fill="#f6efe0"/><rect x="0" y="300" width="500" height="100" fill="#a07f58"/><rect x="200" y="60" width="100" height="240" fill="#cfc7b6"/><rect x="40" y="250" width="420" height="50" fill="#7f6a55"/></svg></div></div>
+    <div class="frame" data-i="2"><div class="inner"><svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="400" height="500" fill="#7c8a6a"/><rect x="0" y="0" width="400" height="120" fill="#a39e93"/><circle cx="120" cy="300" r="90" fill="#5f6a52"/><circle cx="290" cy="330" r="110" fill="#56604a"/><rect x="0" y="420" width="400" height="80" fill="#bdb6a8"/></svg></div></div>
+  </div>
+</section>
+
+<section class="plans" id="plans"><div class="pad">
+  <div class="plans-head"><div><span class="label">Residences</span><h2>Choose a plan</h2></div>
+    <div class="types" role="tablist" id="types"><button class="on" data-t="0">1 bed</button><button data-t="1">2 bed</button><button data-t="2">Penthouse</button></div></div>
+  <div class="plan-grid">
+    <div class="plan"><svg viewBox="0 0 800 520" id="planSvg" role="img" aria-label="Floor plan"></svg></div>
+    <div><table id="specs"></table><p class="price" id="price"></p></div>
+  </div>
+</div></section>
+
+<section class="gallery pad">
+  <div class="frame"><div class="inner"><svg viewBox="0 0 640 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="640" height="400" fill="#3a3835"/><rect x="60" y="0" width="200" height="400" fill="#4a4743"/><rect x="300" y="60" width="300" height="200" fill="#c9c2b4"/><rect x="0" y="330" width="640" height="70" fill="#9a7b56"/></svg></div></div>
+  <div class="frame"><div class="inner"><svg viewBox="0 0 300 400" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="300" height="400" fill="#c2a878"/><rect x="40" y="40" width="220" height="320" fill="#e9e4d8"/><circle cx="150" cy="200" r="60" fill="#a39e93"/></svg></div></div>
+  <div class="frame"><div class="inner"><svg viewBox="0 0 640 360" preserveAspectRatio="xMidYMid slice" aria-hidden="true"><rect width="640" height="360" fill="#8f9aa3"/><rect x="0" y="200" width="640" height="160" fill="#5d6a74"/><rect x="200" y="40" width="240" height="220" fill="#2f2e2c"/><rect x="230" y="70" width="180" height="40" fill="#f3d9a0" opacity=".6"/></svg></div></div>
+  <p class="cap">“We wanted homes that will look better in fifty years than on the day they’re finished.” — Studio Arka, architects</p>
+</section>
+
+<section class="enquire pad" id="enquire">
+  <span class="label" style="color:#ffffff88">Register interest</span>
+  <h2>Be first<br>to <em>see inside.</em></h2>
+  <form id="form"><input type="email" required placeholder="Your email" aria-label="Email" /><button>Send →</button></form>
+  <p class="ok" id="ok" aria-live="polite"></p>
+  <footer><span>© 2026 Monolith Residences — a Lyra template</span><span>Show suite open by appointment</span><span>Architect: Studio Arka (fictional)</span></footer>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  gsap.registerPlugin(ScrollTrigger);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const phone = matchMedia("(max-width: 860px)").matches;
+
+  // Floor plans, drawn as lines; switching type redraws them.
+  const plans = [
+    { walls: ["M40 40 H560 V480 H40 Z", "M300 40 V260", "M300 330 V480", "M40 280 H220", "M420 260 H560"],
+      rooms: [["Living / kitchen", 120, 160], ["Bedroom", 400, 140], ["Bath", 470, 380], ["Hall", 120, 400]],
+      specs: [["Bedrooms", "1"], ["Floor area", "54 m²"], ["Ceiling height", "2.9 m"], ["Outdoor", "Balcony 6 m²"]], price: "£495,000" },
+    { walls: ["M40 40 H760 V480 H40 Z", "M280 40 V300", "M520 40 V240", "M520 310 V480", "M40 300 H200", "M600 240 H760"],
+      rooms: [["Living / kitchen", 100, 160], ["Bedroom 1", 360, 140], ["Bedroom 2", 600, 130], ["Bath", 640, 390], ["Study", 120, 400]],
+      specs: [["Bedrooms", "2"], ["Floor area", "82 m²"], ["Ceiling height", "2.9 m"], ["Outdoor", "Loggia 9 m²"]], price: "£725,000" },
+    { walls: ["M40 40 H760 V480 H40 Z", "M400 40 V200", "M400 280 V480", "M40 260 H260", "M560 260 H760", "M560 40 V120"],
+      rooms: [["Great room", 160, 150], ["Primary suite", 560, 190], ["Bedroom", 150, 390], ["Terrace", 600, 400], ["Library", 470, 80]],
+      specs: [["Bedrooms", "3"], ["Floor area", "148 m²"], ["Ceiling height", "3.4 m"], ["Outdoor", "Roof terrace 60 m²"]], price: "£1,650,000" },
+  ];
+  const svg = document.getElementById("planSvg"), specs = document.getElementById("specs"), price = document.getElementById("price");
+  const drawPlan = (t, animate) => {
+    const p = plans[t];
+    svg.innerHTML = `<rect class="thin" x="20" y="20" width="760" height="480"/>` + p.walls.map((d) => `<path d="${d}"/>`).join("") +
+      p.rooms.map(([n, x, y]) => `<text x="${x}" y="${y}">${n}</text>`).join("");
+    specs.innerHTML = p.specs.map(([k, v]) => `<tr><td>${k}</td><td>${v}</td></tr>`).join("");
+    price.innerHTML = `<small>From</small>${p.price}`;
+    document.querySelectorAll("#types button").forEach((b) => b.classList.toggle("on", +b.dataset.t === t));
+    if (!animate || reduce) return;
+    svg.querySelectorAll("path").forEach((path) => {
+      const len = path.getTotalLength();
+      gsap.fromTo(path, { strokeDasharray: len, strokeDashoffset: len }, { strokeDashoffset: 0, duration: 1.4, ease: "power2.inOut" });
+    });
+    gsap.from(svg.querySelectorAll("text"), { opacity: 0, y: 10, duration: .6, ease: "power3.out", stagger: .08, delay: .8 });
+    gsap.from("#specs tr, #price", { opacity: 0, x: 20, duration: .6, ease: "power3.out", stagger: .06 });
+  };
+  document.querySelectorAll("#types button").forEach((b) => b.addEventListener("click", () => drawPlan(+b.dataset.t, true)));
+  drawPlan(0, false);
+
+  document.getElementById("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+    document.getElementById("ok").textContent = "Thank you — we'll send floor plans and a show-suite invitation.";
+  });
+
+  if (reduce) return;
+
+  const lenis = new Lenis({ lerp: .09 });
+  lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add((t) => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+
+  // Hero: the picture opens from a window to full bleed; title lines rise.
+  gsap.to("#heroImg", { clipPath: "inset(0% 0% 0% 0%)", duration: 1.8, ease: "expo.inOut", delay: .2 });
+  gsap.from("#heroImg svg", { scale: 1.3, duration: 2.4, ease: "expo.out", delay: .2 });
+  gsap.from(".hero h1 .ln > span", { yPercent: 110, duration: 1.3, ease: "expo.out", stagger: .12, delay: 1.1 });
+  gsap.from(".hero .meta", { opacity: 0, duration: 1, delay: 1.6 });
+  gsap.to("#heroImg svg", { yPercent: 12, ease: "none", scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: true } });
+
+  // Split screen: the pinned text follows the picture in view.
+  if (!phone) {
+    const features = gsap.utils.toArray(".feature");
+    const show = (i) => features.forEach((f, j) => gsap.to(f, { opacity: i === j ? 1 : 0, y: i === j ? 0 : (j < i ? -30 : 30), duration: .7, ease: "power3.out", overwrite: true }));
+    document.querySelectorAll(".frames .frame").forEach((frame) => ScrollTrigger.create({ trigger: frame, start: "top 55%", end: "bottom 45%",
+      onToggle: (self) => self.isActive && show(+frame.dataset.i) }));
+  }
+
+  // Every framed picture drifts inside its frame and wipes in from below.
+  gsap.utils.toArray(".frame").forEach((frame) => {
+    gsap.fromTo(frame.querySelector(".inner"), { yPercent: -8 }, { yPercent: 8, ease: "none", scrollTrigger: { trigger: frame, start: "top bottom", end: "bottom top", scrub: true } });
+    gsap.fromTo(frame, { clipPath: "inset(30% 0% 0% 0%)" }, { clipPath: "inset(0% 0% 0% 0%)", ease: "power2.out", scrollTrigger: { trigger: frame, start: "top 95%", end: "top 45%", scrub: true } });
+  });
+
+  // Plans draw themselves the first time they come into view.
+  ScrollTrigger.create({ trigger: "#plans", start: "top 60%", once: true, onEnter: () => drawPlan(0, true) });
+  gsap.from(".gallery .cap", { y: 40, opacity: 0, duration: 1.2, ease: "power3.out", scrollTrigger: { trigger: ".gallery .cap", start: "top 85%" } });
+  gsap.from(".enquire h2", { y: 80, opacity: 0, duration: 1.3, ease: "expo.out", scrollTrigger: { trigger: ".enquire", start: "top 70%" } });
+})();
+</script>
+</body>
+</html>

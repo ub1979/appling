@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "kinetic-type",
+  "name": "Kinetic Type",
+  "tagline": "Huge letters that stretch, scatter and race as you scroll.",
+  "best_for": "Events, festivals, music, bold brands",
+  "palette": [
+    "#0a0a0a",
+    "#d7ff3a",
+    "#ff4fd8",
+    "#f5f5f0"
+  ],
+  "has_demo": true
+}

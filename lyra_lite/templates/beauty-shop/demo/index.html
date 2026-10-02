@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bloom — Beauty & Wellness Shop demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Bodoni+Moda:ital,opsz,wght@0,6..96,400;0,6..96,500;1,6..96,400&family=Nunito+Sans:wght@400;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --blush: #fbefe9; --cocoa: #3d2c2e; --rose: #e8a598; --sage: #b8c4a9; --cream: #fffaf6; --muted: #8a7473;
+    --serif: "Bodoni Moda", Georgia, serif; --sans: "Nunito Sans", system-ui, sans-serif; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--blush); }
+  body { color: var(--cocoa); font-family: var(--sans); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  .wrap { width: min(1180px, 100% - 32px); margin: 0 auto; }
+  .tag { font-size: 12px; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: #b7685a; }
+  .nav { position: fixed; inset: 0 0 auto; z-index: 30; background: #fbefe9d9; backdrop-filter: blur(10px); }
+  .nav .wrap { height: 68px; display: flex; align-items: center; justify-content: space-between; }
+  .nav b { font-family: var(--serif); font-size: 28px; font-weight: 500; letter-spacing: .02em; }
+  .bag { display: inline-flex; align-items: center; gap: 8px; border: 1px solid var(--cocoa); border-radius: 99px; padding: 9px 16px; font-weight: 700; font-size: 14px; background: none; color: var(--cocoa); }
+  .bag span { display: inline-grid; place-items: center; min-width: 22px; height: 22px; border-radius: 99px; background: var(--cocoa); color: var(--cream); font-size: 12px; }
+
+  /* pinned hero: the bottle and its ingredients */
+  .hero { position: relative; height: 300svh; }
+  .hstage { position: sticky; top: 0; height: 100svh; overflow: hidden; display: grid; place-items: center; }
+  .blob { position: absolute; border-radius: 50%; filter: blur(40px); opacity: .7; }
+  .b1 { width: 46vw; height: 46vw; background: var(--rose); left: -10vw; top: 10svh; }
+  .b2 { width: 38vw; height: 38vw; background: var(--sage); right: -8vw; bottom: -6svh; }
+  .htitle { position: absolute; top: 15svh; left: 0; right: 0; text-align: center; z-index: 1; padding: 0 16px; }
+  .htitle h1 { font-family: var(--serif); font-weight: 400; font-size: clamp(48px, 8.4vw, 136px); line-height: .95; letter-spacing: -.02em; }
+  .htitle h1 em { color: #b7685a; }
+  .bottle { position: relative; z-index: 2; width: clamp(120px, 11vw, 180px); height: min(380px, 46svh); margin-top: 36svh; will-change: transform; }
+  .bottle svg { width: 100%; height: 100%; display: block; filter: drop-shadow(0 40px 50px #3d2c2e33); }
+  .ingredient { position: absolute; left: calc(50% - 80px); top: calc(50% - 40px); z-index: 3; display: grid; justify-items: center; gap: 8px; text-align: center; width: 160px; opacity: 0; }
+  .ingredient i { width: 74px; height: 74px; border-radius: 50%; box-shadow: 0 16px 30px #3d2c2e22; }
+  .ingredient b { font-family: var(--serif); font-weight: 500; font-size: 20px; }
+  .ingredient small { color: var(--muted); font-size: 13px; line-height: 1.4; }
+  .beat { position: absolute; z-index: 3; bottom: 9svh; left: 0; right: 0; text-align: center; font-family: var(--serif); font-style: italic; font-size: clamp(20px, 2vw, 28px); opacity: 0; padding: 0 16px; }
+
+  /* shop */
+  .shop { padding: 14svh 0; }
+  .shop-head { display: flex; justify-content: space-between; align-items: end; gap: 16px; flex-wrap: wrap; }
+  .shop h2, .ritual h2, .join h2 { font-family: var(--serif); font-weight: 400; font-size: clamp(40px, 5vw, 76px); line-height: 1; margin-top: 10px; }
+  .grid { margin-top: 40px; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 18px; }
+  .product { background: var(--cream); border-radius: 22px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+  .ph { aspect-ratio: 4 / 5; border-radius: 16px; display: grid; place-items: center; position: relative; overflow: hidden; transition: background .5s; }
+  .ph svg { width: 46%; height: auto; transition: transform .7s cubic-bezier(.2,.8,.2,1); }
+  .product:hover .ph svg { transform: translateY(-8px) rotate(-6deg) scale(1.06); }
+  .product h3 { font-family: var(--serif); font-weight: 500; font-size: 21px; }
+  .product p { color: var(--muted); font-size: 14px; }
+  .buy { display: flex; justify-content: space-between; align-items: center; margin-top: auto; }
+  .buy b { font-size: 17px; }
+  .add { border: 0; background: var(--cocoa); color: var(--cream); padding: 10px 16px; border-radius: 99px; font: 700 13px var(--sans); cursor: pointer; }
+  .add.done { background: #6f8a5a; }
+
+  /* reviews */
+  .reviews { overflow: hidden; padding: 30px 0; background: var(--cocoa); color: var(--cream); }
+  .rtrack { display: flex; gap: 48px; width: max-content; animation: slide 40s linear infinite; font-family: var(--serif); font-style: italic; font-size: clamp(20px, 2vw, 28px); }
+  .rtrack span::before { content: "★★★★★  "; font-style: normal; color: var(--rose); font-size: .7em; letter-spacing: .1em; }
+  @keyframes slide { to { transform: translateX(-50%); } }
+
+  /* ritual */
+  .ritual { padding: 16svh 0; }
+  .steps { margin-top: 48px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
+  .step { position: relative; padding: 34px 26px; border-radius: 26px; background: var(--cream); overflow: hidden; min-height: 280px; }
+  .step .n { font-family: var(--serif); font-size: 84px; line-height: 1; color: var(--rose); }
+  .step h3 { font-family: var(--serif); font-weight: 500; font-size: 26px; margin: 14px 0 8px; }
+  .step p { color: var(--muted); line-height: 1.6; }
+  .step .dot { position: absolute; right: -40px; top: -40px; width: 160px; height: 160px; border-radius: 50%; opacity: .5; }
+
+  /* join */
+  .join { padding: 12svh 0 6svh; text-align: center; }
+  .join form { margin: 30px auto 0; display: flex; gap: 10px; max-width: 460px; }
+  .join input { flex: 1; min-width: 0; border: 1px solid #3d2c2e33; background: var(--cream); padding: 14px 18px; border-radius: 99px; font: 16px var(--sans); color: var(--cocoa); }
+  .join button { border: 0; background: var(--cocoa); color: var(--cream); padding: 14px 22px; border-radius: 99px; font: 700 15px var(--sans); cursor: pointer; }
+  .join .ok { margin-top: 12px; min-height: 20px; color: #6f8a5a; font-weight: 700; }
+  footer { margin-top: 10svh; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--muted); font-size: 13px; padding: 24px 0; border-top: 1px solid #3d2c2e1f; }
+
+  @media (max-width: 900px) {
+    .grid { grid-template-columns: 1fr 1fr; }
+    .steps { grid-template-columns: 1fr; }
+    .ingredient { width: 120px; left: calc(50% - 60px); }
+    .ingredient i { width: 52px; height: 52px; }
+    .ingredient small { display: none; }
+    .bottle { margin-top: 30svh; height: 36svh; }
+  }
+  @media (max-width: 520px) { .join form { flex-direction: column; } }
+  @media (prefers-reduced-motion: reduce) {
+    .rtrack { animation: none; }
+    .hero { height: auto; }
+    .hstage { position: relative; height: auto; min-height: 100svh; padding: 12svh 0; }
+    .ingredient, .beat { position: static; opacity: 1; margin: 12px auto; }
+  }
+</style>
+</head>
+<body>
+<header class="nav"><div class="wrap"><b>bloom</b><button class="bag" id="bag" type="button">Bag <span id="count">0</span></button></div></header>
+
+<section class="hero" id="hero">
+  <div class="hstage">
+    <div class="blob b1" id="b1"></div><div class="blob b2" id="b2"></div>
+    <div class="htitle"><p class="tag">Plant-powered skincare</p><h1>Skin that feels<br><em>like itself.</em></h1></div>
+    <div class="bottle" id="bottle">
+      <svg viewBox="0 0 200 420" role="img" aria-label="Bloom daily serum bottle">
+        <defs><linearGradient id="glass" x1="0" x2="1"><stop offset="0" stop-color="#d98e80"/><stop offset=".45" stop-color="#f2c1b6"/><stop offset="1" stop-color="#c97a6c"/></linearGradient>
+          <linearGradient id="cap" x1="0" x2="1"><stop offset="0" stop-color="#2a1e1f"/><stop offset=".5" stop-color="#5a4446"/><stop offset="1" stop-color="#2a1e1f"/></linearGradient></defs>
+        <rect x="70" y="10" width="60" height="70" rx="10" fill="url(#cap)"/>
+        <rect x="80" y="76" width="40" height="22" fill="#2a1e1f"/>
+        <rect x="30" y="96" width="140" height="310" rx="40" fill="url(#glass)"/>
+        <rect x="46" y="120" width="16" height="250" rx="8" fill="#fff" opacity=".35"/>
+        <g id="label"><rect x="52" y="210" width="96" height="120" rx="6" fill="#fffaf6"/>
+          <text x="100" y="252" text-anchor="middle" font-family="Bodoni Moda, serif" font-size="26" fill="#3d2c2e">bloom</text>
+          <text x="100" y="278" text-anchor="middle" font-family="Nunito Sans, sans-serif" font-size="10" letter-spacing="2" fill="#8a7473">DAILY SERUM</text>
+          <text x="100" y="312" text-anchor="middle" font-family="Nunito Sans, sans-serif" font-size="9" fill="#8a7473">30 ml</text></g>
+      </svg>
+    </div>
+    <div class="ingredient" id="ing0"><i style="background: radial-gradient(circle at 35% 35%, #fff, #f4b9a9)"></i><b>Rosehip</b><small>Vitamin-rich oil for glow</small></div>
+    <div class="ingredient" id="ing1"><i style="background: radial-gradient(circle at 35% 35%, #fff, #b8c4a9)"></i><b>Green tea</b><small>Calms redness</small></div>
+    <div class="ingredient" id="ing2"><i style="background: radial-gradient(circle at 35% 35%, #fff, #e9d48a)"></i><b>Squalane</b><small>Light, lasting moisture</small></div>
+    <p class="beat" id="beat">Three ingredients. Nothing you can't pronounce.</p>
+  </div>
+</section>
+
+<section class="shop wrap">
+  <div class="shop-head"><div><span class="tag">The edit</span><h2>Bestsellers</h2></div><p style="color:var(--muted);max-width:320px">Free delivery over £30. Refills for everything.</p></div>
+  <div class="grid" id="grid"></div>
+</section>
+
+<section class="reviews" aria-label="Reviews"><div class="rtrack" id="rtrack"></div></section>
+
+<section class="ritual wrap">
+  <span class="tag">The ritual</span>
+  <h2>Three steps, two minutes.</h2>
+  <div class="steps">
+    <article class="step"><span class="dot" style="background:var(--rose)"></span><div class="n">1</div><h3>Cleanse</h3><p>Massage the balm in, rinse with warm water. Your skin should feel soft, not tight.</p></article>
+    <article class="step"><span class="dot" style="background:var(--sage)"></span><div class="n">2</div><h3>Treat</h3><p>Three drops of serum, pressed in with your palms while skin is still damp.</p></article>
+    <article class="step"><span class="dot" style="background:#e9d48a"></span><div class="n">3</div><h3>Protect</h3><p>A pea of cream in the morning, a little more at night. That's it.</p></article>
+  </div>
+</section>
+
+<section class="join wrap">
+  <span class="tag">Join the garden</span>
+  <h2>10% off your first order.</h2>
+  <form id="form"><input type="email" required placeholder="Email address" aria-label="Email" /><button>Sign up</button></form>
+  <p class="ok" id="ok" aria-live="polite"></p>
+  <footer><span>© 2026 Bloom — a Lyra template (fictional brand)</span><span>Vegan · Cruelty-free · Refillable</span><span>Instagram · TikTok</span></footer>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  gsap.registerPlugin(ScrollTrigger);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const phone = matchMedia("(max-width: 900px)").matches;
+
+  // Products.
+  const jar = (body, lid) => `<svg viewBox="0 0 120 150" aria-hidden="true"><rect x="22" y="16" width="76" height="30" rx="8" fill="${lid}"/><rect x="12" y="44" width="96" height="96" rx="22" fill="${body}"/><rect x="32" y="74" width="56" height="40" rx="4" fill="#fffaf6"/></svg>`;
+  const products = [["Daily Serum", "Rosehip & squalane", 28, "#f2c1b6", "#3d2c2e", "#f6dcd4", "#f2c9bd"],
+    ["Cloud Cream", "Shea & oat", 32, "#f1e6d8", "#b8c4a9", "#eef0e6", "#dfe6d3"],
+    ["Melt Balm", "Cleansing balm", 24, "#e9d48a", "#3d2c2e", "#f7efd2", "#efe2b0"],
+    ["Night Oil", "Bakuchiol & jojoba", 36, "#6b4f52", "#e8a598", "#eadbd8", "#d9c3bf"]];
+  document.getElementById("grid").innerHTML = products.map(([n, d, p, body, lid, bg, bg2]) =>
+    `<article class="product"><div class="ph" style="background:${bg}" data-bg="${bg}" data-bg2="${bg2}">${jar(body, lid)}</div><h3>${n}</h3><p>${d}</p><div class="buy"><b>£${p}</b><button class="add" type="button">Add to bag</button></div></article>`).join("");
+  document.querySelectorAll(".product").forEach((card) => {
+    const ph = card.querySelector(".ph");
+    card.addEventListener("pointerenter", () => { ph.style.background = ph.dataset.bg2; });
+    card.addEventListener("pointerleave", () => { ph.style.background = ph.dataset.bg; });
+  });
+  let count = 0;
+  document.querySelectorAll(".add").forEach((btn) => btn.addEventListener("click", () => {
+    count += 1;
+    document.getElementById("count").textContent = count;
+    btn.textContent = "Added ✓"; btn.classList.add("done");
+    setTimeout(() => { btn.textContent = "Add to bag"; btn.classList.remove("done"); }, 1400);
+    if (!reduce) gsap.fromTo("#bag", { scale: 1.18 }, { scale: 1, duration: .6, ease: "elastic.out(1, .4)" });
+  }));
+
+  const reviews = ["“My skin hasn't looked this calm in years.” — Priya", "“The balm is a five-minute holiday.” — Jo", "“Finally a serum that doesn't pill.” — Sam", "“Refills are genius.” — Ama", "“Smells like a garden after rain.” — Elena"];
+  document.getElementById("rtrack").innerHTML = [...reviews, ...reviews].map((r) => `<span>${r}</span>`).join("");
+
+  document.getElementById("form").addEventListener("submit", (e) => { e.preventDefault(); document.getElementById("ok").textContent = "Welcome to the garden — your code is on its way."; });
+
+  if (reduce) return;
+
+  const lenis = new Lenis({ lerp: .1 });
+  lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add((t) => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+
+  // Hero: bottle floats in; then, pinned, it turns and the ingredients gather.
+  gsap.from(".htitle > *", { y: 50, opacity: 0, duration: 1.3, ease: "expo.out", stagger: .1 });
+  gsap.from("#bottle", { y: 160, rotate: -10, opacity: 0, duration: 1.6, ease: "expo.out", delay: .2 });
+  gsap.to("#bottle svg", { y: -12, duration: 2.6, ease: "sine.inOut", yoyo: true, repeat: -1 });
+  const spots = phone ? [[-30, -6], [30, -2], [0, 20]] : [[-24, -8], [24, -4], [-18, 16]]; // vw / svh offsets from centre
+  const tl = gsap.timeline({ scrollTrigger: { trigger: "#hero", start: "top top", end: "bottom bottom", scrub: .7 } });
+  tl.to(".htitle", { y: -80, opacity: 0, duration: .6 }, 0)
+    .to("#bottle", { scale: 1.15, y: () => -innerHeight * .2, duration: 1 }, 0)
+    .to("#label", { x: -18, duration: .5, ease: "sine.inOut" }, .2).to("#label", { x: 14, duration: .5, ease: "sine.inOut" }, .7)
+    .to("#b1", { x: () => innerWidth * .2, duration: 2 }, 0).to("#b2", { x: () => -innerWidth * .15, y: -80, duration: 2 }, 0);
+  spots.forEach(([vx, vy], i) => {
+    tl.fromTo("#ing" + i, { opacity: 0, scale: .4, x: 0, y: () => innerHeight * .1 },
+      { opacity: 1, scale: 1, x: () => innerWidth * vx / 100, y: () => innerHeight * vy / 100, duration: .6, ease: "back.out(1.6)" }, .5 + i * .35);
+  });
+  tl.to("#beat", { opacity: 1, duration: .3 }, 1.6).to({}, { duration: .4 });
+
+  gsap.from(".product", { y: 60, opacity: 0, duration: 1, ease: "power3.out", stagger: .1, scrollTrigger: { trigger: "#grid", start: "top 85%" } });
+  gsap.utils.toArray(".step").forEach((step) => {
+    gsap.from(step, { y: 60, opacity: 0, duration: 1, ease: "power3.out", scrollTrigger: { trigger: step, start: "top 88%" } });
+    gsap.to(step.querySelector(".dot"), { y: 80, scale: 1.4, ease: "none", scrollTrigger: { trigger: step, start: "top bottom", end: "bottom top", scrub: true } });
+  });
+})();
+</script>
+</body>
+</html>

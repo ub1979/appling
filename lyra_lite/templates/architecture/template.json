@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "architecture",
+  "name": "Architecture & Property",
+  "tagline": "Calm split-screen scroll, framed pictures, plans that draw themselves.",
+  "best_for": "Architects, property developments, interiors, hotels",
+  "palette": [
+    "#e9e7e2",
+    "#1b1b1b",
+    "#a39e93",
+    "#c2a878"
+  ],
+  "has_demo": true
+}

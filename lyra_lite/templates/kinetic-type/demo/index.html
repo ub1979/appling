@@ -1,0 +1,186 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Night Signal — Kinetic Type demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg: #0a0a0a; --acid: #d7ff3a; --pink: #ff4fd8; --paper: #f5f5f0; --dim: #8a8a85;
+    --display: "Anton", Impact, sans-serif; --sans: "Space Grotesk", system-ui, sans-serif; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--bg); }
+  body { color: var(--paper); font-family: var(--sans); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  .small { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; }
+  .nav { position: fixed; inset: 0 0 auto; z-index: 30; display: flex; justify-content: space-between; align-items: center; padding: 18px clamp(16px, 3vw, 36px); }
+  .nav b { font-family: var(--display); font-size: 22px; letter-spacing: .02em; }
+  .nav a { color: var(--bg); background: var(--acid); text-decoration: none; padding: 10px 18px; border-radius: 99px; font-weight: 700; font-size: 14px; }
+
+  /* hero: letters stretch with scroll speed */
+  .hero { height: 100svh; min-height: 600px; display: grid; align-content: center; padding: 0 clamp(16px, 3vw, 36px); overflow: hidden; position: relative; }
+  .big { font-family: var(--display); font-size: clamp(96px, 23vw, 420px); line-height: .82; text-transform: uppercase; letter-spacing: -.01em; white-space: nowrap; }
+  .big .ch { display: inline-block; transform-origin: 50% 100%; will-change: transform; }
+  .big.two { color: var(--acid); text-align: right; }
+  .hero .meta { display: flex; justify-content: space-between; gap: 16px; margin-top: 3svh; color: var(--dim); flex-wrap: wrap; }
+  .hero .meta b { color: var(--paper); font-weight: 500; }
+
+  /* marquee rows */
+  .rows { padding: 10svh 0; overflow: hidden; border-block: 1px solid #ffffff1a; }
+  .row { display: flex; width: max-content; gap: 3vw; font-family: var(--display); font-size: clamp(56px, 10vw, 170px); line-height: 1.05; text-transform: uppercase; white-space: nowrap; will-change: transform; }
+  .row span:nth-child(even) { color: transparent; -webkit-text-stroke: 1.5px var(--paper); }
+  .row.pink span:nth-child(odd) { color: var(--pink); }
+  .row .star { color: var(--acid) !important; -webkit-text-stroke: 0 !important; }
+
+  /* split headline */
+  .split { min-height: 120svh; display: grid; place-items: center; text-align: center; overflow: hidden; position: relative; }
+  .split h2 { font-family: var(--display); font-size: clamp(64px, 13vw, 240px); line-height: 1; text-transform: uppercase; }
+  .split h2 .w { display: inline-block; will-change: transform; }
+  .split p { max-width: 520px; margin: 28px auto 0; font-size: 19px; line-height: 1.55; color: #d6d6d0; }
+
+  /* lineup */
+  .lineup { padding: 12svh clamp(16px, 3vw, 36px); }
+  .lineup h3 { color: var(--acid); margin-bottom: 18px; }
+  .act { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; padding: 14px 0; border-top: 1px solid #ffffff1a; cursor: default; }
+  .act:last-child { border-bottom: 1px solid #ffffff1a; }
+  .act .n { font-family: var(--display); font-size: clamp(40px, 7vw, 110px); line-height: 1; text-transform: uppercase; transition: color .25s; }
+  .act:hover .n, .act:focus-visible .n { color: var(--pink); }
+  .act .t { color: var(--dim); text-align: right; flex-shrink: 0; }
+
+  /* tickets */
+  .tickets { min-height: 100svh; display: grid; align-content: center; justify-items: center; text-align: center; padding: 12svh 16px; background: var(--acid); color: var(--bg); }
+  .count { display: flex; gap: clamp(12px, 3vw, 40px); font-family: var(--display); font-size: clamp(56px, 11vw, 190px); line-height: .9; }
+  .count small { display: block; font-family: var(--sans); font-size: 13px; letter-spacing: .14em; text-transform: uppercase; margin-top: 8px; }
+  .buy { margin-top: 6svh; display: inline-flex; align-items: center; gap: 12px; font-family: var(--display); font-size: clamp(28px, 4vw, 54px); text-transform: uppercase; color: var(--acid); background: var(--bg); padding: 18px 34px; border-radius: 99px; text-decoration: none; will-change: transform; }
+  footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 22px clamp(16px, 3vw, 36px); color: var(--dim); }
+
+  @media (max-width: 760px) {
+    .act { flex-direction: column; gap: 4px; }
+    .act .t { text-align: left; }
+  }
+</style>
+</head>
+<body>
+<header class="nav"><b>NIGHT SIGNAL</b><a href="#tickets">Tickets</a></header>
+
+<section class="hero">
+  <div class="big one" aria-label="Night Signal">Night</div>
+  <div class="big two" aria-hidden="true">Signal</div>
+  <div class="meta small"><span><b>Lisbon · Docks 7</b></span><span id="dates">12 — 14 June</span><span>3 nights · 40 artists · 1 river</span></div>
+</section>
+
+<section class="rows" aria-hidden="true">
+  <div class="row" data-dir="-1"><span>Techno</span><span>House</span><span class="star">✶</span><span>Ambient</span><span>Live</span><span class="star">✶</span><span>Techno</span><span>House</span><span class="star">✶</span><span>Ambient</span><span>Live</span><span class="star">✶</span></div>
+  <div class="row pink" data-dir="1"><span>Dusk</span><span>till</span><span>Dawn</span><span class="star">✶</span><span>Dusk</span><span>till</span><span>Dawn</span><span class="star">✶</span><span>Dusk</span><span>till</span><span>Dawn</span><span class="star">✶</span></div>
+  <div class="row" data-dir="-1"><span>Riverside</span><span>Stages</span><span class="star">✶</span><span>Riverside</span><span>Stages</span><span class="star">✶</span><span>Riverside</span><span>Stages</span><span class="star">✶</span></div>
+</section>
+
+<section class="split" id="split">
+  <div>
+    <h2><span class="w">Three</span> <span class="w">nights</span><br><span class="w">no</span> <span class="w">sleep</span></h2>
+    <p>Four stages on the old docks, a floating bar, and a sunrise set every morning at 5:40 on the river wall.</p>
+  </div>
+</section>
+
+<section class="lineup">
+  <h3 class="small">Line-up — first wave</h3>
+  <div id="acts"></div>
+</section>
+
+<section class="tickets" id="tickets">
+  <p class="small">Doors open in</p>
+  <div class="count" id="count" aria-live="off"><div><span>00</span><small>days</small></div><div><span>00</span><small>hours</small></div><div><span>00</span><small>mins</small></div></div>
+  <a class="buy" id="buy" href="#">Get tickets →</a>
+</section>
+<footer class="small"><span>© 2026 Night Signal</span><span>A Lyra template</span><span>Instagram · Resident Advisor</span></footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  gsap.registerPlugin(ScrollTrigger);
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  const acts = [["Mira Kolt", "Fri · Main"], ["Saint Atlas", "Fri · River"], ["Ojo Negro b2b Lune", "Sat · Main"],
+    ["Hana Ferro", "Sat · Warehouse"], ["The Quiet Engines", "Sun · Sunrise set"], ["Dax Oyelaran", "Sun · Main"]];
+  document.getElementById("acts").innerHTML = acts.map(([n, t]) =>
+    `<div class="act" tabindex="0"><span class="n" data-text="${n}">${n}</span><span class="t small">${t}</span></div>`).join("");
+
+  // Countdown to the first night.
+  // The next 12 June, so the demo always counts down to a future night.
+  const now = new Date();
+  let year = now.getUTCFullYear();
+  if (Date.UTC(year, 5, 12, 18) < now.getTime()) year += 1;
+  const doors = Date.UTC(year, 5, 12, 18);
+  document.getElementById("dates").textContent = `12 — 14 June ${year}`;
+  const cells = document.querySelectorAll("#count span");
+  const tick = () => {
+    let s = Math.max(0, Math.floor((doors - Date.now()) / 1000));
+    const d = Math.floor(s / 86400); s -= d * 86400;
+    const h = Math.floor(s / 3600); s -= h * 3600;
+    [d, h, Math.floor(s / 60)].forEach((v, i) => { cells[i].textContent = String(v).padStart(2, "0"); });
+  };
+  tick(); setInterval(tick, 30000);
+
+  // Names scramble into place on hover (and on keyboard focus).
+  const glyphs = "ABCDEFGHIJKLMNOPQRSTUVWXYZ#%&*";
+  document.querySelectorAll(".act").forEach((act) => {
+    const el = act.querySelector(".n"), text = el.dataset.text;
+    const run = () => {
+      if (reduce) return;
+      let frame = 0;
+      const id = setInterval(() => {
+        el.textContent = [...text].map((c, i) => (c === " " || i < frame / 2 ? c : glyphs[(Math.random() * glyphs.length) | 0])).join("");
+        if (++frame > text.length * 2) { clearInterval(id); el.textContent = text; }
+      }, 28);
+    };
+    act.addEventListener("pointerenter", run);
+    act.addEventListener("focus", run);
+  });
+
+  if (reduce) return;
+
+  const lenis = new Lenis({ lerp: .1 });
+  lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add((t) => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+
+  // Hero letters: drop in, then stretch taller the faster you scroll.
+  const split = (el) => { el.innerHTML = [...el.textContent].map((c) => `<span class="ch">${c}</span>`).join(""); return el.querySelectorAll(".ch"); };
+  const one = split(document.querySelector(".big.one")), two = split(document.querySelector(".big.two"));
+  gsap.from([...one, ...two], { yPercent: 100, opacity: 0, duration: 1.1, ease: "expo.out", stagger: .04 });
+  gsap.to(".big.one", { xPercent: -12, ease: "none", scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: true } });
+  gsap.to(".big.two", { xPercent: 10, ease: "none", scrollTrigger: { trigger: ".hero", start: "top top", end: "bottom top", scrub: true } });
+  const stretch = gsap.quickTo([...one, ...two], "scaleY", { duration: .5, ease: "power3.out" });
+  const skew = gsap.quickTo(".row", "skewX", { duration: .5, ease: "power3.out" });
+  ScrollTrigger.create({ onUpdate: (self) => {
+    const v = Math.abs(self.getVelocity());
+    stretch(1 + Math.min(v / 2500, .7));
+    skew(gsap.utils.clamp(-14, 14, self.getVelocity() / -260));
+  } });
+
+  // Marquee rows drift with scroll, alternating directions.
+  gsap.utils.toArray(".row").forEach((row) => {
+    gsap.fromTo(row, { xPercent: row.dataset.dir > 0 ? -30 : 0 }, { xPercent: row.dataset.dir > 0 ? 0 : -30, ease: "none",
+      scrollTrigger: { trigger: ".rows", start: "top bottom", end: "bottom top", scrub: true } });
+  });
+
+  // Split headline: words fly in from scattered positions, then settle.
+  gsap.from("#split .w", { x: (i) => [-300, 260, -220, 320][i], y: (i) => [-120, 80, 140, -90][i], rotate: (i) => [-14, 10, 18, -8][i], opacity: 0,
+    ease: "power3.out", stagger: .05, scrollTrigger: { trigger: "#split", start: "top 75%", end: "center 55%", scrub: .8 } });
+  gsap.from("#split p", { y: 30, opacity: 0, duration: 1, ease: "power3.out", scrollTrigger: { trigger: "#split p", start: "top 85%" } });
+
+  gsap.from(".act", { yPercent: 60, opacity: 0, duration: .9, ease: "power3.out", stagger: .07, scrollTrigger: { trigger: "#acts", start: "top 80%" } });
+
+  // Ticket button pulls toward the pointer.
+  const buy = document.getElementById("buy");
+  const bx = gsap.quickTo(buy, "x", { duration: .6, ease: "elastic.out(1, .4)" }), by = gsap.quickTo(buy, "y", { duration: .6, ease: "elastic.out(1, .4)" });
+  buy.addEventListener("pointermove", (e) => { const r = buy.getBoundingClientRect(); bx((e.clientX - r.left - r.width / 2) * .3); by((e.clientY - r.top - r.height / 2) * .4); });
+  buy.addEventListener("pointerleave", () => { bx(0); by(0); });
+  gsap.from("#count > div", { yPercent: 80, opacity: 0, duration: 1, ease: "expo.out", stagger: .1, scrollTrigger: { trigger: "#tickets", start: "top 70%" } });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "stacked-cards",
+  "name": "Stacked Cards",
+  "tagline": "An app page: phone screens change as you read, cards stack up.",
+  "best_for": "Apps, fintech, consumer products, startups",
+  "palette": [
+    "#f6f4ef",
+    "#121212",
+    "#5b5bf7",
+    "#ffb547"
+  ],
+  "has_demo": true
+}
