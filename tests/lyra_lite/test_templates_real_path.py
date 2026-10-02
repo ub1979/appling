@@ -154,3 +154,24 @@ def test_photo_real_template_asks_for_the_owners_footage(env):
             assert "never pass ai pictures off" in payload["media_gate"].lower()
         finally:
             daemon.stop()
+
+
+def test_deck_project_gets_its_reference_deck_and_kit(env):
+    with FakeOpenAIServer([openai_text("Who is the audience?")]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            path = env["home"] / "Lyra Projects" / "Pitch"
+            res = daemon.post("/api/projects", {"path": str(path), "create": True, "team": [],
+                                                "kind": "slides", "template": "deck-pitch", "brief": "Seed pitch"})
+            assert res.status_code == 200, res.text
+            start = _wait_event(path, lambda e: e["type"] == "turn_start")
+            text = start["text"]
+            payload = json.loads(text[len("IDRAK_INTERNAL_SETUP_BEGIN"):text.rindex("IDRAK_INTERNAL_SETUP_END")])
+            assert "kind_skill" not in payload  # the deck template's spec leads, not PowerPoint
+            _wait_event(path, lambda e: e["type"] == "turn_end")
+            demo = REPO / "lyra_lite/templates/deck-pitch/demo/index.html"
+            assert (path / ".lyra/kit/reference/index.html").read_bytes() == demo.read_bytes()
+            assert os.access(path / ".lyra/kit/frames", os.X_OK)
+        finally:
+            daemon.stop()

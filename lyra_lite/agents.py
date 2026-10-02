@@ -161,7 +161,9 @@ def setup_message(root: Path, team: list[str], models: dict | None, brief: str,
         payload["build_profile"] = profile
     if kind in KIND_SKILLS or kind == "app":
         payload["project_kind"] = kind
-        if kind in KIND_SKILLS:
+        # A chosen deck template is built from its spec (HTML deck); PowerPoint
+        # stays the default without one, or when the owner asks for .pptx.
+        if kind in KIND_SKILLS and not (kind == "slides" and template):
             payload["kind_skill"] = KIND_SKILLS[kind]
         if kind == "website":
             payload["website_gate"] = WEBSITE_GATE

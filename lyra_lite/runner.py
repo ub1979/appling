@@ -460,7 +460,7 @@ class ProjectRunner:
         hooks = self._hooks
         hooks.turn_id = turn_id
         state = self.store.state()
-        if state.get("project_kind") == "website":
+        if state.get("project_kind") in ("website", "slides", "video"):
             try:
                 from lyra_lite.templates import ensure_website_kit
 

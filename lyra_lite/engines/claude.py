@@ -71,6 +71,8 @@ SKILLS_ROOT = REPO_ROOT / "plugins" / "ultimate-builder" / "skills"
 # The shared design skills the playbooks load by bare name
 # (skill_view(name="design-taste-frontend"), "design-tokens", "a11y-audit" …).
 DESIGN_SKILLS_ROOT = REPO_ROOT / "skills" / "ui-ux"
+# Other repo skills the playbooks name for a project kind (slides → .pptx).
+EXTRA_SKILLS = [REPO_ROOT / "skills" / "productivity" / "powerpoint" / "SKILL.md"]
 
 
 def _skill_name(skill_md: Path) -> str:
@@ -127,8 +129,9 @@ def builder_plugin_dir() -> Path:
     skills = root / "skills"
     skills.mkdir(exist_ok=True)
     wanted = {path.parent.name: path.parent for path in SKILLS_ROOT.rglob("SKILL.md")}
-    for path in sorted(DESIGN_SKILLS_ROOT.rglob("SKILL.md")):
-        wanted.setdefault(_skill_name(path), path.parent)
+    for path in [*sorted(DESIGN_SKILLS_ROOT.rglob("SKILL.md")), *EXTRA_SKILLS]:
+        if path.is_file():
+            wanted.setdefault(_skill_name(path), path.parent)
     for link in skills.iterdir():
         if link.name not in wanted or not link.is_symlink() or link.resolve() != wanted[link.name].resolve():
             if link.is_symlink() or link.is_file():
