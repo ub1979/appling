@@ -1,9 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, type BuildProfile, type Catalog } from "../api";
+import { api, type BuildProfile, type Catalog, type ProjectKind, type Template } from "../api";
 import { AvatarStack, Brand, FolderDialog, PrefButtons, TeamPicker } from "../components/common";
 import { go } from "../router";
 
 const REQUIRED = ["req-engineer", "task-planner"];
+
+const KINDS: { id: ProjectKind; name: string; text: string; icon: string; team: string[] }[] = [
+  { id: "app", name: "App", text: "Something people use: a tool, tracker, game or service.", icon: "◫", team: [] },
+  { id: "website", name: "Website", text: "A beautiful site: landing page, portfolio or product page — with motion.", icon: "◎", team: ["ui-designer", "sw-developer", "qa-engineer"] },
+  { id: "slides", name: "Slides", text: "A presentation you click through and can share.", icon: "▭", team: ["tech-writer"] },
+  { id: "video", name: "Video", text: "A short business film, ad or explainer.", icon: "▶", team: ["sw-developer"] },
+];
 
 const PROFILES: { id: BuildProfile; name: string; text: string }[] = [
   { id: "personal", name: "Personal / one-off", text: "For you, used now and then. The core features, basic safety and a real check — quick and light." },
@@ -25,6 +32,25 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
   const [customizing, setCustomizing] = useState(false);
   const [brief, setBrief] = useState("");
   const [profile, setProfile] = useState<BuildProfile>("personal");
+  const [kind, setKind] = useState<ProjectKind>("app");
+  const [templates, setTemplates] = useState<Template[]>([]);
+  const [templateId, setTemplateId] = useState<string | null>(null);
+  const [addingTemplate, setAddingTemplate] = useState(false);
+
+  useEffect(() => {
+    setTemplateId(null);
+    if (kind === "app") {
+      setTemplates([]);
+      return;
+    }
+    void api.templates(kind).then((r) => setTemplates(r.templates)).catch(() => setTemplates([]));
+  }, [kind]);
+
+  const chooseKind = (id: ProjectKind) => {
+    setKind(id);
+    const extra = KINDS.find((k) => k.id === id)?.team ?? [];
+    setTeam((t) => Array.from(new Set([...t, ...extra])));
+  };
   const [picking, setPicking] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -58,7 +84,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
     if (!path) return;
     setSaving(true);
     try {
-      const res = await api.addProject({ path, create: mode === "new", team: orderedTeam, style, brief, profile });
+      const res = await api.addProject({ path, create: mode === "new", team: orderedTeam, style, brief, profile, kind, template: templateId });
       go(`/p/${res.id}`);
     } catch (e) {
       setProblem(e instanceof Error ? e.message : String(e));
@@ -112,6 +138,63 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
               </div>
             )}
           </section>
+
+          <section className="card card-pad">
+            <h3>What are you making?</h3>
+            <div className="kind-grid">
+              {KINDS.map((k) => (
+                <button key={k.id} type="button" className={`profile-card ${kind === k.id ? "on" : ""}`} onClick={() => chooseKind(k.id)}>
+                  <span className="kind-icon">{k.icon}</span>
+                  <b>{k.name}</b>
+                  <span>{k.text}</span>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          {kind !== "app" && (
+            <section className="card card-pad">
+              <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+                <div>
+                  <h3>Start from a design</h3>
+                  <p className="muted small" style={{ margin: "4px 0 0" }}>
+                    Pick a template and Lyra will ask what to change — or start from scratch.
+                  </p>
+                </div>
+                <button className="btn soft small" onClick={() => setAddingTemplate(true)}>+ Add your own</button>
+              </div>
+              <div className="template-grid">
+                <button type="button" className={`template-card ${templateId === null ? "on" : ""}`} onClick={() => setTemplateId(null)}>
+                  <span className="template-thumb blank">+</span>
+                  <b>Start from scratch</b>
+                  <span className="muted small">Lyra designs it with you from your brief.</span>
+                </button>
+                {templates.map((t) => (
+                  <div key={t.id} className={`template-card ${templateId === t.id ? "on" : ""}`} role="button" tabIndex={0}
+                    onClick={() => setTemplateId(t.id)} onKeyDown={(e) => { if (e.key === "Enter") setTemplateId(t.id); }}>
+                    <span className="template-thumb" style={{ background: thumb(t.palette) }}>
+                      {t.has_demo && <span className="demo-badge">Live demo</span>}
+                      {t.own && <span className="demo-badge own">Yours</span>}
+                    </span>
+                    <b>{t.name}</b>
+                    <span className="muted small">{t.tagline}</span>
+                    {t.best_for && <span className="tiny muted">Good for: {t.best_for}</span>}
+                    <span className="template-actions">
+                      {t.demo_url && (
+                        <button className="btn small" onClick={(e) => { e.stopPropagation(); window.open(t.demo_url!, "_blank"); }}>▶ Preview</button>
+                      )}
+                      {t.own && (
+                        <button className="btn ghost small" onClick={(e) => {
+                          e.stopPropagation();
+                          void api.deleteTemplate(t.id).then(() => setTemplates((all) => all.filter((x) => x.id !== t.id)));
+                        }}>Remove</button>
+                      )}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="card card-pad">
             <h3>How much should Lyra build?</h3>
@@ -205,6 +288,17 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
         </aside>
       </div>
 
+      {addingTemplate && (
+        <AddTemplateDialog
+          kind={kind}
+          onClose={() => setAddingTemplate(false)}
+          onSaved={(t) => {
+            setTemplates((all) => [...all, { ...t, demo_url: null }]);
+            setTemplateId(t.id);
+            setAddingTemplate(false);
+          }}
+        />
+      )}
       {picking && (
         <FolderDialog
           start={mode === "new" ? parent : folder || parent}
@@ -218,6 +312,43 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
           }}
         />
       )}
+    </div>
+  );
+}
+
+function thumb(palette: string[]): string {
+  const [a = "#6d5cf5", b = "#11111b", c = "#ff7a45"] = palette;
+  return `radial-gradient(120% 90% at 80% 10%, ${c}cc 0%, transparent 45%), linear-gradient(160deg, ${b} 10%, ${a} 140%)`;
+}
+
+function AddTemplateDialog({ kind, onClose, onSaved }: { kind: ProjectKind; onClose: () => void; onSaved: (t: Template) => void }) {
+  const [name, setName] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [spec, setSpec] = useState("");
+  const [problem, setProblem] = useState<string | null>(null);
+  const save = async () => {
+    try {
+      onSaved(await api.addTemplate({ name, kind, tagline, spec }));
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : String(e));
+    }
+  };
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="dialog wide" onClick={(e) => e.stopPropagation()}>
+        <h2>Add your own template</h2>
+        <p className="muted small" style={{ margin: 0 }}>
+          Paste a design prompt you own (for example one you bought). It stays private on this Mac and Lyra uses it as the starting design.
+        </p>
+        <label><span className="field-label">Name</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Glass agency landing" /></label>
+        <label><span className="field-label">One line about it (optional)</span><input className="input" value={tagline} onChange={(e) => setTagline(e.target.value)} /></label>
+        <label><span className="field-label">The prompt</span><textarea className="textarea" style={{ minHeight: 220 }} value={spec} onChange={(e) => setSpec(e.target.value)} placeholder="Paste the full prompt here…" /></label>
+        {problem && <p className="problem small">{problem}</p>}
+        <div className="dialog-actions">
+          <button className="btn ghost" onClick={onClose}>Cancel</button>
+          <button className="btn primary" disabled={!name.trim() || !spec.trim()} onClick={() => void save()}>Save template</button>
+        </div>
+      </div>
     </div>
   );
 }

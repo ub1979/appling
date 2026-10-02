@@ -123,8 +123,16 @@ def project_listing(root: Path, limit: int = 40) -> str:
 PROFILES = ("personal", "reusable", "production")
 
 
+KIND_SKILLS = {
+    "website": "ultimate-builder:web-cinematic",
+    "video": "ultimate-builder:business-motion-film",
+    "slides": "powerpoint",
+}
+
+
 def setup_message(root: Path, team: list[str], models: dict | None, brief: str,
-                  profile: str | None = None) -> str:
+                  profile: str | None = None, kind: str | None = None,
+                  template: dict | None = None) -> str:
     payload = {
         "instruction": INSTRUCTION,
         "first_turn_gate": FIRST_TURN_GATE,
@@ -139,6 +147,18 @@ def setup_message(root: Path, team: list[str], models: dict | None, brief: str,
     }
     if profile in PROFILES:
         payload["build_profile"] = profile
+    if kind in KIND_SKILLS or kind == "app":
+        payload["project_kind"] = kind
+        if kind in KIND_SKILLS:
+            payload["kind_skill"] = KIND_SKILLS[kind]
+    if template:
+        payload["template"] = {"id": template["id"], "name": template.get("name", template["id"])}
+        payload["template_spec"] = template.get("spec", "")
+        payload["template_gate"] = (
+            "The owner chose this template as the starting design. Requirements runs a delta "
+            "interview: confirm the template fits, then ask what to change (brand, words, "
+            "colours, sections, images), one question per message. Do not re-ask what the "
+            "template already decides. Record the template and the agreed changes in requirements.md.")
     return f"{SETUP_BEGIN} {json.dumps(payload, ensure_ascii=False)} {SETUP_END}"
 
 

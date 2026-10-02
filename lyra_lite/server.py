@@ -103,7 +103,8 @@ def default_engine_factory(store: ProjectStore, session_key: str):
     return make_engine(name, **kwargs)
 
 
-PREVIEW_DIRS = ("", "dist", "build", "public")
+# Built output first: a Vite project's root index.html is source, not the app.
+PREVIEW_DIRS = ("dist", "build", "", "public")
 PREVIEW_TYPES = {
     ".html": "text/html", ".css": "text/css", ".js": "text/javascript", ".mjs": "text/javascript",
     ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".jpg": "image/jpeg",
@@ -246,7 +247,8 @@ class Lyra:
 
     def add_project(self, raw_path: str, *, create: bool, team: list[str] | None = None,
                     style: str | None = None, brief: str = "",
-                    models: dict | None = None, profile: str | None = None) -> ProjectRunner:
+                    models: dict | None = None, profile: str | None = None,
+                    kind: str | None = None, template_id: str | None = None) -> ProjectRunner:
         path = Path(raw_path).expanduser().resolve(strict=False)
         reason = placement(path, creating=create and not path.exists())
         if reason:
@@ -261,13 +263,19 @@ class Lyra:
             subprocess.run(["git", "init", "-q"], cwd=path, check=False)
         runner = self._attach(path)
         self._save_registry()
-        if team is not None or brief or style or profile:
+        if team is not None or brief or style or profile or kind:
+            from lyra_lite.templates import KINDS, get_template
+
             chosen = agents.normalise_team(team)
             profile = profile if profile in agents.PROFILES else None
+            kind = kind if kind in KINDS else None
+            template = get_template(template_id) if template_id else None
             runner.store.update_state(team=chosen, style=style or "app-it", models=models or {},
-                                      profile=profile)
+                                      profile=profile, project_kind=kind,
+                                      template=template["id"] if template else None)
             if not runner.store.transcript() and not runner.snapshot()["running"]:
-                runner.submit(agents.setup_message(path, chosen, models, brief, profile), kind="setup",
+                runner.submit(agents.setup_message(path, chosen, models, brief, profile, kind, template),
+                              kind="setup",
                               display=brief.strip() or "Project opened")
         return runner
 
@@ -392,6 +400,8 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             brief=str(body.get("brief") or ""),
             models=body.get("models") if isinstance(body.get("models"), dict) else None,
             profile=str(body.get("profile") or "") or None,
+            kind=str(body.get("kind") or "") or None,
+            template_id=str(body.get("template") or "") or None,
         )
         return {"id": project_key(runner.root), **runner.snapshot()}
 
@@ -550,14 +560,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         root = preview_root(lyra.get(pid).root)
         return {"available": root is not None, "url": f"/preview/{pid}/" if root else None}
 
-    @app.get("/preview/{pid}/{path:path}")
-    def preview(pid: str, path: str, request: Request):
-        # Browser tabs can't send headers, so the preview uses Lyra's cookie.
-        if not secrets.compare_digest(request.cookies.get("lyra_token", ""), token):
-            raise HTTPException(status_code=401, detail="Open the app from Lyra")
-        base = preview_root(lyra.get(pid).root)
-        if base is None:
-            raise HTTPException(status_code=404, detail="This project has no web page yet")
+    def _serve_static(base: Path, path: str):
         parts = [p for p in (path or "index.html").split("/") if p]
         if any(p.startswith(".") for p in parts):
             raise HTTPException(status_code=404)
@@ -570,6 +573,59 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         if kind is None:
             raise HTTPException(status_code=404)
         return FileResponse(target, media_type=kind, headers={"Cache-Control": "no-store"})
+
+    def _check_cookie(request: Request) -> None:
+        # Browser tabs can't send headers, so previews use Lyra's cookie.
+        if not secrets.compare_digest(request.cookies.get("lyra_token", ""), token):
+            raise HTTPException(status_code=401, detail="Open this from Lyra")
+
+    # Declared before the project preview so "templates" is never read as a project id.
+    @app.get("/preview/templates/{tid}/{path:path}")
+    def template_demo(tid: str, path: str, request: Request):
+        from lyra_lite.templates import demo_dir
+
+        _check_cookie(request)
+        base = demo_dir(tid)
+        if base is None:
+            raise HTTPException(status_code=404, detail="This template has no live demo")
+        return _serve_static(base, path)
+
+    @app.get("/preview/{pid}/{path:path}")
+    def preview(pid: str, path: str, request: Request):
+        _check_cookie(request)
+        base = preview_root(lyra.get(pid).root)
+        if base is None:
+            raise HTTPException(status_code=404, detail="This project has no web page yet")
+        return _serve_static(base, path)
+
+    # -- templates -----------------------------------------------------------
+
+    @app.get("/api/templates")
+    def templates_list(kind: str | None = None):
+        from lyra_lite.templates import list_templates
+
+        items = list_templates(kind or None)
+        for t in items:
+            t["demo_url"] = f"/preview/templates/{t['id']}/" if t["has_demo"] else None
+        return {"templates": items}
+
+    @app.post("/api/templates")
+    def templates_add(body: dict = Body(...)):
+        from lyra_lite.templates import save_user_template
+
+        try:
+            return save_user_template(str(body.get("name") or ""), str(body.get("kind") or "website"),
+                                      str(body.get("spec") or ""), str(body.get("tagline") or ""))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc))
+
+    @app.delete("/api/templates/{tid}")
+    def templates_delete(tid: str):
+        from lyra_lite.templates import delete_user_template
+
+        if not delete_user_template(tid):
+            raise HTTPException(status_code=404, detail="Only your own templates can be removed")
+        return {"ok": True}
 
     @app.get("/api/projects/{pid}/map")
     def project_map(pid: str):
@@ -606,8 +662,11 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             raise HTTPException(status_code=409, detail=str(exc))
         state = runner.store.state()
         if state.get("team"):
+            from lyra_lite.templates import get_template
+
+            template = get_template(state["template"]) if state.get("template") else None
             runner.submit(agents.setup_message(runner.root, state["team"], state.get("models"), "",
-                                               state.get("profile")),
+                                               state.get("profile"), state.get("project_kind"), template),
                           kind="setup", display="Project opened")
         return {"chat_id": chat_id}
 

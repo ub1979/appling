@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Aurelia Retreats — Cinematic Parallax demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,500;1,9..144,300&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --night: #0b1020; --night-2: #141a33; --sand: #e9dcc7; --ember: #ff7a45; --mist: #8fa3c7;
+    --display: "Fraunces", Georgia, serif; --sans: "Inter", system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--night); }
+  body { color: var(--sand); font-family: var(--sans); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  .nav { position: fixed; inset: 0 0 auto; z-index: 20; display: flex; justify-content: space-between; align-items: center; padding: 22px clamp(18px, 4vw, 56px); mix-blend-mode: difference; color: #fff; }
+  .nav b { font-family: var(--display); font-weight: 500; letter-spacing: .32em; font-size: 14px; }
+  .nav a { color: inherit; text-decoration: none; font-size: 13px; letter-spacing: .08em; border: 1px solid currentColor; padding: 8px 16px; border-radius: 99px; }
+
+  /* 1 — hero */
+  .hero { position: relative; height: 100svh; min-height: 640px; overflow: hidden;
+    background: radial-gradient(120% 80% at 70% 15%, #2a2f5a 0%, var(--night-2) 45%, var(--night) 100%); }
+  .stars { position: absolute; inset: 0; background-image:
+    radial-gradient(1px 1px at 12% 18%, #fff9, transparent), radial-gradient(1px 1px at 32% 8%, #fff7, transparent),
+    radial-gradient(1.5px 1.5px at 58% 22%, #fffa, transparent), radial-gradient(1px 1px at 77% 12%, #fff8, transparent),
+    radial-gradient(1px 1px at 88% 30%, #fff6, transparent), radial-gradient(1px 1px at 22% 34%, #fff5, transparent),
+    radial-gradient(1.5px 1.5px at 44% 40%, #fff6, transparent), radial-gradient(1px 1px at 67% 38%, #fff5, transparent); }
+  .layer { position: absolute; left: -4%; width: 108%; bottom: 0; will-change: transform; pointer-events: none; }
+  .layer svg { display: block; width: 100%; height: auto; }
+  .sun { position: absolute; left: 62%; top: 26%; width: clamp(140px, 18vw, 280px); aspect-ratio: 1; border-radius: 50%;
+    background: radial-gradient(circle at 40% 40%, #ffd9b0, #ff9a5c 45%, #ff7a4500 70%); filter: blur(1px);
+    box-shadow: 0 0 120px 40px #ff7a4533; }
+  .hero-copy { position: absolute; left: clamp(18px, 6vw, 96px); bottom: 26svh; z-index: 5; max-width: 900px; }
+  .kicker { font-size: 12px; letter-spacing: .4em; text-transform: uppercase; color: var(--mist); margin-bottom: 18px; }
+  h1 { font-family: var(--display); font-weight: 300; font-size: clamp(54px, 10vw, 168px); line-height: .92; letter-spacing: -.02em; }
+  h1 em { color: var(--ember); font-style: italic; }
+  .word { display: inline-block; overflow: hidden; vertical-align: top; padding-bottom: .08em; }
+  .word > span { display: inline-block; }
+  .lede { margin-top: 26px; max-width: 460px; font-size: 17px; line-height: 1.6; color: #e9dcc7cc; }
+  .cue { position: absolute; left: 50%; bottom: 28px; translate: -50% 0; z-index: 6; font-size: 11px; letter-spacing: .35em; text-transform: uppercase; color: var(--mist); display: grid; justify-items: center; gap: 10px; }
+  .cue i { width: 1px; height: 46px; background: linear-gradient(var(--mist), transparent); animation: cue 2.2s cubic-bezier(.7,0,.3,1) infinite; transform-origin: top; }
+  @keyframes cue { 0% { transform: scaleY(0); } 50% { transform: scaleY(1); } 100% { transform: scaleY(0); transform-origin: bottom; } }
+
+  /* 2 — pinned story */
+  .story { position: relative; height: 100svh; overflow: hidden; background: #000; }
+  .story canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .beats { position: absolute; right: clamp(18px, 7vw, 120px); top: 50%; translate: 0 -50%; width: min(420px, 80vw); height: 220px; }
+  .beat { position: absolute; inset: 0; opacity: 0; }
+  .beat small { font-size: 11px; letter-spacing: .35em; text-transform: uppercase; color: var(--ember); }
+  .beat h2 { font-family: var(--display); font-weight: 300; font-size: clamp(32px, 4.4vw, 64px); line-height: 1.02; margin: 14px 0 12px; }
+  .beat p { color: #e9dcc7bb; line-height: 1.6; }
+
+  /* 3 — horizontal gallery */
+  .gallery { position: relative; height: 100svh; overflow: hidden; background: var(--sand); color: var(--night); }
+  .gallery header { position: absolute; left: clamp(18px, 6vw, 96px); top: 12svh; z-index: 2; }
+  .gallery header h2 { font-family: var(--display); font-weight: 300; font-size: clamp(36px, 5vw, 76px); line-height: 1; }
+  .track { position: absolute; left: 0; top: 30svh; display: flex; gap: 3vw; padding: 0 clamp(18px, 6vw, 96px); will-change: transform; }
+  .card { flex: 0 0 auto; width: clamp(260px, 34vw, 520px); }
+  .card .art { aspect-ratio: 4 / 5; border-radius: 6px; overflow: hidden; position: relative; transform-origin: center; }
+  .card .art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .card h3 { font-family: var(--display); font-weight: 500; font-size: 22px; margin-top: 16px; }
+  .card p { font-size: 13px; color: #0b1020aa; margin-top: 4px; letter-spacing: .02em; }
+
+  /* 4 — text reveal */
+  .reveal { padding: 22svh clamp(18px, 8vw, 140px); background: var(--night); }
+  .reveal p { font-family: var(--display); font-weight: 300; font-size: clamp(30px, 4.6vw, 72px); line-height: 1.14; max-width: 1200px; }
+  .reveal .w { opacity: .15; }
+  .reveal .w.accent { color: var(--ember); font-style: italic; }
+
+  /* 5 — CTA */
+  .cta { position: relative; height: 100svh; min-height: 560px; overflow: hidden; display: grid; place-items: center;
+    background: radial-gradient(90% 70% at 50% 100%, #2a1c22 0%, var(--night) 70%); }
+  .cta-inner { text-align: center; z-index: 2; translate: 0 -10svh; }
+  .cta-inner p { color: var(--mist); letter-spacing: .3em; text-transform: uppercase; font-size: 12px; }
+  .cta-inner h2 { font-family: var(--display); font-weight: 300; font-size: clamp(40px, 6vw, 96px); margin: 18px 0 36px; }
+  .magnet { display: inline-grid; place-items: center; width: 168px; height: 168px; border-radius: 50%; background: var(--ember); color: var(--night);
+    font-weight: 600; letter-spacing: .04em; text-decoration: none; will-change: transform; }
+  .wordmark { position: absolute; left: 50%; bottom: -0.18em; translate: -50% 0; font-family: var(--display); font-weight: 500;
+    font-size: 27vw; line-height: .8; letter-spacing: -.03em; color: #e9dcc712; white-space: nowrap; pointer-events: none; }
+
+  @media (max-width: 700px) {
+    .hero-copy { bottom: 22svh; }
+    .beats { left: 18px; right: 18px; width: auto; top: auto; bottom: 10svh; translate: none; }
+    .magnet { width: 132px; height: 132px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .cue i { animation: none; }
+    .reveal .w { opacity: 1; }
+    .beat:first-child { opacity: 1; }
+  }
+</style>
+</head>
+<body>
+<nav class="nav"><b>AURELIA</b><a href="#book">Book a stay</a></nav>
+
+<section class="hero" id="hero">
+  <div class="stars"></div>
+  <div class="layer" data-depth="0.15" style="top:0;bottom:auto;height:100%"><div class="sun"></div></div>
+  <div class="layer" data-depth="0.2"><svg viewBox="0 0 1440 560" preserveAspectRatio="xMidYMax slice">
+    <defs><linearGradient id="far" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5b6593"/><stop offset="1" stop-color="#2b3158"/></linearGradient></defs>
+    <path fill="url(#far)" d="M0 420 L120 300 L210 360 L330 210 L460 330 L560 250 L700 380 L820 230 L930 300 L1060 170 L1190 300 L1300 240 L1440 330 L1440 560 L0 560 Z"/></svg></div>
+  <div class="layer" data-depth="0.5"><svg viewBox="0 0 1440 520" preserveAspectRatio="xMidYMax slice">
+    <defs><linearGradient id="mid" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2f3766"/><stop offset="1" stop-color="#171c38"/></linearGradient></defs>
+    <path fill="url(#mid)" d="M0 380 L160 270 L260 330 L420 230 L560 350 L700 280 L860 360 L1000 250 L1140 340 L1280 270 L1440 350 L1440 520 L0 520 Z"/></svg></div>
+  <div class="layer" data-depth="0.8"><svg viewBox="0 0 1440 420" preserveAspectRatio="xMidYMax slice">
+    <defs><linearGradient id="near" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#131833"/><stop offset="1" stop-color="#0b1020"/></linearGradient></defs>
+    <path fill="url(#near)" d="M0 300 C180 240 300 290 420 260 C560 225 640 300 780 280 C930 258 1020 200 1160 240 C1290 276 1360 250 1440 260 L1440 420 L0 420 Z"/></svg></div>
+  <div class="layer" data-depth="1.1"><svg viewBox="0 0 1440 300" preserveAspectRatio="xMidYMax slice">
+    <path fill="#060914" d="M0 230 C220 200 320 250 520 236 C700 224 760 180 920 196 C1080 212 1200 250 1440 220 L1440 300 L0 300 Z"/>
+    <g fill="#060914" transform="translate(1090 92)"><path d="M18 120 L18 70 L2 70 L18 46 L8 46 L22 22 L14 22 L28 0 L42 22 L34 22 L48 46 L38 46 L54 70 L38 70 L38 120 Z"/></g>
+    <g fill="#060914" transform="translate(1160 120)"><path d="M14 92 L14 54 L2 54 L14 36 L6 36 L17 17 L11 17 L22 0 L33 17 L27 17 L38 36 L30 36 L42 54 L30 54 L30 92 Z"/></g></svg></div>
+  <div class="hero-copy">
+    <p class="kicker">Aurelia Retreats · Est. 2026</p>
+    <h1 class="split">Where the light <em>lingers.</em></h1>
+    <p class="lede">Twelve cabins above the clouds. No timetable, no signal — just mornings that take their time.</p>
+  </div>
+  <div class="cue">Scroll<i></i></div>
+</section>
+
+<section class="story" id="story">
+  <canvas id="seq"></canvas>
+  <div class="beats">
+    <div class="beat"><small>05:12</small><h2>First, the blue hour.</h2><p>The valley holds its breath. Coffee on the deck, blankets, the quiet before colour.</p></div>
+    <div class="beat"><small>05:41</small><h2>Then the edge of fire.</h2><p>Light finds the ridge first, then the lake, then you.</p></div>
+    <div class="beat"><small>06:30</small><h2>And the whole day ahead.</h2><p>Walks, sauna, long lunches. Or nothing at all. Both are on the plan.</p></div>
+  </div>
+</section>
+
+<section class="gallery" id="gallery">
+  <header><h2>Five ways<br/>to slow down.</h2></header>
+  <div class="track" id="track">
+    <article class="card"><div class="art"><svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f6b37f"/><stop offset="1" stop-color="#c2584a"/></linearGradient></defs><rect width="400" height="500" fill="url(#g1)"/><circle cx="270" cy="170" r="60" fill="#ffe2bd"/><path d="M0 360 C120 300 220 380 400 320 L400 500 L0 500 Z" fill="#8e3b3b"/><path d="M0 420 C140 380 260 440 400 400 L400 500 L0 500 Z" fill="#5c2530"/></svg></div><h3>The dune cabins</h3><p>Warm stone · sunset decks</p></article>
+    <article class="card"><div class="art"><svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9fd3d6"/><stop offset="1" stop-color="#2b6f86"/></linearGradient></defs><rect width="400" height="500" fill="url(#g2)"/><path d="M0 300 C100 280 300 320 400 290 L400 500 L0 500 Z" fill="#1f5367"/><g stroke="#cdeef0" stroke-width="3" opacity=".6"><line x1="60" y1="350" x2="140" y2="350"/><line x1="220" y1="390" x2="330" y2="390"/><line x1="110" y1="430" x2="200" y2="430"/></g></svg></div><h3>The lagoon house</h3><p>Cold plunge · glass floor</p></article>
+    <article class="card"><div class="art"><svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice"><rect width="400" height="500" fill="#2f4a3a"/><g fill="#1c3226"><path d="M60 500 L60 330 L20 330 L60 260 L35 260 L75 180 L115 260 L90 260 L130 330 L90 330 L90 500 Z"/><path d="M230 500 L230 300 L180 300 L230 210 L200 210 L250 110 L300 210 L270 210 L320 300 L270 300 L270 500 Z"/></g><rect width="400" height="500" fill="url(#fog)"/><defs><linearGradient id="fog" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#e9dcc700"/><stop offset=".7" stop-color="#e9dcc755"/><stop offset="1" stop-color="#e9dcc700"/></linearGradient></defs></svg></div><h3>The forest loft</h3><p>Fireplace · birdsong</p></article>
+    <article class="card"><div class="art"><svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g4" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#0d1430"/><stop offset="1" stop-color="#26315c"/></linearGradient><linearGradient id="au" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#5df2c3" stop-opacity="0"/><stop offset=".5" stop-color="#5df2c3" stop-opacity=".7"/><stop offset="1" stop-color="#9d7cff" stop-opacity="0"/></linearGradient></defs><rect width="400" height="500" fill="url(#g4)"/><path d="M-20 160 C100 90 220 230 420 120 L420 200 C240 300 110 170 -20 240 Z" fill="url(#au)"/><path d="M0 400 L120 330 L220 380 L320 320 L400 360 L400 500 L0 500 Z" fill="#0a0f24"/></svg></div><h3>The aurora suite</h3><p>Sky roof · heated bath</p></article>
+    <article class="card"><div class="art"><svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="g5" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f0d9b5"/><stop offset="1" stop-color="#d07a3e"/></linearGradient></defs><rect width="400" height="500" fill="url(#g5)"/><path d="M0 260 L80 260 L80 500 L0 500 Z M150 200 L250 200 L250 500 L150 500 Z M320 240 L400 240 L400 500 L320 500 Z" fill="#a24f2b"/><path d="M80 300 L150 300 L150 500 L80 500 Z M250 330 L320 330 L320 500 L250 500 Z" fill="#7d3a20"/></svg></div><h3>The canyon rooms</h3><p>Red rock · open sky</p></article>
+  </div>
+</section>
+
+<section class="reveal" id="reveal">
+  <p id="revealText">We built Aurelia for people who forgot what an <span class="accent">unhurried</span> morning feels like. Stay three nights and the clock stops mattering; stay a week and you will remember how to <span class="accent">listen</span>.</p>
+</section>
+
+<section class="cta" id="book">
+  <div class="cta-inner">
+    <p>Season opens in April</p>
+    <h2>Come stay a while.</h2>
+    <a class="magnet" href="#book" id="magnet">Plan your stay</a>
+  </div>
+  <div class="wordmark">AURELIA</div>
+</section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const finePointer = matchMedia("(pointer: fine)").matches;
+  gsap.registerPlugin(ScrollTrigger);
+
+  // Split headline into words (masked reveal).
+  document.querySelectorAll(".split").forEach((el) => {
+    const nodes = [...el.childNodes];
+    el.textContent = "";
+    nodes.forEach((n) => {
+      const text = n.textContent;
+      const wrapTag = n.nodeType === 1 ? n.tagName.toLowerCase() : null;
+      text.split(/(\s+)/).forEach((part) => {
+        if (!part.trim()) { el.append(part); return; }
+        const outer = document.createElement("span"); outer.className = "word";
+        const inner = document.createElement(wrapTag || "span"); inner.textContent = part;
+        if (wrapTag) inner.style.display = "inline-block";
+        outer.append(inner); el.append(outer);
+      });
+    });
+  });
+  // Words for the reveal paragraph.
+  const rp = document.getElementById("revealText");
+  const parts = [];
+  rp.childNodes.forEach((n) => n.textContent.split(/(\s+)/).forEach((t) => parts.push([t, n.nodeType === 1])));
+  rp.innerHTML = parts.map(([t, acc]) => (t.trim() ? `<span class="w${acc ? " accent" : ""}">${t}</span>` : t)).join("");
+
+  // Sunrise canvas (stands in for an image sequence).
+  const canvas = document.getElementById("seq"), ctx = canvas.getContext("2d");
+  let W = 0, H = 0, progress = 0;
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const mix = (c1, c2, t) => c1.map((v, i) => Math.round(lerp(v, c2[i], t)));
+  const rgb = (c) => `rgb(${c[0]},${c[1]},${c[2]})`;
+  const stops = [[[8,12,32],[34,40,80]], [[60,40,90],[255,140,90]], [[120,170,220],[255,214,160]]];
+  function draw() {
+    const p = progress, seg = p < .5 ? 0 : 1, t = p < .5 ? p / .5 : (p - .5) / .5;
+    const top = mix(stops[seg][0], stops[seg + 1][0], t), bottom = mix(stops[seg][1], stops[seg + 1][1], t);
+    const g = ctx.createLinearGradient(0, 0, 0, H * .62); g.addColorStop(0, rgb(top)); g.addColorStop(1, rgb(bottom));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    const sunY = lerp(H * .78, H * .22, p), r = Math.min(W, H) * .08;
+    const glow = ctx.createRadialGradient(W * .38, sunY, 0, W * .38, sunY, r * 5);
+    glow.addColorStop(0, `rgba(255,220,170,${.9 * p + .1})`); glow.addColorStop(1, "rgba(255,160,100,0)");
+    ctx.fillStyle = glow; ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = `rgba(255,236,205,${.4 + .6 * p})`; ctx.beginPath(); ctx.arc(W * .38, sunY, r, 0, Math.PI * 2); ctx.fill();
+    const lake = ctx.createLinearGradient(0, H * .62, 0, H); lake.addColorStop(0, rgb(mix(bottom, [10,14,30], .55))); lake.addColorStop(1, "#05070f");
+    ctx.fillStyle = lake; ctx.fillRect(0, H * .62, W, H * .38);
+    ctx.strokeStyle = `rgba(255,214,170,${.15 + .5 * p})`; ctx.lineWidth = 2;
+    for (let i = 0; i < 14; i++) { const y = H * .64 + i * H * .025, w = (r * 3) * (1 - i / 16);
+      ctx.beginPath(); ctx.moveTo(W * .38 - w, y); ctx.lineTo(W * .38 + w, y); ctx.stroke(); }
+    ctx.fillStyle = "#04060d"; ctx.beginPath(); ctx.moveTo(0, H * .62);
+    for (let x = 0; x <= W; x += W / 24) ctx.lineTo(x, H * .62 - (Math.sin(x / W * 9) * .5 + .5) * H * .09 - (x > W * .6 ? H * .06 : 0));
+    ctx.lineTo(W, H * .62); ctx.closePath(); ctx.fill();
+  }
+  function resize() { const d = Math.min(devicePixelRatio || 1, 2); W = canvas.clientWidth; H = canvas.clientHeight;
+    canvas.width = W * d; canvas.height = H * d; ctx.setTransform(d, 0, 0, d, 0, 0); draw(); }
+  addEventListener("resize", resize); resize();
+
+  if (reduce) { progress = .7; draw(); return; }   // static, readable page
+
+  // Smooth scroll driving ScrollTrigger.
+  const lenis = new Lenis({ lerp: .09 });
+  lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add((t) => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+
+  // 1 — hero entrance + depth parallax + mouse tilt.
+  gsap.from(".hero .word > *", { yPercent: 110, opacity: 0, filter: "blur(12px)", duration: 1.4, ease: "expo.out", stagger: .08, delay: .2 });
+  gsap.from(".lede, .kicker", { opacity: 0, y: 24, duration: 1.2, ease: "power3.out", delay: .7, stagger: .1 });
+  document.querySelectorAll(".hero .layer").forEach((layer) => {
+    const depth = +layer.dataset.depth;
+    gsap.to(layer, { yPercent: depth * 22, ease: "none", scrollTrigger: { trigger: "#hero", start: "top top", end: "bottom top", scrub: true } });
+    if (finePointer) {
+      const qx = gsap.quickTo(layer, "x", { duration: 1.2, ease: "power3.out" });
+      addEventListener("mousemove", (e) => qx((e.clientX / innerWidth - .5) * -40 * depth));
+    }
+  });
+  gsap.to(".hero-copy", { yPercent: -40, opacity: 0, ease: "none", scrollTrigger: { trigger: "#hero", start: "top top", end: "70% top", scrub: true } });
+
+  // 2 — pinned story: scrub the sunrise, three text beats.
+  const beats = gsap.utils.toArray(".beat");
+  const tl = gsap.timeline({ scrollTrigger: { trigger: "#story", start: "top top", end: "+=300%", pin: true, scrub: .6,
+    onUpdate: (self) => { progress = self.progress; draw(); } } });
+  beats.forEach((b, i) => {
+    tl.fromTo(b, { opacity: 0, y: 40 }, { opacity: 1, y: 0, duration: .5, ease: "power3.out" }, i * 1.2)
+      .to(b, { opacity: 0, y: -40, duration: .5, ease: "power3.in" }, i * 1.2 + .9);
+  });
+
+  // 3 — horizontal gallery driven by vertical scroll, skewed by velocity.
+  const track = document.getElementById("track");
+  const distance = () => track.scrollWidth - innerWidth;
+  const skew = gsap.quickTo(".card .art", "skewX", { duration: .6, ease: "power3.out" });
+  gsap.to(track, { x: () => -distance(), ease: "none", scrollTrigger: { trigger: "#gallery", start: "top top",
+    end: () => "+=" + distance(), pin: true, scrub: 1, invalidateOnRefresh: true,
+    onUpdate: (self) => skew(gsap.utils.clamp(-8, 8, self.getVelocity() / -320)) } });
+
+  // 4 — words from 15% to 100%.
+  gsap.to("#revealText .w", { opacity: 1, ease: "none", stagger: .05,
+    scrollTrigger: { trigger: "#reveal", start: "top 70%", end: "bottom 60%", scrub: true } });
+
+  // 5 — wordmark rise + magnetic button.
+  gsap.from(".wordmark", { yPercent: 40, opacity: 0, ease: "power3.out", duration: 1.4, scrollTrigger: { trigger: "#book", start: "top 70%" } });
+  const magnet = document.getElementById("magnet");
+  if (finePointer) {
+    const mx = gsap.quickTo(magnet, "x", { duration: .6, ease: "power3.out" }), my = gsap.quickTo(magnet, "y", { duration: .6, ease: "power3.out" });
+    magnet.addEventListener("mousemove", (e) => { const r = magnet.getBoundingClientRect();
+      mx((e.clientX - r.left - r.width / 2) * .35); my((e.clientY - r.top - r.height / 2) * .35); });
+    magnet.addEventListener("mouseleave", () => { mx(0); my(0); });
+  }
+  addEventListener("load", () => ScrollTrigger.refresh());
+})();
+</script>
+</body>
+</html>

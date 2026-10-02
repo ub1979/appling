@@ -27,6 +27,8 @@ _SPECIALIST_SKILLS = {
     "qa-functional": "Verify approved behaviour through real user paths.",
     "qa-experience": "Audit usability, layout and accessibility evidence.",
     "qa-evidence": "Record trustworthy evidence for a selected QA scope.",
+    "web-cinematic": "Build premium scroll-driven, parallax websites.",
+    "business-motion-film": "Make premium short business videos and explainers.",
     "security-auditor": "Security auditing",
     "devops-engineer": "Deployment and operations",
     "tech-writer": "Technical documentation",

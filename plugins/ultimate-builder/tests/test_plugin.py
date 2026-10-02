@@ -134,7 +134,8 @@ def test_built_dashboard_uses_the_same_product_version():
 
 
 def test_start_script_launches_dashboard_from_ignored_project_root():
-    start_script = (ROOT.parents[1] / "start.sh").read_text()
+    # In the Lyra Lite branch the classic Studio launcher is start-studio.sh.
+    start_script = (ROOT.parents[1] / "start-studio.sh").read_text()
     assert 'WORKSPACE_DIR="$PROJECT_DIR/my_projects"' in start_script
     assert 'cd "$WORKSPACE_DIR"' in start_script
     assert 'uv run --project "$PROJECT_DIR" hermes dashboard' in start_script

@@ -67,6 +67,26 @@ For Personal, do not add Architecture, Security, Deployment, Benchmarks,
 Accessibility or release documentation unless the owner asks for that outcome
 or the app has a concrete risk the small build cannot handle.
 
+## Project kind and templates
+
+The setup message may carry `project_kind` (app, website, slides, video), the
+playbook for that kind (`kind_skill`) and a chosen `template` with its full
+`template_spec`:
+
+- **website** — the building agent loads `ultimate-builder:web-cinematic`; a
+  chosen template's spec is the starting design.
+- **video** — use `ultimate-builder:business-motion-film` (short business
+  films and explainers).
+- **slides** — use the `powerpoint` skill for a deck the owner can open and
+  present.
+
+With a template, Requirements does not start from a blank page: it confirms
+the template fits, then asks what to change — brand, words, colours,
+sections, images — one question per message, and records the template plus
+the agreed changes in `requirements.md`. Images for websites are decided in
+that interview: the owner's own, free stock, AI-generated, or placeholders
+first.
+
 For an existing project, the setup message already carries a project listing
 and your workspace snapshot. Treat those as the inspection: briefly state what
 the project appears to be, then ask only for the desired change or outcome.

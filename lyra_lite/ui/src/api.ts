@@ -113,6 +113,19 @@ export interface Catalog {
 }
 
 export type BuildProfile = "personal" | "reusable" | "production";
+export type ProjectKind = "app" | "website" | "slides" | "video";
+
+export interface Template {
+  id: string;
+  kind: ProjectKind;
+  name: string;
+  tagline: string;
+  best_for: string;
+  palette: string[];
+  has_demo: boolean;
+  demo_url: string | null;
+  own: boolean;
+}
 
 export interface NewProject {
   path: string;
@@ -121,6 +134,8 @@ export interface NewProject {
   style: string;
   brief: string;
   profile: BuildProfile;
+  kind: ProjectKind;
+  template: string | null;
 }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
@@ -152,6 +167,10 @@ export const api = {
   modelSave: (provider: string, model: string, confirm: boolean) =>
     call<{ ok: boolean; confirm_required?: boolean; message?: string }>("POST", "/api/settings/model", { provider, model, confirm }),
   claudeCli: () => call<{ found: boolean; logged_in: boolean; method?: string; plan?: string }>("GET", "/api/settings/claude-cli"),
+  templates: (kind: ProjectKind) => call<{ templates: Template[] }>("GET", `/api/templates?kind=${kind}`),
+  addTemplate: (body: { name: string; kind: ProjectKind; tagline: string; spec: string }) =>
+    call<Template>("POST", "/api/templates", body),
+  deleteTemplate: (id: string) => call("DELETE", `/api/templates/${id}`),
   engines: () => call<{ engines: { id: string; label: string }[]; anthropic_key: boolean }>("GET", "/api/engines"),
   applyRules: (id: string) => call("POST", `/api/projects/${id}/apply-rules`),
   stop: (id: string) => call("POST", `/api/projects/${id}/stop`),

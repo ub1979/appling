@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "product-launch-3d",
+  "name": "3D Product Launch",
+  "tagline": "A product that turns and glows as you scroll.",
+  "best_for": "Gadgets, apps, products, launches",
+  "palette": [
+    "#07080c",
+    "#c6ff4a",
+    "#7a5cff",
+    "#e8e8f0"
+  ],
+  "has_demo": true
+}

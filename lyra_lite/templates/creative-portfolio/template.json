@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "creative-portfolio",
+  "name": "Creative Portfolio",
+  "tagline": "Big type, bold work, smooth case-study transitions.",
+  "best_for": "Designers, studios, photographers, freelancers",
+  "palette": [
+    "#111111",
+    "#f2f0ea",
+    "#ff3d2e",
+    "#9a9a9a"
+  ],
+  "has_demo": false
+}

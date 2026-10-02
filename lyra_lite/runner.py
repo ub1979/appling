@@ -94,6 +94,7 @@ class ProjectRunner:
         self._cond = threading.Condition()
         self._stop = False
         self._busy = False
+        self._memory_lock = threading.Lock()  # one index refresh at a time
         self._hooks = _Hooks(self)
         self._reload_pending = False
         self._recover()
@@ -210,6 +211,8 @@ class ProjectRunner:
             "team": state.get("team") or [],
             "style": state.get("style") or "app-it",
             "profile": state.get("profile"),
+            "project_kind": state.get("project_kind"),
+            "template": state.get("template"),
             "models": state.get("models") or {},
             "watchdog": state.get("watchdog") or {},
             "has_engine": self._engine is not None,
@@ -481,14 +484,23 @@ class ProjectRunner:
             "done" if result.completed else "incomplete")
         sha = checkpoint(self.root, role="lyra", status=status,
                          exit_reason=status, goal=turn["text"][:200])
+        # Idle before announcing the end, so anyone reacting to turn_end
+        # (the screen, a watchdog, a test) sees a finished project.
+        with self._cond:
+            self._busy = False
+            self.store.update_state(running=False, turn=None)
         self.store.append_event(
             "turn_end", turn=turn_id, status=status, reply=result.reply,
             error=result.error, usage=result.usage, checkpoint=sha,
         )
+        threading.Thread(target=self._refresh_memory, name="lyra-memory-index", daemon=True).start()
+
+    def _refresh_memory(self) -> None:
         try:
             from lyra_lite.memory import ProjectMemory
 
-            ProjectMemory(self.root).refresh()
+            with self._memory_lock:
+                ProjectMemory(self.root).refresh()
         except Exception:
             logger.warning("lyra-lite: project memory index failed", exc_info=True)
 

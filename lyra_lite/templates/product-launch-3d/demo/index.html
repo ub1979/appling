@@ -1,0 +1,199 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Halo — 3D Product Launch demo</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --ink: #07080c; --acid: #c6ff4a; --violet: #7a5cff; --soft: #e8e8f0;
+    --sans: "Space Grotesk", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--ink); }
+  body { color: var(--soft); font-family: var(--sans); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  #stage { position: fixed; inset: 0; z-index: 0; display: block; }
+  .vignette { position: fixed; inset: 0; z-index: 1; pointer-events: none;
+    background: radial-gradient(80% 70% at 50% 45%, transparent 40%, #07080ccc 100%); }
+  main { position: relative; z-index: 2; }
+  .nav { position: fixed; inset: 0 0 auto; z-index: 5; display: flex; justify-content: space-between; align-items: center; padding: 22px clamp(18px, 4vw, 56px); }
+  .nav b { font-weight: 700; letter-spacing: .02em; font-size: 20px; }
+  .nav b span { color: var(--acid); }
+  .nav a { color: var(--ink); background: var(--acid); text-decoration: none; font-weight: 600; font-size: 13px; padding: 9px 16px; border-radius: 99px; }
+  section { min-height: 100svh; display: grid; align-items: center; padding: 0 clamp(18px, 7vw, 120px); }
+  .hero { text-align: center; align-content: end; padding-bottom: 12svh; }
+  .tag { font-family: var(--mono); font-size: 12px; letter-spacing: .2em; color: var(--acid); text-transform: uppercase; }
+  h1 { font-weight: 700; font-size: clamp(56px, 11vw, 190px); line-height: .86; letter-spacing: -.045em; margin: 14px 0 18px; }
+  h1 span { display: inline-block; }
+  .sub { color: #e8e8f0b3; font-size: clamp(16px, 1.6vw, 20px); }
+  .feature { max-width: 440px; }
+  .feature.right { justify-self: end; }
+  .feature h2 { font-weight: 500; font-size: clamp(36px, 5vw, 76px); line-height: .98; letter-spacing: -.03em; margin: 14px 0 16px; }
+  .feature p { color: #e8e8f0b3; line-height: 1.6; }
+  .specs { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 2vw; align-content: center; }
+  .spec { border-top: 1px solid #e8e8f033; padding-top: 18px; }
+  .spec b { display: block; font-weight: 500; font-size: clamp(40px, 5.4vw, 88px); letter-spacing: -.04em; }
+  .spec b small { font-size: .4em; color: var(--acid); margin-left: 4px; }
+  .spec span { font-family: var(--mono); font-size: 12px; color: #e8e8f099; letter-spacing: .08em; }
+  .colors { text-align: center; align-content: end; padding-bottom: 10svh; }
+  .swatches { display: inline-flex; gap: 14px; margin-top: 22px; }
+  .swatch { width: 54px; height: 54px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; transition: transform .4s cubic-bezier(.2,.8,.2,1), border-color .3s; }
+  .swatch:hover { transform: scale(1.08); }
+  .swatch.on { border-color: var(--soft); }
+  .buy { text-align: center; align-content: end; padding-bottom: 12svh; }
+  .buy h2 { font-weight: 700; font-size: clamp(48px, 8vw, 140px); letter-spacing: -.05em; line-height: .9; }
+  .price { font-family: var(--mono); color: #e8e8f0b3; margin: 18px 0 30px; }
+  .btn { display: inline-block; background: var(--acid); color: var(--ink); text-decoration: none; font-weight: 700; padding: 18px 34px; border-radius: 99px;
+    box-shadow: 0 0 0 0 #c6ff4a66; animation: pulse 2.6s cubic-bezier(.2,.8,.2,1) infinite; }
+  @keyframes pulse { 0% { box-shadow: 0 0 0 0 #c6ff4a55; } 70% { box-shadow: 0 0 0 26px #c6ff4a00; } 100% { box-shadow: 0 0 0 0 #c6ff4a00; } }
+  footer { position: relative; z-index: 2; padding: 30px clamp(18px, 7vw, 120px); font-family: var(--mono); font-size: 12px; color: #e8e8f066; }
+  @media (max-width: 760px) {
+    .specs { grid-template-columns: 1fr 1fr; row-gap: 32px; }
+    .feature, .feature.right { justify-self: start; align-self: end; padding-bottom: 12svh; }
+  }
+  @media (prefers-reduced-motion: reduce) { .btn { animation: none; } }
+</style>
+</head>
+<body>
+<canvas id="stage"></canvas>
+<div class="vignette"></div>
+<nav class="nav"><b>halo<span>.</span></b><a href="#buy">Pre-order</a></nav>
+<main>
+  <section class="hero" id="hero">
+    <div>
+      <p class="tag">Introducing</p>
+      <h1 id="title"><span>Halo.</span></h1>
+      <p class="sub">Sound you can see. A speaker that glows with what it plays.</p>
+    </div>
+  </section>
+  <section id="f1"><div class="feature"><p class="tag">01 — Light</p><h2>A ring that listens.</h2><p>Two hundred LEDs follow the beat, the voice and the room — soft at night, alive at a party.</p></div></section>
+  <section id="f2"><div class="feature right"><p class="tag">02 — Sound</p><h2>360° of depth.</h2><p>Six drivers face every way, so the best seat is wherever you are.</p></div></section>
+  <section id="f3"><div class="feature"><p class="tag">03 — Calm</p><h2>Smart, then silent.</h2><p>It learns your evenings and fades itself out. No app required.</p></div></section>
+  <section class="specs" id="specs">
+    <div class="spec"><b data-to="360">0<small>°</small></b><span>FULL-ROOM SOUND</span></div>
+    <div class="spec"><b data-to="200">0<small>leds</small></b><span>REACTIVE LIGHT RING</span></div>
+    <div class="spec"><b data-to="24">0<small>h</small></b><span>BATTERY LIFE</span></div>
+    <div class="spec"><b data-to="980">0<small>g</small></b><span>LIGHTER THAN A BOOK</span></div>
+  </section>
+  <section class="colors" id="colors">
+    <div><p class="tag">Pick your glow</p>
+      <div class="swatches">
+        <button class="swatch on" style="background:#c6ff4a" data-ring="#c6ff4a" data-body="#15171f" aria-label="Acid"></button>
+        <button class="swatch" style="background:#7a5cff" data-ring="#9a82ff" data-body="#1a1630" aria-label="Violet"></button>
+        <button class="swatch" style="background:#ff8a5c" data-ring="#ff8a5c" data-body="#2a1a14" aria-label="Ember"></button>
+      </div></div>
+  </section>
+  <section class="buy" id="buy"><div><h2>Halo.</h2><p class="price">From $249 · ships in spring</p><a class="btn" href="#buy">Pre-order now</a></div></section>
+</main>
+<footer>Halo is a demo product for a Lyra website template.</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const phone = matchMedia("(max-width: 760px)").matches;
+  gsap.registerPlugin(ScrollTrigger);
+
+  // ---- 3D scene: a speaker sculpted from primitives, a light ring, a particle halo.
+  const canvas = document.getElementById("stage");
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(35, 1, .1, 100);
+  camera.position.set(0, .2, 9);
+
+  const product = new THREE.Group(); scene.add(product);
+  const bodyMat = new THREE.MeshStandardMaterial({ color: "#15171f", metalness: .6, roughness: .32 });
+  const body = new THREE.Mesh(new THREE.CylinderGeometry(1.05, 1.22, 2.4, 96, 1), bodyMat); product.add(body);
+  const cap = new THREE.Mesh(new THREE.SphereGeometry(1.05, 96, 48, 0, Math.PI * 2, 0, Math.PI / 2), bodyMat);
+  cap.position.y = 1.2; cap.scale.y = .32; product.add(cap);
+  const ringMat = new THREE.MeshStandardMaterial({ color: "#c6ff4a", emissive: "#c6ff4a", emissiveIntensity: 1.6, roughness: .4 });
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(1.14, .04, 24, 160), ringMat);
+  ring.rotation.x = Math.PI / 2; ring.position.y = .55; product.add(ring);
+  const grilleMat = new THREE.MeshStandardMaterial({ color: "#0c0d12", metalness: .2, roughness: .9 });
+  for (let i = 0; i < 9; i++) { const g = new THREE.Mesh(new THREE.TorusGeometry(1.1 + i * .014, .011, 8, 120), grilleMat);
+    g.rotation.x = Math.PI / 2; g.position.y = -.9 + i * .16; product.add(g); }
+  product.rotation.set(.18, -.5, 0);
+  const SIZE = .7; product.scale.setScalar(SIZE);
+
+  const count = phone ? 900 : 1800, pos = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) { const r = 2.2 + Math.random() * 1.6, a = Math.random() * Math.PI * 2, y = (Math.random() - .5) * 2.6;
+    pos.set([Math.cos(a) * r, y, Math.sin(a) * r], i * 3); }
+  const pGeo = new THREE.BufferGeometry(); pGeo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  const pMat = new THREE.PointsMaterial({ color: "#c6ff4a", size: .022, transparent: true, opacity: .55, depthWrite: false });
+  const halo = new THREE.Points(pGeo, pMat); scene.add(halo);
+
+  scene.add(new THREE.AmbientLight("#ffffff", .25));
+  const key = new THREE.PointLight("#c6ff4a", 1.3, 20); key.position.set(3, 2, 4); scene.add(key);
+  const rim = new THREE.PointLight("#7a5cff", 3, 20); rim.position.set(-4, 1, -2); scene.add(rim);
+  const fill = new THREE.DirectionalLight("#ffffff", .6); fill.position.set(0, 4, 6); scene.add(fill);
+
+  function resize() { const w = innerWidth, h = innerHeight; renderer.setSize(w, h, false);
+    camera.aspect = w / h; camera.position.z = w < 760 ? 12 : 9; camera.updateProjectionMatrix(); }
+  addEventListener("resize", resize); resize();
+
+  const pointer = { x: 0, y: 0 };
+  if (!phone) addEventListener("mousemove", (e) => { pointer.x = e.clientX / innerWidth - .5; pointer.y = e.clientY / innerHeight - .5; });
+  const state = { spin: 0, x: 0, lift: .95, tilt: .18, glow: 1.6 };
+  let visible = true;
+  document.addEventListener("visibilitychange", () => { visible = !document.hidden; });
+  gsap.ticker.add((time) => {
+    if (!visible) return;
+    product.rotation.y = -.5 + state.spin + (reduce ? 0 : time * .15) + pointer.x * .4;
+    product.rotation.x = state.tilt + pointer.y * .2;
+    product.position.x = state.x; product.position.y = state.lift;
+    halo.rotation.y = time * .05; halo.position.x = state.x;
+    ringMat.emissiveIntensity = state.glow + (reduce ? 0 : Math.sin(time * 3) * .25);
+    renderer.render(scene, camera);
+  });
+
+  // ---- Smooth scroll + scroll-driven choreography.
+  if (!reduce) {
+    const lenis = new Lenis({ lerp: .08 });
+    lenis.on("scroll", ScrollTrigger.update);
+    gsap.ticker.add((t) => lenis.raf(t * 1000));
+    gsap.ticker.lagSmoothing(0);
+  }
+  const side = phone ? 0 : 2.1;
+  gsap.from("#title span", { yPercent: 100, opacity: 0, duration: 1.4, ease: "expo.out", delay: .2 });
+  gsap.from(".hero .tag, .hero .sub", { opacity: 0, y: 20, duration: 1.2, ease: "power3.out", delay: .6, stagger: .12 });
+  gsap.from(product.scale, { x: SIZE * .6, y: SIZE * .6, z: SIZE * .6, duration: 1.6, ease: "expo.out" });
+
+  const tl = gsap.timeline({ defaults: { ease: "power3.inOut" },
+    scrollTrigger: { trigger: "main", start: "top top", end: "bottom bottom", scrub: reduce ? false : 1 } });
+  tl.to(state, { x: side, lift: 0, spin: Math.PI * .5, tilt: .05, duration: 1 })  // feature 1: product moves right
+    .to(state, { x: -side, spin: Math.PI * 1.2, tilt: .35, duration: 1 })        // feature 2: swings left
+    .to(state, { x: side * .8, spin: Math.PI * 1.9, tilt: .1, glow: .5, duration: 1 }) // feature 3: dims ("calm")
+    .to(state, { x: 0, lift: 1.35, spin: Math.PI * 2.2, glow: 1.2, duration: 1 }) // specs: rises above
+    .to(state, { lift: .7, spin: Math.PI * 2.5, duration: 1 })                    // colours: centre stage
+    .to(state, { lift: 1.2, spin: Math.PI * 3, glow: 2.2, duration: 1 });        // buy: above the offer, bright
+
+  gsap.utils.toArray(".feature").forEach((el) => {
+    gsap.from(el.children, { opacity: 0, y: 40, stagger: .08, duration: 1, ease: "power3.out",
+      scrollTrigger: { trigger: el, start: "top 75%" } });
+  });
+  document.querySelectorAll(".spec b").forEach((el) => {
+    const to = +el.dataset.to, unit = el.querySelector("small").outerHTML, n = { v: 0 };
+    gsap.to(n, { v: to, duration: 1.6, ease: "expo.out", scrollTrigger: { trigger: el, start: "top 85%" },
+      onUpdate: () => { el.innerHTML = Math.round(n.v) + unit; } });
+  });
+
+  // ---- Colour picker recolours the product live.
+  document.querySelectorAll(".swatch").forEach((sw) => sw.addEventListener("click", () => {
+    document.querySelectorAll(".swatch").forEach((s) => s.classList.toggle("on", s === sw));
+    const ring = new THREE.Color(sw.dataset.ring), body = new THREE.Color(sw.dataset.body);
+    gsap.to(ringMat.color, { r: ring.r, g: ring.g, b: ring.b, duration: .9, ease: "power3.out" });
+    gsap.to(ringMat.emissive, { r: ring.r, g: ring.g, b: ring.b, duration: .9, ease: "power3.out" });
+    gsap.to(pMat.color, { r: ring.r, g: ring.g, b: ring.b, duration: .9, ease: "power3.out" });
+    gsap.to(key.color, { r: ring.r, g: ring.g, b: ring.b, duration: .9, ease: "power3.out" });
+    gsap.to(bodyMat.color, { r: body.r, g: body.g, b: body.b, duration: .9, ease: "power3.out" });
+  }));
+})();
+</script>
+</body>
+</html>
