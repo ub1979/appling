@@ -11,6 +11,7 @@ import hashlib
 import json
 import logging
 import os
+import re
 import secrets
 import subprocess
 import threading
@@ -24,6 +25,9 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Streamin
 
 from lyra_lite import agents
 from lyra_lite.preview import PREVIEW_TYPES, AppHosts, PreviewError
+
+UPLOADS = Path("assets") / "uploads"
+MAX_UPLOAD = 2 * 1024 ** 3
 from lyra_lite.runner import REPO_ROOT, ProjectRunner, project_key
 from lyra_lite.store import ProjectStore
 from lyra_lite.watchdog import NUDGE
@@ -541,6 +545,41 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         from lyra_lite.usage import summarise_usage
 
         return summarise_usage(lyra.get(pid).store)
+
+    @app.put("/api/projects/{pid}/files")
+    async def upload(pid: str, request: Request, name: str = ""):
+        """Save an attached file into the project (assets/uploads/), streamed
+        so a long video never sits in memory. Returns its project path."""
+        root = lyra.get(pid).root
+        stem = re.sub(r"[^A-Za-z0-9._ -]+", "-", Path(name).name).strip(" .-")[:120]
+        if not stem:
+            raise HTTPException(status_code=400, detail="The file needs a name")
+        folder = root / UPLOADS
+        folder.mkdir(parents=True, exist_ok=True)
+        ignore = folder / ".gitignore"
+        if not ignore.exists():
+            # Originals (often big videos) stay out of the project's history;
+            # what the site actually uses (frames, cut-outs) is committed.
+            ignore.write_text("*\n!.gitignore\n")
+        target, n = folder / stem, 2
+        while target.exists():
+            target, n = folder / f"{Path(stem).stem}-{n}{Path(stem).suffix}", n + 1
+        size = 0
+        part = target.with_name(target.name + ".part")
+        try:
+            with part.open("wb") as fh:
+                async for chunk in request.stream():
+                    size += len(chunk)
+                    if size > MAX_UPLOAD:
+                        raise HTTPException(status_code=413, detail="That file is over 2 GB")
+                    fh.write(chunk)
+            part.replace(target)
+        finally:
+            part.unlink(missing_ok=True)
+        rel = target.relative_to(root).as_posix()
+        runner = lyra.get(pid)
+        runner.store.append_event("file_added", path=rel, size=size)
+        return {"path": rel, "size": size}
 
     hosts = AppHosts()
     app.state.app_hosts = hosts

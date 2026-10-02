@@ -4,13 +4,14 @@ import remarkGfm from "remark-gfm";
 import {
   api,
   streamUrl,
+  uploadFile,
   type Agent,
   type Catalog,
   type ChatMessage,
   type ProjectDetail,
   type ProjectMap,
 } from "../api";
-import { ArrowLeft, ArrowUp, Check, Copy, MessageSquarePlus, Play, Square, UsersRound } from "lucide-react";
+import { ArrowLeft, ArrowUp, Check, Copy, MessageSquarePlus, Paperclip, Play, Square, UsersRound, X } from "lucide-react";
 import { Avatar, IconButton, PrefButtons, TeamPicker } from "../components/common";
 import { activeHelpers, applyEvent, emptyLive, type InboxItem, type LiveState, type LyraEvent } from "../live";
 import { go } from "../router";
@@ -78,6 +79,9 @@ export function Studio({ id }: { id: string }) {
   const [showTeam, setShowTeam] = useState(false);
   // Bumped on every owner message so the chat jumps to the bottom to show it.
   const [sent, setSent] = useState(0);
+  // Files dropped anywhere on the chat go to the composer's attachments.
+  const [dragging, setDragging] = useState(false);
+  const [dropped, setDropped] = useState<File[]>([]);
 
   const load = useCallback(async () => {
     const data = await api.project(id);
@@ -360,7 +364,12 @@ export function Studio({ id }: { id: string }) {
           )}
         </aside>
 
-        <section className="chat-col">
+        <section
+          className={`chat-col ${dragging ? "dragging" : ""}`}
+          onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
+          onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
+          onDrop={(e) => { if (e.dataTransfer.files.length) { e.preventDefault(); setDragging(false); setDropped(Array.from(e.dataTransfer.files)); } }}
+        >
           <ChatScroll
             sent={sent}
             shown={shown}
@@ -375,7 +384,7 @@ export function Studio({ id }: { id: string }) {
             onTeam={(t) => void run(async () => { await api.team(id, t); await load(); })}
             onAnswer={(item, a) => void run(() => api.answer(id, item, a))}
           />
-          <Composer busy={busy} onSend={send} />
+          <Composer busy={busy} onSend={send} projectId={id} dropped={dropped} />
         </section>
 
         <aside className="side right">
@@ -835,30 +844,64 @@ function NeedCard({ item, onAnswer }: { item: InboxItem; onAnswer: (a: string) =
   );
 }
 
-function Composer({ busy, onSend }: { busy: boolean; onSend: (text: string) => Promise<void> }) {
+interface Attachment { key: string; name: string; progress: number; path?: string; error?: string }
+
+function Composer({ busy, onSend, projectId, dropped }: { busy: boolean; onSend: (text: string) => Promise<void>; projectId: string; dropped: File[] }) {
   const [text, setText] = useState("");
+  const [files, setFiles] = useState<Attachment[]>([]);
   const area = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const el = area.current;
     if (!el) return;
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   }, [text]);
+  const attach = useCallback((list: File[]) => {
+    for (const file of list) {
+      const key = `${file.name}-${file.size}-${Math.random()}`;
+      setFiles((all) => [...all, { key, name: file.name, progress: 0 }]);
+      const update = (patch: Partial<Attachment>) => setFiles((all) => all.map((f) => (f.key === key ? { ...f, ...patch } : f)));
+      uploadFile(projectId, file, (progress) => update({ progress }))
+        .then(({ path }) => update({ path, progress: 1 }))
+        .catch((e: Error) => update({ error: e.message }));
+    }
+  }, [projectId]);
+  useEffect(() => { if (dropped.length) attach(dropped); }, [dropped, attach]);
+  const uploading = files.some((f) => !f.path && !f.error);
+  const ready = files.filter((f) => f.path);
   const send = async () => {
     const value = text.trim();
-    if (!value) return;
+    if ((!value && !ready.length) || uploading) return;
+    const note = ready.length ? `${value ? "\n\n" : ""}Attached: ${ready.map((f) => f.path).join(", ")}` : "";
     setText("");
-    await onSend(value);
+    setFiles([]);
+    await onSend(`${value}${note}`);
   };
   return (
     <div className="composer">
+      {files.length > 0 && (
+        <div className="attachments">
+          {files.map((f) => (
+            <span key={f.key} className={`attachment ${f.error ? "bad" : f.path ? "done" : ""}`} title={f.error ?? f.path ?? "Uploading…"}>
+              <Paperclip size={12} /> {f.name}
+              {!f.path && !f.error && <i style={{ width: `${Math.round(f.progress * 100)}%` }} />}
+              {f.error && <> — {f.error}</>}
+              <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles((all) => all.filter((x) => x.key !== f.key))}><X size={12} /></button>
+            </span>
+          ))}
+        </div>
+      )}
       <div className="composer-box">
+        <button type="button" className="attach" aria-label="Attach files" title="Attach a video, frames or pictures" onClick={() => picker.current?.click()}><Paperclip size={18} /></button>
+        <input ref={picker} type="file" multiple hidden onChange={(e) => { attach(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
         <textarea
           ref={area}
           rows={1}
           value={text}
           placeholder={busy ? "Lyra is working — write anyway, she'll read it next…" : "Message Lyra…"}
           onChange={(e) => setText(e.target.value)}
+          onPaste={(e) => { const pasted = Array.from(e.clipboardData.files); if (pasted.length) { e.preventDefault(); attach(pasted); } }}
           onKeyDown={(e) => {
             if (e.key === "Enter" && !e.shiftKey) {
               e.preventDefault();
@@ -866,9 +909,9 @@ function Composer({ busy, onSend }: { busy: boolean; onSend: (text: string) => P
             }
           }}
         />
-        <button className="send" onClick={() => void send()} disabled={!text.trim()} aria-label="Send" title="Send"><ArrowUp size={18} /></button>
+        <button className="send" onClick={() => void send()} disabled={(!text.trim() && !ready.length) || uploading} aria-label="Send" title={uploading ? "Wait for the upload to finish" : "Send"}><ArrowUp size={18} /></button>
       </div>
-      <div className="hint">Enter to send · Shift+Enter for a new line</div>
+      <div className="hint">Enter to send · Shift+Enter for a new line · drop files here or use 📎</div>
     </div>
   );
 }

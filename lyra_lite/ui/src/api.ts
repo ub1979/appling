@@ -149,6 +149,25 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
   return data as T;
 }
 
+/** Upload one file into the project's assets/uploads/, reporting progress (0–1). */
+export function uploadFile(id: string, file: File, onProgress: (p: number) => void): Promise<{ path: string; size: number }> {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open("PUT", `/api/projects/${id}/files?name=${encodeURIComponent(file.name)}`);
+    xhr.setRequestHeader("x-lyra-token", token());
+    xhr.setRequestHeader("content-type", "application/octet-stream");
+    xhr.upload.onprogress = (e) => e.lengthComputable && onProgress(e.loaded / e.total);
+    xhr.onload = () => {
+      let data: { path?: string; size?: number; detail?: string } = {};
+      try { data = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
+      if (xhr.status >= 200 && xhr.status < 300 && data.path) resolve({ path: data.path, size: data.size ?? file.size });
+      else reject(new Error(data.detail ?? `Upload failed (${xhr.status})`));
+    };
+    xhr.onerror = () => reject(new Error("Upload failed — is Lyra still running?"));
+    xhr.send(file);
+  });
+}
+
 export const api = {
   projects: () => call<{ projects: ProjectSummary[]; default_root: string; version?: string }>("GET", "/api/projects"),
   catalog: () => call<Catalog>("GET", "/api/catalog"),

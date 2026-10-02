@@ -705,3 +705,25 @@ def test_about_me_reaches_lyra_in_every_project(env):
             assert "ABOUT-ME: explain simply" in json.dumps(llm.main_requests()[0]["messages"][0])
         finally:
             daemon.stop()
+
+
+def test_attached_files_land_in_the_project_uploads_folder(env):
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            put = lambda name, data, **kw: httpx.put(f"{daemon.base}/api/projects/{pid}/files", params={"name": name},
+                                                    content=data, timeout=10, **kw)
+            assert put("clip.mp4", b"x" * 10).status_code == 401  # needs Lyra's token
+            headers = {"x-lyra-token": TOKEN}
+            first = put("reveal clip.mp4", b"\0" * 300_000, headers=headers).json()
+            assert first == {"path": "assets/uploads/reveal clip.mp4", "size": 300_000}
+            assert put("reveal clip.mp4", b"2", headers=headers).json()["path"] == "assets/uploads/reveal clip-2.mp4"
+            sneaky = put("../../escape.txt", b"no", headers=headers).json()["path"]
+            assert sneaky == "assets/uploads/escape.txt" and not (path.parent / "escape.txt").exists()
+            assert put("...", b"no", headers=headers).status_code == 400
+            assert (path / "assets/uploads/.gitignore").read_text().startswith("*")  # originals stay out of git
+            assert any(e["type"] == "file_added" for e in _events(path))
+        finally:
+            daemon.stop()
