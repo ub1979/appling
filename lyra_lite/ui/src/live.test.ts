@@ -64,7 +64,7 @@ describe("applyEvent", () => {
 import { asksForApproval } from "./pages/Studio";
 
 describe("asksForApproval", () => {
-  it("shows the Approve button only when APP IT asks for approval", () => {
+  it("shows the Approve button only when Appling asks for approval", () => {
     expect(asksForApproval("Here is the summary. Do you approve these requirements?")).toBe(true);
     expect(asksForApproval("Options: Approve / Change / Skip")).toBe(true);
     expect(asksForApproval("Your approval is already recorded, so I won't ask again.")).toBe(false);

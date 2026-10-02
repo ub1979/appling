@@ -12,7 +12,7 @@ Numbers that move: charts, races and maps in an editorial style. For [BRAND / PR
 ## Blocks to start from (HyperFrames registry)
 `data-chart`, `bar-chart-race`, `world-map`, `us-map-flow`
 
-## How APP IT builds it
+## How Appling builds it
 HyperFrames (Apache-2.0, by HeyGen and contributors): plain HTML compositions
 rendered to MP4 in headless Chrome.
 

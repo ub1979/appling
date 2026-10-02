@@ -1,6 +1,6 @@
 # Engineering standards
 
-House rules for every project APP IT builds. `sw-developer`, `code-reviewer`,
+House rules for every project Appling builds. `sw-developer`, `code-reviewer`,
 `qa-engineer` and `sw-architect` all read this file — it is the single source of
 truth, so a rule changes here and nowhere else.
 

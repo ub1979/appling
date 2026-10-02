@@ -174,7 +174,7 @@ def test_reply_streams_over_sse_and_is_saved(env):
 
             # The model saw Lyra's rules and the project folder.
             system = llm.main_requests()[0]["messages"][0]["content"]
-            assert "APP IT" in system and str(path) in system
+            assert "Appling" in system and str(path) in system
         finally:
             daemon.stop()
 

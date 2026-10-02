@@ -1,4 +1,4 @@
-"""APP IT-wide AI settings: which engine, which model.
+"""Appling-wide AI settings: which engine, which model.
 
 - The Hermes model is Hermes' own main model in ``config.yaml`` — the same
   setting the Studio's model page writes — chosen from the providers the
@@ -92,7 +92,7 @@ def set_hermes_model(provider: str, model: str, confirm: bool = False) -> dict[s
 
 
 def effective_engine(state: dict) -> str:
-    """The engine a project runs on: its own choice, else APP IT's default."""
+    """The engine a project runs on: its own choice, else Appling's default."""
     if state.get("engine_override") and state.get("engine") in ENGINES:
         return str(state["engine"])
     return default_engine()

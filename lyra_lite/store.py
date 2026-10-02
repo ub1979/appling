@@ -1,4 +1,4 @@
-"""Per-project files that hold everything APP IT knows about a project.
+"""Per-project files that hold everything Appling knows about a project.
 
 Everything lives under ``<project>/.lyra/`` so a refresh, a sleep or a restart
 loses nothing — the UI and the daemon simply re-read the files:

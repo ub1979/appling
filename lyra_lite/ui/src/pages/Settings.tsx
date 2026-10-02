@@ -7,7 +7,7 @@ const ENGINE_CARDS = [
   {
     id: "hermes",
     name: "Hermes",
-    text: "APP IT's own engine. Works with any model you've linked — your Codex or Claude subscription, Ollama, Copilot and more.",
+    text: "Appling's own engine. Works with any model you've linked — your Codex or Claude subscription, Ollama, Copilot and more.",
   },
   {
     id: "claude",
@@ -72,7 +72,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
       <div className="setup-head">
         <p className="kicker">AI settings</p>
         <h1>Engine and model</h1>
-        <p>Choose how APP IT thinks. Changes apply from APP IT's next message; anything already running finishes as it started.</p>
+        <p>Choose how Appling thinks. Changes apply from Appling's next message; anything already running finishes as it started.</p>
       </div>
 
       {(note || problem) && (
@@ -94,7 +94,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
                   key={e.id}
                   type="button"
                   className={`profile-card ${settings.engine === e.id ? "on" : ""}`}
-                  onClick={() => void run(async () => setSettings(await api.settingsSave({ engine: e.id })), `${e.name} is now APP IT's engine.`)}
+                  onClick={() => void run(async () => setSettings(await api.settingsSave({ engine: e.id })), `${e.name} is now Appling's engine.`)}
                 >
                   <span className="radio" />
                   <b>{e.name}</b>
@@ -121,7 +121,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
                     }
                   }
                   setSettings(await api.settingsGet());
-                  setNote(`APP IT now uses ${model}.`);
+                  setNote(`Appling now uses ${model}.`);
                 })
               }
             />
@@ -141,10 +141,10 @@ export function Settings({ projectId }: { projectId: string | null }) {
           {project && (
             <section className="card card-pad">
               <h2 style={{ fontSize: 20 }}>This project: {project.name}</h2>
-              <p className="muted small" style={{ margin: "4px 0 0" }}>Usually a project follows APP IT's engine. You can pin one for this project only.</p>
+              <p className="muted small" style={{ margin: "4px 0 0" }}>Usually a project follows Appling's engine. You can pin one for this project only.</p>
               <div className="stack" style={{ marginTop: 14 }}>
                 {[
-                  { id: "default", label: `Follow APP IT's engine (now ${settings.engine === "claude" ? "Claude Code" : "Hermes"})` },
+                  { id: "default", label: `Follow Appling's engine (now ${settings.engine === "claude" ? "Claude Code" : "Hermes"})` },
                   { id: "hermes", label: "Always use Hermes for this project" },
                   { id: "claude", label: "Always use Claude Code for this project" },
                 ].map((o) => {
@@ -246,7 +246,7 @@ function AboutMe({ initial, onSave }: { initial: string; onSave: (text: string) 
     <section className="card card-pad">
       <h2 style={{ fontSize: 20 }}>About me</h2>
       <p className="muted small" style={{ margin: "4px 0 0" }}>
-        The only thing APP IT carries between projects. Everything else stays inside each project's own memory.
+        The only thing Appling carries between projects. Everything else stays inside each project's own memory.
       </p>
       <textarea
         className="textarea"
@@ -329,7 +329,7 @@ function ClaudeModel({
           <p className={`small ${settings.anthropic_key ? "muted" : "problem"}`} style={{ margin: 0 }}>
             {settings.anthropic_key
               ? "✓ Anthropic API key found. Billed per use by Anthropic."
-              : "No Anthropic API key found. Add ANTHROPIC_API_KEY to ~/.hermes/.env and restart APP IT."}
+              : "No Anthropic API key found. Add ANTHROPIC_API_KEY to ~/.hermes/.env and restart Appling."}
           </p>
         )}
         <label>

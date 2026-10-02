@@ -1,6 +1,6 @@
 """Token use, read from the project's activity file.
 
-APP IT's own turns record counter deltas on ``turn_end``; each finished helper
+Appling's own turns record counter deltas on ``turn_end``; each finished helper
 records its totals on its ``helper`` complete event. "input" is fresh
 (uncached) input; the full prompt is input + cache_read + cache_write.
 """

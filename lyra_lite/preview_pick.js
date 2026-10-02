@@ -1,12 +1,12 @@
-// APP IT preview helper — added to every page APP IT's preview serves.
-// Inert unless the page sits inside APP IT's preview panel. It lets the owner
+// Appling preview helper — added to every page Appling's preview serves.
+// Inert unless the page sits inside Appling's preview panel. It lets the owner
 // point at a part of the page (🎯 Pick) and reports page errors to the panel.
 (() => {
   if (window.parent === window || window.__appitPick) return;
   window.__appitPick = true;
   const post = (msg) => window.parent.postMessage({ source: "appit-preview", ...msg }, "*");
 
-  // Page errors reach the panel, so the owner (and APP IT) can see them.
+  // Page errors reach the panel, so the owner (and Appling) can see them.
   addEventListener("error", (e) => post({ type: "error", text: String(e.message || e.error || "Error").slice(0, 300) }));
   addEventListener("unhandledrejection", (e) => post({ type: "error", text: ("Unhandled: " + String(e.reason)).slice(0, 300) }));
   const original = console.error;

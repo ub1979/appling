@@ -4,7 +4,7 @@ import { Crosshair, ExternalLink, Laptop, RotateCw, Smartphone, X } from "lucide
 import type { AppPreview } from "../api";
 import { IconButton } from "./common";
 
-/** What the owner picked in the preview, described for APP IT. */
+/** What the owner picked in the preview, described for Appling. */
 export interface PickedElement {
   element: string;
   selector: string;
@@ -52,7 +52,7 @@ export function PreviewPanel({ preview, onClose, onPicked }: Props) {
     void QRCode.toDataURL(preview.url, { margin: 1, width: 240, color: { dark: "#15152a", light: "#ffffff" } }).then(setQr);
   }, [preview]);
 
-  // Messages from APP IT's helper inside the previewed page.
+  // Messages from Appling's helper inside the previewed page.
   useEffect(() => {
     if (preview.kind !== "web") return;
     const onMessage = (e: MessageEvent) => {
@@ -108,7 +108,7 @@ export function PreviewPanel({ preview, onClose, onPicked }: Props) {
             <li>Join the <b>same Wi-Fi</b> as this computer.</li>
             <li>iPhone: scan with the Camera. Android: scan inside Expo Go.</li>
           </ol>
-          <p className="muted small">Your app opens on the phone and updates by itself whenever APP IT changes it.</p>
+          <p className="muted small">Your app opens on the phone and updates by itself whenever Appling changes it.</p>
           <code>{preview.url}</code>
         </div>
       )}

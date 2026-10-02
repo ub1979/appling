@@ -12,7 +12,7 @@ A friendly class deck: agenda, goals, code, quiz, timed exercise. For [TOPIC / A
 6. Your turn — three numbered tasks and a countdown (press T).
 7. Recap — what was built, what is next, where the materials are.
 
-## How APP IT builds it
+## How Appling builds it
 An HTML deck on reveal.js 5 (MIT): one `index.html`, 1280×720 slides,
 speaker notes (press S), fragments for build-ups, auto-animate between
 related slides. The live demo (`.lyra/kit/reference/index.html` when this

@@ -116,8 +116,8 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
         <h1>{mode === "new" ? "Set up your new project" : "Open an existing project"}</h1>
         <p>
           {mode === "new"
-            ? "Choose the folder and tell APP IT the outcome you want. Everything else can be adjusted later."
-            : "Pick the folder with your code and tell APP IT what you'd like to improve."}
+            ? "Choose the folder and tell Appling the outcome you want. Everything else can be adjusted later."
+            : "Pick the folder with your code and tell Appling what you'd like to improve."}
         </p>
       </div>
 
@@ -184,7 +184,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
                 <div>
                   <h3>Start from a design</h3>
                   <p className="muted small" style={{ margin: "4px 0 0" }}>
-                    Pick a template and APP IT will ask what to change — or start from scratch.
+                    Pick a template and Appling will ask what to change — or start from scratch.
                   </p>
                 </div>
                 <button className="btn soft small" onClick={() => setAddingTemplate(true)}>+ Add your own</button>
@@ -193,7 +193,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
                 <button type="button" className={`template-card ${templateId === null ? "on" : ""}`} onClick={() => setTemplateId(null)}>
                   <span className="template-thumb blank">+</span>
                   <b>Start from scratch</b>
-                  <span className="muted small">APP IT designs it with you from your brief.</span>
+                  <span className="muted small">Appling designs it with you from your brief.</span>
                 </button>
                 {templates.map((t) => (
                   <div key={t.id} className={`template-card ${templateId === t.id ? "on" : ""}`} role="button" tabIndex={0}
@@ -226,13 +226,13 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
             <section className="card card-pad">
               <h3>Checked like a visitor sees it</h3>
               <p className="muted small" style={{ margin: "4px 0 0" }}>
-                Websites skip the size question. APP IT builds every section of the design and tests it in a real
+                Websites skip the size question. Appling builds every section of the design and tests it in a real
                 browser on a computer and a phone, side by side with the template's demo, before calling it done.
               </p>
             </section>
           ) : (
             <section className="card card-pad">
-              <h3>How much should APP IT build?</h3>
+              <h3>How much should Appling build?</h3>
               <p className="muted small" style={{ margin: "4px 0 0" }}>This sets how big the plan, the checks and the team are. You can grow it later.</p>
               <div className="profile-grid">
                 {PROFILES.map((p) => (
@@ -251,7 +251,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
               <div>
                 <h2 style={{ fontSize: 20 }}>Your starting team</h2>
                 <p className="muted small" style={{ margin: "4px 0 0" }}>
-                  {orderedTeam.length} of {catalog?.agents.length ?? 21} agents selected · APP IT can recommend changes later
+                  {orderedTeam.length} of {catalog?.agents.length ?? 21} agents selected · Appling can recommend changes later
                 </p>
               </div>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
@@ -281,7 +281,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
           </section>
 
           <section className="card card-pad">
-            <h3>What should APP IT help with?</h3>
+            <h3>What should Appling help with?</h3>
             <textarea
               className="textarea"
               style={{ marginTop: 14 }}
@@ -311,14 +311,14 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
             <div className="team-count" style={{ marginTop: 12 }}>
               <div className="kicker" style={{ color: "var(--muted)", marginBottom: 6 }}>Starting team</div>
               <div className="big">{orderedTeam.length} agents</div>
-              <div className="muted small">APP IT can recommend changes later and will ask before applying them.</div>
+              <div className="muted small">Appling can recommend changes later and will ask before applying them.</div>
             </div>
             {problem && <p className="problem small">{problem}</p>}
             <button className="btn primary big" style={{ marginTop: 14 }} disabled={!path || saving} onClick={() => void start()}>
               {saving ? "Opening…" : "Enter project studio →"}
             </button>
             <p className="muted small" style={{ textAlign: "center", margin: "10px 0 0" }}>
-              The project opens in a simple chat. APP IT handles tools and terminal work quietly in the background.
+              The project opens in a simple chat. Appling handles tools and terminal work quietly in the background.
             </p>
           </section>
         </aside>
@@ -374,7 +374,7 @@ function AddTemplateDialog({ kind, onClose, onSaved }: { kind: ProjectKind; onCl
       <div className="dialog wide" onClick={(e) => e.stopPropagation()}>
         <h2>Add your own template</h2>
         <p className="muted small" style={{ margin: 0 }}>
-          Paste a design prompt you own (for example one you bought). It stays private on this Mac and APP IT uses it as the starting design.
+          Paste a design prompt you own (for example one you bought). It stays private on this Mac and Appling uses it as the starting design.
         </p>
         <label><span className="field-label">Name</span><input className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Glass agency landing" /></label>
         <label><span className="field-label">One line about it (optional)</span><input className="input" value={tagline} onChange={(e) => setTagline(e.target.value)} /></label>

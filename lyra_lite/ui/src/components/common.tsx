@@ -8,7 +8,7 @@ export function Brand({ sub, onClick }: { sub: string; onClick?: () => void }) {
     <button className="brand" onClick={onClick} type="button">
       <span className="brand-mark">A</span>
       <span>
-        <span className="brand-name">APP IT</span>
+        <span className="brand-name">Appling</span>
         <br />
         <span className="brand-sub">{sub}</span>
       </span>

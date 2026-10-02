@@ -5,9 +5,9 @@ for whom]. Built on real footage: the hero is a video played frame by frame
 as the visitor scrolls.
 
 ## Footage and pictures (ask first, one question)
-Best → worst, and what APP IT does with each:
+Best → worst, and what Appling does with each:
 1. **The owner's video** of the reveal (5–15 s, steady camera, 1080p+).
-   APP IT turns it into 90–150 frames with `.lyra/kit/frames` and plays them
+   Appling turns it into 90–150 frames with `.lyra/kit/frames` and plays them
    on a canvas as you scroll.
 2. **Frames** the owner already has (a numbered image sequence) — used as is.
 3. **Two to five stills of the same shot** (covered → half → uncovered) — the
@@ -54,5 +54,5 @@ performance ≥ 85.
 ## Process
 Section plan + component tree first; build one section at a time and review;
 finish with a taste pass and a senior Awwwards-judge critique, fixing the top
-five issues. The live demo (`.lyra/kit/reference/index.html` in an APP IT
+five issues. The live demo (`.lyra/kit/reference/index.html` in an Appling
 project) is the reference for every effect above.

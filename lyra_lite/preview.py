@@ -1,7 +1,7 @@
 """Open app: build the project's site when it needs it, then serve it like a host.
 
 A built site (Vite, React, …) asks for ``/assets/...`` from the root of its
-address, so it only works when served at ``/`` — under APP IT's own
+address, so it only works when served at ``/`` — under Appling's own
 ``/preview/<id>/`` path its styles and scripts never load. Each project's app
 therefore gets its own small local server on a free port (localhost only).
 The first visit carries a one-time key in the address, which becomes a cookie
@@ -125,7 +125,7 @@ class _ExpoHost:
         while time.time() < deadline:
             if self.proc.poll() is not None:
                 tail = "\n".join(log.read_text(errors="replace").strip().splitlines()[-10:])
-                raise PreviewError(f"The phone preview (Expo) stopped while starting. Ask APP IT to fix it:\n{tail}")
+                raise PreviewError(f"The phone preview (Expo) stopped while starting. Ask Appling to fix it:\n{tail}")
             try:
                 urllib.request.urlopen(f"http://127.0.0.1:{self.port}/status", timeout=2)
                 return
@@ -180,7 +180,7 @@ def _run(cmd: list[str], project: Path, timeout: int, what: str) -> None:
         raise PreviewError(f"{what} took longer than {timeout // 60} minutes and was stopped.")
     if done.returncode != 0:
         tail = "\n".join((done.stdout + "\n" + done.stderr).strip().splitlines()[-12:])
-        raise PreviewError(f"{what} failed, so there is nothing to open yet. Ask APP IT to fix it:\n{tail}")
+        raise PreviewError(f"{what} failed, so there is nothing to open yet. Ask Appling to fix it:\n{tail}")
 
 
 _build_locks: dict[str, threading.Lock] = {}
@@ -213,7 +213,7 @@ def prepare(project: Path) -> Path:
 
 
 def _with_pick(html: bytes) -> bytes:
-    """Add APP IT's preview helper to a page (inert outside the preview panel)."""
+    """Add Appling's preview helper to a page (inert outside the preview panel)."""
     tag = f'<script src="{PICK_PATH}" defer></script>'.encode()
     lower = html.lower()
     for marker in (b"</head>", b"<body", b"</html>"):
@@ -245,11 +245,11 @@ class _Host:
                     self.send_header("Set-Cookie", f"{cookie}={host.secret}; Path=/; HttpOnly; SameSite=Strict")
                     self.end_headers()
                     return
-                if url.path == PICK_PATH:  # APP IT's own helper, not part of the app
+                if url.path == PICK_PATH:  # Appling's own helper, not part of the app
                     return self._send(200, "text/javascript", PICK_SCRIPT.read_bytes(), body)
                 sent = dict(p.strip().split("=", 1) for p in (self.headers.get("Cookie") or "").split(";") if "=" in p)
                 if not secrets.compare_digest(sent.get(cookie, ""), host.secret):
-                    return self._plain(401, "Open this app from APP IT's Open app button.")
+                    return self._plain(401, "Open this app from Appling's Open app button.")
                 target = host.resolve(url.path)
                 if target is None:
                     return self._plain(404, "Not found")

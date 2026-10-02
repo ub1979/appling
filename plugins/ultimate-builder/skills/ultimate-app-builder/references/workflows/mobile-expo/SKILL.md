@@ -6,7 +6,7 @@ description: Build phone apps the owner tests live with Expo Go.
 # Mobile Expo Skill
 
 Builds one app for iPhone and Android with Expo (React Native) so the owner
-can test it on their own phone from day one: they scan a QR code in APP IT's
+can test it on their own phone from day one: they scan a QR code in Appling's
 preview panel with the free Expo Go app and every change reloads on the phone
 within seconds. It does not publish to the app stores (that needs the owner's
 own Apple / Google developer accounts — a separate, later step).
@@ -32,7 +32,7 @@ npx create-expo-app@latest . --template blank-typescript --yes
 npx expo install <package>     # always, never plain npm install, for native packages
 ```
 
-Do not run `expo start` yourself for the owner: APP IT's preview panel starts
+Do not run `expo start` yourself for the owner: Appling's preview panel starts
 it and shows the QR code. For your own checks use `npx expo export --platform web`
 (or `npx expo start --web` briefly) and the site check, plus `npx tsc --noEmit`.
 
@@ -76,7 +76,7 @@ it and shows the QR code. For your own checks use `npx expo export --platform we
   `npx expo install`.
 - Web-only APIs (`window`, `localStorage`, DOM) crash on the phone.
 - Phones and computers on different Wi-Fi networks can't connect; tell the
-  owner to join the same network (or ask APP IT to use a tunnel).
+  owner to join the same network (or ask Appling to use a tunnel).
 - Large images in the bundle make reloads slow: resize assets.
 
 ## Verification

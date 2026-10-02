@@ -11,7 +11,7 @@ Film-grade titles: frost, portals, leaves and light. For [BRAND / PRODUCT — on
 ## Blocks to start from (HyperFrames registry)
 `frost-sequence-camera-orbit`, `wireframe-portal-title`, `canopy-part-title`, `glass-shard-title`, `light-leak`
 
-## How APP IT builds it
+## How Appling builds it
 HyperFrames (Apache-2.0, by HeyGen and contributors): plain HTML compositions
 rendered to MP4 in headless Chrome.
 

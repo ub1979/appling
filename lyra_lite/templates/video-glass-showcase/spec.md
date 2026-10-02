@@ -12,7 +12,7 @@ Frosted-glass widgets over a living aurora — modern SaaS polish. For [BRAND / 
 ## Blocks to start from (HyperFrames registry)
 `liquid-glass-widgets`, `liquid-glass-notification`, `ui-3d-reveal`, `vfx-liquid-background`
 
-## How APP IT builds it
+## How Appling builds it
 HyperFrames (Apache-2.0, by HeyGen and contributors): plain HTML compositions
 rendered to MP4 in headless Chrome.
 

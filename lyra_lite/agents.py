@@ -2,7 +2,7 @@
 
 The wording of the setup and team-update messages is the Studio's protocol
 that the app-it playbook already understands (IDRAK_INTERNAL_SETUP_* and
-IDRAK_INTERNAL_SKILLS_UPDATE_*), so APP IT behaves the same in Lite.
+IDRAK_INTERNAL_SKILLS_UPDATE_*), so Appling behaves the same in Lite.
 """
 
 from __future__ import annotations
@@ -38,8 +38,8 @@ LABELS = {a[0]: a[1] for a in AGENTS}
 REQUIRED = ["req-engineer", "task-planner"]
 
 STYLES: list[dict] = [
-    {"id": "app-it", "name": "Let APP IT guide me", "accent": "violet",
-     "description": "Start with your idea. APP IT asks a few questions and recommends the smallest useful team.",
+    {"id": "app-it", "name": "Let Appling guide me", "accent": "violet",
+     "description": "Start with your idea. Appling asks a few questions and recommends the smallest useful team.",
      "team": []},
     {"id": "sdlc", "name": "Complete build", "accent": "violet",
      "description": "Take the product from a clear idea through building, checks, documentation, and launch preparation.",
@@ -56,17 +56,17 @@ STYLES: list[dict] = [
 ]
 
 INSTRUCTION = (
-    "APP IT is the permanent user-facing project guide. Use the internal ultimate-builder:app-it skill, "
+    "Appling is the permanent user-facing project guide. Use the internal ultimate-builder:app-it skill, "
     "keep internal skill names and orchestration out of user-facing messages, and work only inside the "
     "selected workspace. Vocabulary: when speaking to the user these are AGENTS — the requirements agent, "
     "the development agent, the QA agent. Never call them skills, specialists, playbooks, or subagents in a "
-    "user-facing message; those are internal words. Agents verify and commit their own work; APP IT "
+    "user-facing message; those are internal words. Agents verify and commit their own work; Appling "
     "coordinates and judges it from their reports, and her own edits are saved automatically. Never push "
     "remotely unless the user explicitly asks."
 )
 FIRST_TURN_GATE = (
     "The project listing below, together with your workspace snapshot, IS the inspection — do not call file, "
-    "search, or terminal tools before greeting. Greet the user warmly as APP IT, briefly say what the project "
+    "search, or terminal tools before greeting. Greet the user warmly as Appling, briefly say what the project "
     "appears to be (or that it is empty) from what you were given, and ask exactly ONE short question about "
     "what they want to build or change. Inspect files later, once you know what they actually want. "
     "Recommend the smallest useful agent team later and ask permission before changing it."
@@ -78,7 +78,7 @@ REQUIREMENTS_GATE = (
     "behavior, data, permissions, integrations, or acceptance criteria. Do not activate or reload it for "
     "greetings, status questions, explanations, approvals, pause/stop commands, ordinary in-scope feedback, "
     "implementation details already covered by approved requirements, or minor fixes. If requirements.md "
-    "already covers the request, APP IT handles the turn directly. When Requirements is genuinely needed, load "
+    "already covers the request, Appling handles the turn directly. When Requirements is genuinely needed, load "
     'skill_view(name="ultimate-builder:req-engineer") and run its interactive playbook in this conversation; '
     "do not delegate it. Complete its relevant interview, Grill, design-space exploration, prototype choice, "
     "requirements.md update, and approval gate before downstream work affected by that change. Once approved, "
@@ -92,7 +92,7 @@ TEAM_GATE = (
 
 SETUP_BEGIN, SETUP_END = "IDRAK_INTERNAL_SETUP_BEGIN", "IDRAK_INTERNAL_SETUP_END"
 TEAM_BEGIN, TEAM_END = "IDRAK_INTERNAL_SKILLS_UPDATE_BEGIN", "IDRAK_INTERNAL_SKILLS_UPDATE_END"
-GREETING_REQUEST = "Start this project conversation now with APP IT's greeting and first focused question."
+GREETING_REQUEST = "Start this project conversation now with Appling's greeting and first focused question."
 
 
 def normalise_team(ids: list[str] | None) -> list[str]:
@@ -145,10 +145,10 @@ KIND_SKILLS = {
 PLATFORMS = ("web", "phone", "computer")
 PLATFORM_GATE = (
     "The owner chose where people will use this app; build for exactly these. "
-    "web → a responsive web app (installable as a PWA when it helps), previewed in APP IT's panel. "
+    "web → a responsive web app (installable as a PWA when it helps), previewed in Appling's panel. "
     "phone → one Expo (React Native) app for iPhone and Android on the current Expo SDK, "
     "following `ultimate-builder:mobile-expo`; the owner tests it live on their own phone by "
-    "scanning the QR code in APP IT's preview panel with Expo Go. "
+    "scanning the QR code in Appling's preview panel with Expo Go. "
     "computer → a Tauri 2 desktop app (web UI in a small native window; never Electron); "
     "its web UI is previewed in the panel, and installers need Rust — ask before installing it. "
     "web + phone → prefer one Expo app that also runs on the web (expo web).")

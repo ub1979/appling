@@ -2,7 +2,7 @@
 
 One SQLite full-text index per project (``.lyra/memory.db``) over the full
 chat transcript, the project's documents (requirements, plan, progress,
-Project Brain, reports, README …) and its Git history. APP IT and its agents
+Project Brain, reports, README …) and its Git history. Appling and its agents
 query it with the ``project_recall`` tool to find earlier decisions and the
 owner's exact words without carrying the whole history in context.
 
@@ -131,8 +131,8 @@ class ProjectMemory:
                 text = str(entry.get("content") or "")
                 if not text.strip() or text.startswith("IDRAK_INTERNAL"):
                     continue
-                speaker = "Owner" if entry.get("role") == "user" else "APP IT"
-                if text.startswith("[ASYNC DELEGATION") or text.startswith(("While APP IT was stopped", "While Lyra was stopped")):
+                speaker = "Owner" if entry.get("role") == "user" else "Appling"
+                if text.startswith("[ASYNC DELEGATION") or text.startswith(("While Appling was stopped", "While APP IT was stopped", "While Lyra was stopped")):
                     speaker = "Agent report"
                 ts = time.strftime("%Y-%m-%d %H:%M", time.localtime(entry["ts"])) if entry.get("ts") else ""
                 for piece in chunks(text):

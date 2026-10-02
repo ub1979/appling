@@ -1,8 +1,8 @@
-# APP IT
+# Appling
 
 > **Describe it. Pick a design. Get a working app, website, deck or video — on your own machine.**
 
-APP IT is a personal AI product studio. You describe what you want; a team of
+Appling is a personal AI product studio. You describe what you want; a team of
 AI agents asks the right questions, plans, builds, tests in a real browser and
 hands you something you can open. It runs locally on the AI subscriptions you
 already have (Claude, ChatGPT/Codex, Ollama and more).
@@ -15,7 +15,7 @@ already have (Claude, ChatGPT/Codex, Ollama and more).
 - **Your files:** everything lives in your project folder; 📎 attach videos,
   frames or photos in the chat
 
-APP IT grew out of Lyra and runs on [Hermes Agent](https://github.com/NousResearch/hermes-agent)
+Appling (briefly APP IT) grew out of Lyra and runs on [Hermes Agent](https://github.com/NousResearch/hermes-agent)
 by Nous Research (MIT). Internal folders still use the name `lyra`
 (`lyra_lite/`, each project's `.lyra/`). The original Lyra README follows.
 

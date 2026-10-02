@@ -12,7 +12,7 @@ A cinematic 30–45 s launch: glass titles, device shots, UI reveal, logo. For [
 ## Blocks to start from (HyperFrames registry)
 `glass-shard-title`, `vfx-iphone-device`, `ui-3d-reveal`, `liquid-glass-widgets`, `logo-outro`
 
-## How APP IT builds it
+## How Appling builds it
 HyperFrames (Apache-2.0, by HeyGen and contributors): plain HTML compositions
 rendered to MP4 in headless Chrome.
 

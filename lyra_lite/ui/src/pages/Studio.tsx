@@ -141,7 +141,7 @@ export function Studio({ id }: { id: string }) {
     void api.preview(id).then((p) => setCanOpen(p.available)).catch(() => undefined);
   }, [id, live.turnsEnded, live.helperChanges]);
 
-  useAttentionSignals(detail?.name ?? "APP IT", live);
+  useAttentionSignals(detail?.name ?? "Appling", live);
 
   const run = useCallback(async (action: () => Promise<unknown>) => {
     try {
@@ -159,7 +159,7 @@ export function Studio({ id }: { id: string }) {
   const liveHelpers = activeHelpers(live);
   const busy = !!live.turn;
 
-  // Phase state from APP IT's markers, then the project's own plan file.
+  // Phase state from Appling's markers, then the project's own plan file.
   const phases = useMemo(() => {
     const started: string[] = [];
     const completed = new Set<string>();
@@ -209,16 +209,16 @@ export function Studio({ id }: { id: string }) {
   const status = live.inbox.length
     ? { text: "Needs you", tone: "need" }
     : busy
-      ? { text: "APP IT is working", tone: "busy" }
+      ? { text: "Appling is working", tone: "busy" }
       : helpers.length
         ? { text: `${helpers.length} agent${helpers.length > 1 ? "s" : ""} working`, tone: "busy" }
         : live.paused
           ? { text: "Stopped", tone: "" }
           : { text: "Ready", tone: "good" };
 
-  // APP IT builds the site if it needs it and serves it at its own address.
+  // Appling builds the site if it needs it and serves it at its own address.
   // The tab opens right away (browsers block tabs opened after a wait).
-  // APP IT builds the app if it needs it and shows it beside the chat
+  // Appling builds the app if it needs it and shows it beside the chat
   // (phone apps get a QR code for Expo Go).
   const openApp = () => {
     setOpening(true);
@@ -248,7 +248,7 @@ export function Studio({ id }: { id: string }) {
         </div>
         <div className="studio-actions">
           <span className={`pill ${status.tone}`}>{status.text}</span>
-          <label className="toggle" title="When work is left and nothing waits for you, APP IT continues by itself after 10 quiet minutes.">
+          <label className="toggle" title="When work is left and nothing waits for you, Appling continues by itself after 10 quiet minutes.">
             <span
               className={`switch ${detail.keep_going ? "on" : ""}`}
               role="switch"
@@ -263,12 +263,12 @@ export function Studio({ id }: { id: string }) {
             <span className="label">Keep going</span>
           </label>
           {(busy || live.queued.length > 0 || helpers.length > 0) && (
-            <IconButton label="Stop APP IT and its agents" tone="danger" onClick={() => void run(() => api.stop(id))}>
+            <IconButton label="Stop Appling and its agents" tone="danger" onClick={() => void run(() => api.stop(id))}>
               <Square size={14} fill="currentColor" />
             </IconButton>
           )}
           {canOpen && (
-            <IconButton label={opening ? "Getting your app ready…" : "Open the app APP IT built"} tone="accent" disabled={opening} onClick={openApp}>
+            <IconButton label={opening ? "Getting your app ready…" : "Open the app Appling built"} tone="accent" disabled={opening} onClick={openApp}>
               <Play size={16} fill="currentColor" />
             </IconButton>
           )}
@@ -287,7 +287,7 @@ export function Studio({ id }: { id: string }) {
       <div>
         {detail.rules_outdated && (
           <div className="banner warn">
-            APP IT's rules were updated since this chat started.
+            Appling's rules were updated since this chat started.
             <button className="btn small" disabled={busy || helpers.length > 0} onClick={() => void run(async () => { await api.applyRules(id); await load(); })}>
               Use the new rules
             </button>
@@ -308,7 +308,7 @@ export function Studio({ id }: { id: string }) {
             <div className="agent-row working" style={{ background: "transparent", padding: 0 }}>
               <Avatar id="app-it" size={44} />
               <div className="who">
-                <b>APP IT</b>
+                <b>Appling</b>
                 <span>
                   {live.inbox.length ? "Waiting for your answer" : busy ? "Working on it…" : helpers.length ? "Guiding the agents" : "Here when you need me"}
                 </span>
@@ -474,7 +474,7 @@ function askNotificationPermission(): void {
 function useAttentionSignals(name: string, live: LiveState): void {
   const seen = useRef({ ended: live.turnsEnded, inbox: live.inbox.length });
   useEffect(() => {
-    const base = `${name} · APP IT`;
+    const base = `${name} · Appling`;
     const clear = () => {
       if (!document.hidden) document.title = base;
     };
@@ -488,7 +488,7 @@ function useAttentionSignals(name: string, live: LiveState): void {
     const needs = live.inbox.length > prev.inbox;
     const replied = live.turnsEnded > prev.ended && !live.turn && live.queued.length === 0;
     if (!document.hidden || (!needs && !replied)) return;
-    const text = needs ? "APP IT needs you" : "APP IT replied";
+    const text = needs ? "Appling needs you" : "Appling replied";
     document.title = `● ${text} — ${name}`;
     try {
       if ("Notification" in window && Notification.permission === "granted") new Notification(text, { body: name, icon: "/avatars/app-it.webp" });
@@ -576,7 +576,7 @@ function UsagePanel({ id, refresh, agents }: { id: string; refresh: number; agen
         <b>{tokens(u.total.prompt)}</b> read · <b>{u.total.cached_pct}%</b> from cache · <b>{tokens(u.total.output)}</b> written
       </div>
       <div className="usage-row head"><span style={{ width: 22 }} /><span className="u-name" /><span>calls</span><span>read</span><span>cache</span><span>out</span></div>
-      {row("APP IT", u.lyra, "app-it")}
+      {row("Appling", u.lyra, "app-it")}
       {u.by_agent.map((a) => row(a.label, a, agents.some((x) => x.id === a.id) ? a.id : undefined))}
       <div className="tiny muted" style={{ marginTop: 6 }}>
         Fresh (not cached) input: {tokens(u.total.input)}{u.total.cost_usd ? ` · cost $${u.total.cost_usd.toFixed(2)}` : ""}
@@ -596,7 +596,7 @@ function TeamDialog({ agents, team, onClose, onSave }: { agents: Agent[]; team: 
     <div className="overlay" onClick={onClose}>
       <div className="dialog wide" onClick={(e) => e.stopPropagation()}>
         <h2>Your team</h2>
-        <p className="muted small" style={{ margin: 0 }}>APP IT will use only these agents. Requirements and Task planning are always on.</p>
+        <p className="muted small" style={{ margin: 0 }}>Appling will use only these agents. Requirements and Task planning are always on.</p>
         <TeamPicker agents={agents} selected={draft} onToggle={toggle} />
         <div className="dialog-actions">
           <button className="btn ghost" onClick={onClose}>Cancel</button>
@@ -648,7 +648,7 @@ function ChatScroll(props: {
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [shown.length, liveText.length, live.queued.length, live.inbox.length, props.proposal]);
   // The owner just sent something: always show it, even if they had scrolled
-  // up to read APP IT's last reply. Later layout keeps it pinned via `stick`.
+  // up to read Appling's last reply. Later layout keeps it pinned via `stick`.
   useEffect(() => {
     if (!props.sent) return;
     stick.current = true;
@@ -705,7 +705,7 @@ function ChatScroll(props: {
         {turn && (
           <div className="msg lyra">
             <div className="bubble">
-              <div className="msg-head"><img className="lyra-face" src="/avatars/app-it.webp" alt="" /> APP IT</div>
+              <div className="msg-head"><img className="lyra-face" src="/avatars/app-it.webp" alt="" /> Appling</div>
               {liveText ? (
                 <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{liveText}</ReactMarkdown></div>
               ) : null}
@@ -716,7 +716,7 @@ function ChatScroll(props: {
         {live.queued.map((q) => (
           <div key={q.id} className="msg user queued">
             <div className="bubble">
-              <div className="msg-head">You · APP IT reads this next</div>
+              <div className="msg-head">You · Appling reads this next</div>
               {q.text.startsWith("IDRAK_INTERNAL") ? "…" : q.text}
             </div>
           </div>
@@ -732,7 +732,7 @@ function ChatScroll(props: {
 function TurnStart({ kind, text }: { kind: string; text: string }) {
   if (kind === "user") return <Message item={{ role: "user", text, proposal: null }} />;
   if (kind === "helper_done") return <Message item={{ role: "report", text, proposal: null }} />;
-  const note = kind === "watchdog" ? "APP IT kept going on its own." : kind === "team" ? text : kind === "setup" && text !== "Project opened" ? null : "Project opened";
+  const note = kind === "watchdog" ? "Appling kept going on its own." : kind === "team" ? text : kind === "setup" && text !== "Project opened" ? null : "Project opened";
   if (note === null) return <Message item={{ role: "user", text, proposal: null }} />;
   return <Message item={{ role: "note", text: note, proposal: null }} />;
 }
@@ -759,7 +759,7 @@ function Message({ item, children }: { item: Shown; children?: React.ReactNode }
       <div className="bubble">
         <div className="msg-head">
           {item.role === "lyra" && <img className="lyra-face" src="/avatars/app-it.webp" alt="" />}
-          {item.role === "lyra" ? "APP IT" : "You"}
+          {item.role === "lyra" ? "Appling" : "You"}
           <button className="copy" onClick={copy} title="Copy" aria-label="Copy message">{copied ? <Check size={13} /> : <Copy size={13} />}</button>
         </div>
         {item.role === "lyra" ? (
@@ -780,7 +780,7 @@ function TeamProposal({ agents, proposal, current, onConfirm }: { agents: Agent[
   const toggle = (agentId: string) => setDraft((d) => (d.includes(agentId) ? d.filter((x) => x !== agentId) : [...d, agentId]));
   return (
     <div className="team-proposal" style={{ marginTop: 12 }}>
-      <b style={{ color: "var(--ink)" }}>APP IT suggests this team</b>
+      <b style={{ color: "var(--ink)" }}>Appling suggests this team</b>
       <div className="tiny muted">Untick anyone you don't want, or add more. Nothing changes until you confirm.</div>
       <TeamPicker agents={shownAgents} selected={draft} recommended={proposal} onToggle={toggle} />
       <div className="answer-row" style={{ borderTop: 0, paddingTop: 0 }}>
@@ -803,7 +803,7 @@ function NeedCard({ item, onAnswer }: { item: InboxItem; onAnswer: (a: string) =
   if (item.kind === "approval") {
     return (
       <div className="need-card">
-        <b>APP IT wants to run a command</b>
+        <b>Appling wants to run a command</b>
         {item.description && <span className="small">Why it's flagged: {item.description}</span>}
         <pre>{item.command}</pre>
         <div className="answer-row" style={{ borderTop: 0, paddingTop: 0, marginTop: 0 }}>
@@ -817,7 +817,7 @@ function NeedCard({ item, onAnswer }: { item: InboxItem; onAnswer: (a: string) =
   const secret = item.kind === "secret";
   return (
     <div className="need-card">
-      <b>{secret ? "APP IT needs a key or password" : "APP IT has a question"}</b>
+      <b>{secret ? "Appling needs a key or password" : "Appling has a question"}</b>
       <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{item.question ?? ""}</ReactMarkdown></div>
       {secret && item.env_var && <span className="tiny muted">Saved privately as {item.env_var}; never shown in the chat.</span>}
       {!!item.choices?.length && (
@@ -910,7 +910,7 @@ function Composer({ busy, onSend, projectId, dropped, picks, onPicksChange }: {
           ref={area}
           rows={1}
           value={text}
-          placeholder={busy ? "APP IT is working — write anyway, it reads this next…" : "Message APP IT…"}
+          placeholder={busy ? "Appling is working — write anyway, it reads this next…" : "Message Appling…"}
           onChange={(e) => setText(e.target.value)}
           onPaste={(e) => { const pasted = Array.from(e.clipboardData.files); if (pasted.length) { e.preventDefault(); attach(pasted); } }}
           onKeyDown={(e) => {

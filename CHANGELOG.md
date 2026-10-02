@@ -9,7 +9,12 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
-### APP IT (next) — live preview, pick to change, phone apps
+### Appling v0.04 beta — 2026-10-02
+
+APP IT is now **Appling** — a little app that grows. New name on every screen
+and in the assistant's own words; the app's folder is now `my_lyra/appling`.
+
+Live preview, pick to change, phone apps:
 
 - **Live preview beside the chat**: ▶ opens your app in a panel next to the
   conversation, at computer or phone size, with reload, open-in-tab and the

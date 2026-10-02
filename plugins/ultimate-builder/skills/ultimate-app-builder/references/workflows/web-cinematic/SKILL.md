@@ -32,7 +32,7 @@ Work in the project folder. Scaffold once:
 `npm create vite@latest site -- --template vanilla-ts` (or React + TS when
 the spec uses React Three Fiber), then `npm i gsap lenis` (+ `three` /
 `@react-three/fiber` only if the spec has a 3D moment). Put the app at the
-project root or build it to `dist/` so APP IT's **Open app** button shows it.
+project root or build it to `dist/` so Appling's **Open app** button shows it.
 Run `npm run build` after every section and open the built page.
 
 ## Quick Reference
@@ -90,8 +90,8 @@ oversized wordmark and a magnetic button.
 ## Photo-real sites (footage, layers, AI pictures)
 
 Templates marked photo-real get their look from real footage and layered
-photos, not code-drawn art. In an APP IT project three commands help (they run
-with APP IT's own Python; files the owner attaches are in `assets/uploads/`):
+photos, not code-drawn art. In an Appling project three commands help (they run
+with Appling's own Python; files the owner attaches are in `assets/uploads/`):
 
 | Command | Use |
 |---|---|
@@ -120,7 +120,7 @@ with APP IT's own Python; files the owner attaches are in `assets/uploads/`):
 and phone size, scrolls it like a visitor, and lists console errors, failed
 requests, sideways overflow and text that never becomes readable. It writes
 screenshots and one contact sheet per size; with `--compare` each row shows
-the build next to the reference demo at the same scroll point. In an APP IT
+the build next to the reference demo at the same scroll point. In an Appling
 project it is copied to `.lyra/kit/site-check.mjs`:
 
 ```
