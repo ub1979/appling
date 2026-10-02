@@ -137,7 +137,11 @@ export interface NewProject {
   profile: BuildProfile;
   kind: ProjectKind;
   template: string | null;
+  platforms?: Platform[];
 }
+
+export type Platform = "web" | "phone" | "computer";
+export interface AppPreview { kind: "web" | "expo"; url: string }
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
@@ -176,7 +180,7 @@ export const api = {
   project: (id: string) => call<ProjectDetail>("GET", `/api/projects/${id}`),
   usage: (id: string) => call<unknown>("GET", `/api/projects/${id}/usage`),
   preview: (id: string) => call<{ available: boolean; build: boolean }>("GET", `/api/projects/${id}/preview`),
-  openApp: (id: string) => call<{ url: string }>("POST", `/api/projects/${id}/preview/open`),
+  openApp: (id: string) => call<AppPreview>("POST", `/api/projects/${id}/preview/open`),
   map: (id: string) => call<ProjectMap>("GET", `/api/projects/${id}/map`),
   send: (id: string, text: string) => call("POST", `/api/projects/${id}/messages`, { text }),
   answer: (id: string, item: string, answer: string) => call("POST", `/api/projects/${id}/inbox/${item}`, { answer }),

@@ -9,6 +9,18 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### APP IT (next) — live preview, pick to change, phone apps
+
+- **Live preview beside the chat**: ▶ opens your app in a panel next to the
+  conversation, at computer or phone size, with reload, open-in-tab and the
+  app's own error messages.
+- **🎯 Pick**: point at any part of the app in the preview; it joins your
+  message ("make this bigger") with what APP IT needs to find it in the code.
+- **Where will people use it?** New apps choose Web, Phone and/or Computer.
+- **Phone apps with Expo Go**: phone apps are built with Expo; the preview
+  panel shows a QR code — scan it with Expo Go and the app runs on your phone,
+  updating live as APP IT works. New `mobile-expo` playbook for the agents.
+
 ### APP IT v0.03 beta — 2026-10-02
 
 Lyra Lite is now **APP IT**: a new name on every screen and in the assistant's

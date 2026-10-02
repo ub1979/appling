@@ -237,7 +237,8 @@ class Lyra:
     def add_project(self, raw_path: str, *, create: bool, team: list[str] | None = None,
                     style: str | None = None, brief: str = "",
                     models: dict | None = None, profile: str | None = None,
-                    kind: str | None = None, template_id: str | None = None) -> ProjectRunner:
+                    kind: str | None = None, template_id: str | None = None,
+                    platforms: list[str] | None = None) -> ProjectRunner:
         path = Path(raw_path).expanduser().resolve(strict=False)
         reason = placement(path, creating=create and not path.exists())
         if reason:
@@ -263,11 +264,12 @@ class Lyra:
                 # functional + visual QA that a public page needs.
                 profile = "reusable"
             template = get_template(template_id) if template_id else None
+            platforms = agents.normalise_platforms(platforms) if kind == "app" else None
             runner.store.update_state(team=chosen, style=style or "app-it", models=models or {},
                                       profile=profile, project_kind=kind,
-                                      template=template["id"] if template else None)
+                                      template=template["id"] if template else None, platforms=platforms)
             if not runner.store.transcript() and not runner.snapshot()["running"]:
-                runner.submit(agents.setup_message(path, chosen, models, brief, profile, kind, template),
+                runner.submit(agents.setup_message(path, chosen, models, brief, profile, kind, template, platforms),
                               kind="setup",
                               display=brief.strip() or "Project opened")
         return runner
@@ -396,6 +398,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             profile=str(body.get("profile") or "") or None,
             kind=str(body.get("kind") or "") or None,
             template_id=str(body.get("template") or "") or None,
+            platforms=[str(p) for p in body["platforms"]] if isinstance(body.get("platforms"), list) else None,
         )
         return {"id": project_key(runner.root), **runner.snapshot()}
 
@@ -598,7 +601,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     def preview_open(pid: str):
         """Build the site if it needs it, serve it at its own address, return that address."""
         try:
-            return {"url": hosts.open(lyra.get(pid).root)}
+            return hosts.open(lyra.get(pid).root)
         except PreviewError as exc:
             raise HTTPException(status_code=409, detail=str(exc))
 
@@ -707,7 +710,8 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
 
             template = get_template(state["template"]) if state.get("template") else None
             runner.submit(agents.setup_message(runner.root, state["team"], state.get("models"), "",
-                                               state.get("profile"), state.get("project_kind"), template),
+                                               state.get("profile"), state.get("project_kind"), template,
+                                               state.get("platforms")),
                           kind="setup", display="Project opened")
         return {"chat_id": chat_id}
 

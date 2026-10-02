@@ -727,3 +727,77 @@ def test_attached_files_land_in_the_project_uploads_folder(env):
             assert any(e["type"] == "file_added" for e in _events(path))
         finally:
             daemon.stop()
+
+
+FAKE_EXPO = """#!/usr/bin/env python3
+import http.server, sys
+port = int(sys.argv[sys.argv.index("--port") + 1])
+class H(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def do_GET(self):
+        body = b"packager-status:running" if self.path == "/status" else b'{"runtimeVersion": "exposdk:test"}'
+        self.send_response(200); self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+http.server.HTTPServer(("0.0.0.0", port), H).serve_forever()
+"""
+
+
+def test_preview_pages_carry_the_pick_helper(env):
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            (path / "index.html").write_text("<html><head><title>x</title></head><body><button>Go</button></body></html>")
+            opened = daemon.post(f"/api/projects/{pid}/preview/open", {}).json()
+            assert opened["kind"] == "web"
+            with httpx.Client(timeout=5, follow_redirects=True) as browser:
+                page = browser.get(opened["url"]).text
+                assert '<script src="/__appit/pick.js" defer></script></head>' in page
+                helper = browser.get(opened["url"].split("/?")[0] + "/__appit/pick.js")
+                assert helper.status_code == 200 and "appit-preview" in helper.text
+        finally:
+            daemon.stop()
+
+
+def test_phone_app_preview_runs_expo_and_offers_its_address(env):
+    """An Expo project gets Expo's dev server and an exp:// address for the QR
+    code; it stops with APP IT."""
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            (path / "package.json").write_text(json.dumps({"name": "phone", "dependencies": {"expo": "~57.0.0"}}))
+            fake = path / "node_modules" / ".bin" / "expo"
+            fake.parent.mkdir(parents=True)
+            fake.write_text(FAKE_EXPO.replace("#!/usr/bin/env python3", f"#!{sys.executable}", 1))
+            fake.chmod(0o755)
+            assert daemon.get(f"/api/projects/{pid}/preview").json()["available"] is True
+            opened = daemon.post(f"/api/projects/{pid}/preview/open", {}).json()
+            assert opened["kind"] == "expo" and opened["url"].startswith("exp://")
+            port = int(opened["url"].rsplit(":", 1)[1])
+            assert httpx.get(f"http://127.0.0.1:{port}/status", timeout=5).text == "packager-status:running"
+            assert daemon.post(f"/api/projects/{pid}/preview/open", {}).json()["url"] == opened["url"]  # reused
+        finally:
+            daemon.stop()
+        time.sleep(1)
+        with pytest.raises(httpx.HTTPError):
+            httpx.get(f"http://127.0.0.1:{port}/status", timeout=2)
+
+
+def test_app_platforms_reach_the_planner(env):
+    with FakeOpenAIServer([text_step("Which screens matter most?")]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            path = env["home"] / "Lyra Projects" / "Habits"
+            res = daemon.post("/api/projects", {"path": str(path), "create": True, "team": [], "kind": "app",
+                                                "platforms": ["phone", "nonsense", "web"], "brief": "A habit tracker"})
+            assert res.status_code == 200, res.text
+            start = _wait_event(path, lambda e: e["type"] == "turn_start")
+            text = start["text"]
+            payload = json.loads(text[len("IDRAK_INTERNAL_SETUP_BEGIN"):text.rindex("IDRAK_INTERNAL_SETUP_END")])
+            assert payload["platforms"] == ["web", "phone"]
+            assert payload["kind_skill"] == "ultimate-builder:mobile-expo" and "Expo Go" in payload["platform_gate"]
+        finally:
+            daemon.stop()

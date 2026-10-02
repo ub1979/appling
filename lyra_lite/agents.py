@@ -142,9 +142,26 @@ KIND_SKILLS = {
 }
 
 
+PLATFORMS = ("web", "phone", "computer")
+PLATFORM_GATE = (
+    "The owner chose where people will use this app; build for exactly these. "
+    "web → a responsive web app (installable as a PWA when it helps), previewed in APP IT's panel. "
+    "phone → one Expo (React Native) app for iPhone and Android on the current Expo SDK, "
+    "following `ultimate-builder:mobile-expo`; the owner tests it live on their own phone by "
+    "scanning the QR code in APP IT's preview panel with Expo Go. "
+    "computer → a Tauri 2 desktop app (web UI in a small native window; never Electron); "
+    "its web UI is previewed in the panel, and installers need Rust — ask before installing it. "
+    "web + phone → prefer one Expo app that also runs on the web (expo web).")
+
+
+def normalise_platforms(value: list[str] | None) -> list[str]:
+    chosen = [p for p in PLATFORMS if p in (value or [])]
+    return chosen or ["web"]
+
+
 def setup_message(root: Path, team: list[str], models: dict | None, brief: str,
                   profile: str | None = None, kind: str | None = None,
-                  template: dict | None = None) -> str:
+                  template: dict | None = None, platforms: list[str] | None = None) -> str:
     payload = {
         "instruction": INSTRUCTION,
         "first_turn_gate": FIRST_TURN_GATE,
@@ -167,6 +184,11 @@ def setup_message(root: Path, team: list[str], models: dict | None, brief: str,
             payload["kind_skill"] = KIND_SKILLS[kind]
         if kind == "website":
             payload["website_gate"] = WEBSITE_GATE
+        if kind == "app" and platforms:
+            payload["platforms"] = platforms
+            payload["platform_gate"] = PLATFORM_GATE
+            if "phone" in platforms:
+                payload["kind_skill"] = "ultimate-builder:mobile-expo"
     if template:
         payload["template"] = {"id": template["id"], "name": template.get("name", template["id"])}
         payload["template_spec"] = template.get("spec", "")

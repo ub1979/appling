@@ -32,6 +32,7 @@ _SPECIALIST_SKILLS = {
     "a11y-auditor": "Accessibility audit",
     "web-cinematic": "Build premium scroll-driven, parallax websites.",
     "color-and-ux": "Choose colours and UI/UX patterns that work.",
+    "mobile-expo": "Build phone apps the owner tests live with Expo Go.",
     "business-motion-film": "Make premium short business videos and explainers.",
     "security-auditor": "Security auditing",
     "devops-engineer": "Deployment and operations",

@@ -5,13 +5,15 @@ import {
   api,
   streamUrl,
   uploadFile,
+  type AppPreview,
   type Agent,
   type Catalog,
   type ChatMessage,
   type ProjectDetail,
   type ProjectMap,
 } from "../api";
-import { ArrowLeft, ArrowUp, Check, Copy, MessageSquarePlus, Paperclip, Play, Square, UsersRound, X } from "lucide-react";
+import { ArrowLeft, ArrowUp, Check, Copy, Crosshair, MessageSquarePlus, Paperclip, Play, Square, UsersRound, X } from "lucide-react";
+import { PreviewPanel, pickLabel, pickNote, type PickedElement } from "../components/PreviewPanel";
 import { Avatar, IconButton, PrefButtons, TeamPicker } from "../components/common";
 import { activeHelpers, applyEvent, emptyLive, type InboxItem, type LiveState, type LyraEvent } from "../live";
 import { go } from "../router";
@@ -79,6 +81,10 @@ export function Studio({ id }: { id: string }) {
   const [showTeam, setShowTeam] = useState(false);
   // Bumped on every owner message so the chat jumps to the bottom to show it.
   const [sent, setSent] = useState(0);
+  // The live preview beside the chat, and parts of it the owner picked.
+  const [preview, setPreview] = useState<AppPreview | null>(null);
+  const [picks, setPicks] = useState<PickedElement[]>([]);
+  const addPick = useCallback((p: PickedElement) => setPicks((all) => [...all.slice(-4), p]), []);
   // Files dropped anywhere on the chat go to the composer's attachments.
   const [dragging, setDragging] = useState(false);
   const [dropped, setDropped] = useState<File[]>([]);
@@ -212,21 +218,13 @@ export function Studio({ id }: { id: string }) {
 
   // APP IT builds the site if it needs it and serves it at its own address.
   // The tab opens right away (browsers block tabs opened after a wait).
+  // APP IT builds the app if it needs it and shows it beside the chat
+  // (phone apps get a QR code for Expo Go).
   const openApp = () => {
-    const tab = window.open("about:blank", "_blank");
-    if (tab) {
-      tab.document.title = "Opening your app…";
-      tab.document.body.innerHTML = '<p style="font:16px system-ui;padding:40px;color:#555">APP IT is getting your app ready — building it first if needed…</p>';
-    }
     setOpening(true);
     void run(async () => {
       try {
-        const { url } = await api.openApp(id);
-        if (tab) tab.location.href = url;
-        else window.open(url, "_blank");
-      } catch (e) {
-        tab?.close();
-        throw e;
+        setPreview(await api.openApp(id));
       } finally {
         setOpening(false);
       }
@@ -304,7 +302,7 @@ export function Studio({ id }: { id: string }) {
         )}
       </div>
 
-      <div className="studio-body">
+      <div className={`studio-body ${preview ? "with-preview" : ""}`}>
         <aside className="side left">
           <section className="panel">
             <div className="agent-row working" style={{ background: "transparent", padding: 0 }}>
@@ -384,7 +382,7 @@ export function Studio({ id }: { id: string }) {
             onTeam={(t) => void run(async () => { await api.team(id, t); await load(); })}
             onAnswer={(item, a) => void run(() => api.answer(id, item, a))}
           />
-          <Composer busy={busy} onSend={send} projectId={id} dropped={dropped} />
+          <Composer busy={busy} onSend={send} projectId={id} dropped={dropped} picks={picks} onPicksChange={setPicks} />
         </section>
 
         <aside className="side right">
@@ -439,6 +437,7 @@ export function Studio({ id }: { id: string }) {
             )}
           </section>
         </aside>
+        {preview && <PreviewPanel preview={preview} onClose={() => setPreview(null)} onPicked={addPick} />}
       </div>
 
       {showTeam && catalog && (
@@ -846,7 +845,10 @@ function NeedCard({ item, onAnswer }: { item: InboxItem; onAnswer: (a: string) =
 
 interface Attachment { key: string; name: string; progress: number; path?: string; error?: string }
 
-function Composer({ busy, onSend, projectId, dropped }: { busy: boolean; onSend: (text: string) => Promise<void>; projectId: string; dropped: File[] }) {
+function Composer({ busy, onSend, projectId, dropped, picks, onPicksChange }: {
+  busy: boolean; onSend: (text: string) => Promise<void>; projectId: string; dropped: File[];
+  picks: PickedElement[]; onPicksChange: (p: PickedElement[]) => void;
+}) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<Attachment[]>([]);
   const area = useRef<HTMLTextAreaElement>(null);
@@ -872,16 +874,25 @@ function Composer({ busy, onSend, projectId, dropped }: { busy: boolean; onSend:
   const ready = files.filter((f) => f.path);
   const send = async () => {
     const value = text.trim();
-    if ((!value && !ready.length) || uploading) return;
-    const note = ready.length ? `${value ? "\n\n" : ""}Attached: ${ready.map((f) => f.path).join(", ")}` : "";
+    if ((!value && !ready.length && !picks.length) || uploading) return;
+    const parts = [value];
+    if (picks.length) parts.push(picks.map(pickNote).join("\n\n"));
+    if (ready.length) parts.push(`Attached: ${ready.map((f) => f.path).join(", ")}`);
     setText("");
     setFiles([]);
-    await onSend(`${value}${note}`);
+    onPicksChange([]);
+    await onSend(parts.filter(Boolean).join("\n\n"));
   };
   return (
     <div className="composer">
-      {files.length > 0 && (
+      {(files.length > 0 || picks.length > 0) && (
         <div className="attachments">
+          {picks.map((p, i) => (
+            <span key={`pick-${i}`} className="attachment pick" title={p.selector}>
+              <Crosshair size={12} /> {pickLabel(p)}
+              <button type="button" aria-label="Remove picked part" onClick={() => onPicksChange(picks.filter((_, j) => j !== i))}><X size={12} /></button>
+            </span>
+          ))}
           {files.map((f) => (
             <span key={f.key} className={`attachment ${f.error ? "bad" : f.path ? "done" : ""}`} title={f.error ?? f.path ?? "Uploading…"}>
               <Paperclip size={12} /> {f.name}
@@ -909,7 +920,7 @@ function Composer({ busy, onSend, projectId, dropped }: { busy: boolean; onSend:
             }
           }}
         />
-        <button className="send" onClick={() => void send()} disabled={(!text.trim() && !ready.length) || uploading} aria-label="Send" title={uploading ? "Wait for the upload to finish" : "Send"}><ArrowUp size={18} /></button>
+        <button className="send" onClick={() => void send()} disabled={(!text.trim() && !ready.length && !picks.length) || uploading} aria-label="Send" title={uploading ? "Wait for the upload to finish" : "Send"}><ArrowUp size={18} /></button>
       </div>
       <div className="hint">Enter to send · Shift+Enter for a new line · drop files here or use 📎</div>
     </div>

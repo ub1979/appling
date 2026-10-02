@@ -85,6 +85,9 @@ playbook for that kind (`kind_skill`) and a chosen `template` with its full
 - **slides** — with a template, an HTML deck on reveal.js copied from its
   live demo (PDF export included); use the `powerpoint` skill when the owner
   needs a `.pptx`, keeping the template's layout and palette.
+- **app** — the setup message's `platforms` and `platform_gate` say where
+  it runs: web, phone (Expo, tested live by the owner via the QR code in the
+  preview panel — `ultimate-builder:mobile-expo`) and/or computer (Tauri).
 - **any interface or deck** — choose and check colours with
   `ultimate-builder:color-and-ux`.
 

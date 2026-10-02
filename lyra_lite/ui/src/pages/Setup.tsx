@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, type BuildProfile, type Catalog, type ProjectKind, type Template } from "../api";
+import { api, type BuildProfile, type Catalog, type Platform, type ProjectKind, type Template } from "../api";
 import { AvatarStack, Brand, FolderDialog, PrefButtons, TeamPicker } from "../components/common";
 import { go } from "../router";
 
@@ -10,6 +10,12 @@ const KINDS: { id: ProjectKind; name: string; text: string; icon: string; team: 
   { id: "website", name: "Website", text: "A beautiful site: landing page, portfolio or product page — with motion.", icon: "◎", team: ["ui-designer", "sw-developer", "qa-engineer"] },
   { id: "slides", name: "Slides", text: "A presentation you click through and can share.", icon: "▭", team: ["tech-writer"] },
   { id: "video", name: "Video", text: "A short business film, ad or explainer.", icon: "▶", team: ["sw-developer"] },
+];
+
+const PLATFORMS: { id: Platform; name: string; text: string; icon: string }[] = [
+  { id: "web", name: "Web", text: "In a browser on any phone or computer. Easiest to share.", icon: "🌐" },
+  { id: "phone", name: "Phone", text: "An iPhone and Android app. Test it live on your phone with Expo Go.", icon: "📱" },
+  { id: "computer", name: "Computer", text: "A desktop app for Mac, Windows and Linux.", icon: "💻" },
 ];
 
 const PROFILES: { id: BuildProfile; name: string; text: string }[] = [
@@ -33,6 +39,9 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
   const [brief, setBrief] = useState("");
   const [profile, setProfile] = useState<BuildProfile>("personal");
   const [kind, setKind] = useState<ProjectKind>("app");
+  const [platforms, setPlatforms] = useState<Platform[]>(["web"]);
+  const togglePlatform = (id: Platform) =>
+    setPlatforms((all) => (all.includes(id) ? (all.length > 1 ? all.filter((p) => p !== id) : all) : [...all, id]));
   const [templates, setTemplates] = useState<Template[]>([]);
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [addingTemplate, setAddingTemplate] = useState(false);
@@ -84,7 +93,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
     if (!path) return;
     setSaving(true);
     try {
-      const res = await api.addProject({ path, create: mode === "new", team: orderedTeam, style, brief, profile: kind === "website" ? "reusable" : profile, kind, template: templateId });
+      const res = await api.addProject({ path, create: mode === "new", team: orderedTeam, style, brief, profile: kind === "website" ? "reusable" : profile, kind, template: templateId, platforms: kind === "app" ? platforms : undefined });
       go(`/p/${res.id}`);
     } catch (e) {
       setProblem(e instanceof Error ? e.message : String(e));
@@ -151,6 +160,23 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
               ))}
             </div>
           </section>
+
+          {kind === "app" && (
+            <section className="card card-pad">
+              <h3>Where will people use it?</h3>
+              <p className="muted small" style={{ margin: "4px 0 0" }}>Pick one or more. You can add more later.</p>
+              <div className="kind-grid platform-grid">
+                {PLATFORMS.map((p) => (
+                  <button key={p.id} type="button" aria-pressed={platforms.includes(p.id)}
+                    className={`profile-card ${platforms.includes(p.id) ? "on" : ""}`} onClick={() => togglePlatform(p.id)}>
+                    <span className="kind-icon">{p.icon}</span>
+                    <b>{p.name}</b>
+                    <span>{p.text}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
           {kind !== "app" && (
             <section className="card card-pad">
