@@ -9,7 +9,7 @@ already have (Claude, ChatGPT/Codex, Ollama and more).
 
 - **Start:** `./start.sh` → <http://127.0.0.1:9200/> · **Stop:** `./stop.sh`
 - **Make:** apps, websites (19 templates with live demos, two photo-real),
-  slide decks (4 templates) and short videos (8 templates)
+  slide decks (6 templates) and short videos (10 templates)
 - **Checks:** websites are opened in Chrome on desktop and phone before QA
   can pass; colours are measured, not guessed
 - **Your files:** everything lives in your project folder; 📎 attach videos,

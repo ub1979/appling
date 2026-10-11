@@ -1,0 +1,25 @@
+{
+  "kind": "video",
+  "id": "video-announcement",
+  "name": "Announcement",
+  "tagline": "Big news in 6–15 seconds: a headline that lands, one detail, your brand.",
+  "best_for": "Launches, new features, events, hiring, milestones",
+  "palette": [
+    "#f4f1ea",
+    "#111111",
+    "#ff5b2e",
+    "#ffffff"
+  ],
+  "preview": {
+    "video": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/flash-through-white.mp4",
+    "poster": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/flash-through-white.png",
+    "credit": "Preview: HyperFrames block “flash-through-white” (Apache-2.0)"
+  },
+  "blocks": [
+    "split-flap-board",
+    "headline-slam",
+    "flash-through-white",
+    "macos-notification",
+    "logo-outro"
+  ]
+}

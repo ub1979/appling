@@ -38,6 +38,13 @@ appears in the team picker and is the default builder for its project kind.
   **New Company** (a calm, credible first site) and **Developer Tool**
   (install command, live terminal, code tabs). Templates are folders in
   `lyra_lite/templates/` — adding or removing one needs no code change.
+- **Two new slide templates**: **Sales Demo** (the customer's outcome,
+  before/after, three capabilities with product screens, a pilot and one
+  next step) and **Company Intro** (who we are, how we work, results, a
+  growing timeline, team and studios).
+- **Two new video templates**: **Social Captions Reel** (vertical, bold
+  word-by-word captions that work muted) and **Announcement** (6–15 s: a
+  split-flap reveal, a headline that lands, one detail, your logo).
 - The Data Report deck template's source lines are 16 px, so the template
   passes its own deck check.
 
