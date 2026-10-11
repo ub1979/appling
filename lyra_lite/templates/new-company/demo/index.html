@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Northfold — engineering for hardware teams</title>
+<meta name="description" content="Northfold is a small engineering studio that takes hardware products from working prototype to first production run." />
+<meta property="og:title" content="Northfold — engineering for hardware teams" />
+<meta property="og:description" content="From working prototype to first production run, without the guesswork." />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Newsreader:ital,opsz,wght@0,6..72,300;0,6..72,400;0,6..72,500;1,6..72,300;1,6..72,400&family=Albert+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --bg: #ece9e2; --bg-2: #e3dfd6; --ink: #16161a; --muted: #57544d; --rule: #16161a26; --accent: #2b3bd6; --on-accent: #ffffff;
+    --serif: "Newsreader", Georgia, serif; --sans: "Albert Sans", system-ui, sans-serif; --gut: 24px; --max: 1240px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--bg); scroll-behavior: smooth; }
+  body { color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.6; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
+  .wrap { width: min(var(--max), 100% - 48px); margin: 0 auto; }
+  .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gut); }
+  .skip { position: absolute; left: -999px; top: 8px; background: var(--ink); color: var(--bg); padding: 8px 12px; z-index: 99; }
+  .skip:focus { left: 8px; }
+
+  header.top { position: sticky; top: 0; z-index: 40; background: #ece9e2e6; backdrop-filter: blur(10px); border-bottom: 1px solid var(--rule); }
+  header.top .wrap { display: flex; align-items: center; justify-content: space-between; height: 68px; }
+  .brand { display: flex; align-items: center; gap: 10px; font-family: var(--serif); font-size: 22px; text-decoration: none; letter-spacing: -.01em; }
+  .brand svg { width: 22px; height: 22px; }
+  nav.links { display: flex; gap: 32px; font-size: 15px; }
+  nav.links a { text-decoration: none; color: var(--muted); }
+  nav.links a:hover { color: var(--ink); }
+  .btn { display: inline-flex; align-items: center; gap: 10px; padding: 13px 22px; border-radius: 999px; font: 600 15px var(--sans); text-decoration: none; border: 1px solid var(--ink); background: transparent; color: var(--ink); cursor: pointer; transition: background .25s, color .25s; }
+  .btn.solid { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+  .btn.solid:hover { background: #1f2db8; }
+  .btn:not(.solid):hover { background: var(--ink); color: var(--bg); }
+  .menu-btn { display: none; }
+
+  .num { font: 500 13px var(--sans); letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+  .num b { color: var(--accent); font-weight: 600; margin-right: 10px; }
+  section { padding: 120px 0; border-top: 1px solid var(--rule); }
+  h2 { font: 400 clamp(34px, 4.4vw, 58px)/1.05 var(--serif); letter-spacing: -.02em; }
+  h2 em, h1 em { font-style: italic; color: var(--accent); }
+  .lede { color: var(--muted); font-size: 19px; max-width: 34em; }
+
+  /* hero */
+  .hero { padding: 96px 0 72px; border-top: 0; }
+  .hero h1 { grid-column: 1 / 12; font: 300 clamp(44px, 7vw, 104px)/.98 var(--serif); letter-spacing: -.035em; }
+  .hero h1 .line { display: block; overflow: hidden; padding-bottom: .06em; }
+  .hero h1 .line > span { display: block; }
+  .hero .side { grid-column: 8 / 13; margin-top: 44px; }
+  .hero .side p { color: var(--muted); font-size: 18px; margin-bottom: 26px; }
+  .plate { grid-column: 1 / 13; margin-top: 72px; position: relative; border: 1px solid var(--rule); background: var(--bg-2); aspect-ratio: 16 / 6; overflow: hidden; }
+  .plate svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+  .plate .coord { position: absolute; font: 500 12px var(--sans); letter-spacing: .1em; color: var(--muted); }
+
+  .marquee { border-top: 1px solid var(--rule); border-bottom: 1px solid var(--rule); overflow: hidden; padding: 18px 0; }
+  .marquee .track { display: flex; gap: 48px; width: max-content; font: 400 26px var(--serif); font-style: italic; color: var(--muted); animation: slide 48s linear infinite; }
+  .marquee span::after { content: "·"; margin-left: 48px; color: var(--accent); }
+  @keyframes slide { to { transform: translateX(-50%); } }
+
+  /* services */
+  .services .intro { grid-column: 1 / 6; }
+  .services ul { grid-column: 7 / 13; list-style: none; border-top: 1px solid var(--ink); }
+  .svc { border-bottom: 1px solid var(--rule); }
+  .svc button { width: 100%; display: grid; grid-template-columns: 48px 1fr 24px; align-items: baseline; gap: 12px; padding: 26px 0; background: none; border: 0; text-align: left; cursor: pointer; color: inherit; font: 400 28px/1.2 var(--serif); }
+  .svc button small { font: 500 13px var(--sans); color: var(--accent); letter-spacing: .1em; }
+  .svc button i { font-style: normal; font: 300 26px var(--sans); transition: transform .35s; justify-self: end; }
+  .svc[data-open] button i { transform: rotate(45deg); }
+  .svc .body { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s ease; }
+  .svc[data-open] .body { grid-template-rows: 1fr; }
+  .svc .body > div { overflow: hidden; padding-left: 60px; }
+  .svc .body p { color: var(--muted); padding-bottom: 26px; max-width: 32em; }
+
+  /* principles */
+  .why .head { grid-column: 1 / 8; margin-bottom: 64px; }
+  .pr { grid-column: span 4; border-top: 1px solid var(--ink); padding-top: 22px; }
+  .pr h3 { font: 400 26px/1.2 var(--serif); margin: 14px 0 12px; }
+  .pr p { color: var(--muted); }
+
+  /* work */
+  .work .head { grid-column: 1 / 13; display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 56px; }
+  .case { grid-column: span 4; display: flex; flex-direction: column; text-decoration: none; }
+  .case figure { aspect-ratio: 4 / 5; background: var(--bg-2); border: 1px solid var(--rule); position: relative; overflow: hidden; }
+  .case figure svg { width: 100%; height: 100%; display: block; transition: transform .8s cubic-bezier(.2,.7,.2,1); }
+  .case:hover figure svg { transform: scale(1.04); }
+  .case .meta { display: flex; justify-content: space-between; margin-top: 18px; font-size: 13px; color: var(--muted); letter-spacing: .06em; text-transform: uppercase; }
+  .case h3 { font: 400 24px/1.25 var(--serif); margin-top: 8px; }
+  .case p { color: var(--muted); font-size: 16px; margin-top: 6px; }
+
+  /* team + story */
+  .team .head { grid-column: 1 / 6; }
+  .people { grid-column: 7 / 13; display: grid; gap: 0; border-top: 1px solid var(--ink); }
+  .person { display: grid; grid-template-columns: 64px 1fr; gap: 20px; align-items: center; padding: 22px 0; border-bottom: 1px solid var(--rule); }
+  .person .avatar { width: 64px; height: 64px; border-radius: 50%; display: grid; place-items: center; font: 400 22px var(--serif); background: var(--ink); color: var(--bg); }
+  .person .avatar.a { background: var(--accent); color: var(--on-accent); }
+  .person b { font: 400 22px var(--serif); display: block; }
+  .person span { color: var(--muted); font-size: 15px; }
+  .story { grid-column: 1 / 13; margin-top: 110px; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); column-gap: var(--gut); }
+  .story blockquote { grid-column: 1 / 9; font: 300 clamp(28px, 3.4vw, 44px)/1.2 var(--serif); letter-spacing: -.015em; }
+  .story p { grid-column: 9 / 13; color: var(--muted); align-self: end; }
+
+  /* contact */
+  .contact .head { grid-column: 1 / 6; }
+  .contact .head dl { margin-top: 40px; display: grid; gap: 18px; }
+  .contact dt { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+  .contact dd { font: 400 22px var(--serif); }
+  form { grid-column: 7 / 13; display: grid; gap: 22px; }
+  label { display: grid; gap: 8px; font-size: 14px; font-weight: 600; }
+  input, textarea { font: 400 17px var(--sans); color: var(--ink); background: transparent; border: 0; border-bottom: 1px solid var(--ink); padding: 10px 0; border-radius: 0; }
+  textarea { min-height: 120px; resize: vertical; }
+  input:focus-visible, textarea:focus-visible { outline: none; border-bottom: 2px solid var(--accent); }
+  .err { color: #a3261b; font-size: 14px; font-weight: 500; min-height: 1em; }
+  .ok { font: 400 22px var(--serif); color: var(--accent); }
+
+  footer { border-top: 1px solid var(--rule); padding: 32px 0 48px; font-size: 14px; color: var(--muted); }
+  footer .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  /* mobile panel */
+  .panel { position: fixed; inset: 0; z-index: 60; background: var(--ink); color: var(--bg); padding: 24px; display: flex; flex-direction: column; gap: 8px; transform: translateY(-100%); visibility: hidden; transition: transform .45s cubic-bezier(.2,.7,.2,1), visibility 0s .45s; }
+  .panel.open { transform: none; visibility: visible; transition: transform .45s cubic-bezier(.2,.7,.2,1); }
+  .panel .row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; }
+  .panel a { font: 300 40px/1.25 var(--serif); text-decoration: none; }
+  .panel button { background: none; border: 1px solid #ece9e255; color: var(--bg); border-radius: 999px; padding: 10px 18px; font: 600 15px var(--sans); }
+
+  @media (max-width: 900px) {
+    nav.links, header.top .btn { display: none; }
+    .menu-btn { display: inline-flex; padding: 10px 18px; }
+    section { padding: 80px 0; }
+    .hero h1, .hero .side, .services .intro, .services ul, .why .head, .pr, .case, .team .head, .people,
+    .story blockquote, .story p, .contact .head, form { grid-column: 1 / -1; }
+    .hero .side { margin-top: 32px; }
+    .plate { aspect-ratio: 4 / 3; margin-top: 48px; }
+    .services ul, .people, form { margin-top: 40px; }
+    .pr + .pr, .case + .case { margin-top: 40px; }
+    .work .head { flex-direction: column; align-items: start; }
+    .story { margin-top: 72px; }
+    .story p { margin-top: 24px; }
+    .svc button { font-size: 23px; grid-template-columns: 40px 1fr 24px; }
+    .svc .body > div { padding-left: 52px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .marquee .track { animation: none; }
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="#top" aria-label="Northfold home">
+      <svg viewBox="0 0 22 22" aria-hidden="true"><rect x=".5" y=".5" width="21" height="21" fill="none" stroke="currentColor"/><path d="M.5 21.5 21.5 .5V21.5Z" fill="#2b3bd6"/></svg>
+      Northfold
+    </a>
+    <nav class="links" aria-label="Main">
+      <a href="#services">Services</a><a href="#work">Work</a><a href="#studio">Studio</a><a href="#contact">Contact</a>
+    </nav>
+    <a class="btn" href="#contact">Start a project</a>
+    <button class="btn menu-btn" id="menuBtn" aria-expanded="false" aria-controls="panel">Menu</button>
+  </div>
+</header>
+<div class="panel" id="panel" role="dialog" aria-modal="true" aria-label="Menu">
+  <div class="row"><span class="brand">Northfold</span><button id="closeBtn">Close</button></div>
+  <a href="#services">Services</a><a href="#work">Work</a><a href="#studio">Studio</a><a href="#contact">Contact</a>
+</div>
+
+<main id="main">
+  <section class="hero" id="top">
+    <div class="wrap grid">
+      <h1 aria-label="We take hardware from working prototype to first production run.">
+        <span class="line"><span>We take hardware</span></span>
+        <span class="line"><span>from working prototype</span></span>
+        <span class="line"><span>to <em>first production run.</em></span></span>
+      </h1>
+      <div class="side">
+        <p>Northfold is a four-person engineering studio for small hardware teams. We design for manufacture, find the factory and stay until the first thousand units ship.</p>
+        <a class="btn solid" href="#contact">Book an intro call <span aria-hidden="true">→</span></a>
+      </div>
+      <div class="plate" aria-hidden="true">
+        <svg viewBox="0 0 1600 600" preserveAspectRatio="xMidYMid slice">
+          <g stroke="#16161a" stroke-opacity=".14" fill="none">
+            <path d="M0 150H1600M0 300H1600M0 450H1600M200 0V600M400 0V600M600 0V600M800 0V600M1000 0V600M1200 0V600M1400 0V600"/>
+          </g>
+          <g class="fold" fill="none" stroke="#16161a" stroke-width="1.5">
+            <path d="M600 520 800 120 1000 520Z"/>
+            <path d="M800 120V520" stroke-dasharray="6 8"/>
+          </g>
+          <path class="flap" d="M800 120 1000 520 800 520Z" fill="#2b3bd6"/>
+          <circle cx="800" cy="120" r="7" fill="#16161a"/>
+          <g fill="#16161a" font-family="Albert Sans, sans-serif" font-size="15" letter-spacing="2">
+            <text x="612" y="560">PROTOTYPE</text><text x="900" y="560">PRODUCTION</text>
+          </g>
+          <circle class="orb" cx="1260" cy="300" r="120" fill="none" stroke="#16161a" stroke-opacity=".3"/>
+          <circle class="orb" cx="1260" cy="300" r="60" fill="none" stroke="#2b3bd6"/>
+          <path d="M150 460c120-160 260-200 380-120" fill="none" stroke="#16161a" stroke-opacity=".35" stroke-dasharray="2 8"/>
+        </svg>
+        <span class="coord" style="left:20px;top:16px">FIG. 01 — THE FOLD</span>
+        <span class="coord" style="right:20px;bottom:16px">EST. 2026 · SHEFFIELD</span>
+      </div>
+    </div>
+  </section>
+
+  <div class="marquee" aria-hidden="true">
+    <div class="track">
+      <span>Design for manufacture</span><span>Electronics</span><span>Tooling</span><span>Supplier search</span><span>Pilot runs</span><span>Certification</span>
+      <span>Design for manufacture</span><span>Electronics</span><span>Tooling</span><span>Supplier search</span><span>Pilot runs</span><span>Certification</span>
+    </div>
+  </div>
+
+  <section class="services" id="services">
+    <div class="wrap grid">
+      <div class="intro reveal">
+        <p class="num"><b>01</b>What we do</p>
+        <h2 style="margin-top:20px">Four jobs, done <em>end to end.</em></h2>
+        <p class="lede" style="margin-top:22px">Most teams hire us for one of these and keep us for the rest.</p>
+      </div>
+      <ul class="reveal">
+        <li class="svc" data-open><button aria-expanded="true" aria-controls="s1"><small>A</small>Design for manufacture<i aria-hidden="true">+</i></button>
+          <div class="body" id="s1"><div><p>We rework a prototype so a factory can build it: fewer parts, sensible tolerances, a bill of materials that survives a price rise.</p></div></div></li>
+        <li class="svc"><button aria-expanded="false" aria-controls="s2"><small>B</small>Electronics and firmware<i aria-hidden="true">+</i></button>
+          <div class="body" id="s2"><div><p>Board layout, power budgets and the firmware that tests every unit on the line before it is boxed.</p></div></div></li>
+        <li class="svc"><button aria-expanded="false" aria-controls="s3"><small>C</small>Suppliers and tooling<i aria-hidden="true">+</i></button>
+          <div class="body" id="s3"><div><p>Shortlists, factory visits and tooling reviews, with quotes you can compare line by line.</p></div></div></li>
+        <li class="svc"><button aria-expanded="false" aria-controls="s4"><small>D</small>Pilot run and launch<i aria-hidden="true">+</i></button>
+          <div class="body" id="s4"><div><p>We stand on the line for the first run, fix what breaks and write down how to build it again.</p></div></div></li>
+      </ul>
+    </div>
+  </section>
+
+  <section class="why">
+    <div class="wrap grid">
+      <div class="head reveal">
+        <p class="num"><b>02</b>How we work</p>
+        <h2 style="margin-top:20px">Three rules we <em>do not bend.</em></h2>
+      </div>
+      <article class="pr reveal"><p class="num"><b>I</b></p><h3>One engineer owns your product.</h3><p>The person on your first call is the person on the factory floor. No hand-offs, no account managers.</p></article>
+      <article class="pr reveal"><p class="num"><b>II</b></p><h3>Fixed price per phase.</h3><p>Every phase has a written scope and a price before it starts. If we are wrong about effort, that is our cost.</p></article>
+      <article class="pr reveal"><p class="num"><b>III</b></p><h3>You keep every file.</h3><p>CAD, schematics, firmware and supplier contacts are yours from day one, in your own accounts.</p></article>
+    </div>
+  </section>
+
+  <section class="work" id="work">
+    <div class="wrap grid">
+      <div class="head reveal">
+        <div><p class="num"><b>03</b>Selected work</p><h2 style="margin-top:20px">What this <em>looks like</em> in practice.</h2></div>
+        <a class="btn" href="#contact">Ask for the full list</a>
+      </div>
+      <a class="case reveal" href="#contact">
+        <figure><svg viewBox="0 0 400 500" aria-hidden="true"><rect width="400" height="500" fill="#e3dfd6"/><rect x="110" y="120" width="180" height="260" rx="24" fill="none" stroke="#16161a" stroke-width="2"/><circle cx="200" cy="200" r="38" fill="#2b3bd6"/><path d="M150 320h100M150 345h60" stroke="#16161a" stroke-width="2"/></svg></figure>
+        <div class="meta"><span>Consumer device</span><span>2026</span></div>
+        <h3>A hand-held air monitor, re-engineered for a single factory.</h3>
+        <p>Part count halved and a one-day line test written.</p>
+      </a>
+      <a class="case reveal" href="#contact">
+        <figure><svg viewBox="0 0 400 500" aria-hidden="true"><rect width="400" height="500" fill="#e3dfd6"/><g stroke="#16161a" stroke-width="2" fill="none"><path d="M80 380h240M110 380V200h180v180"/><path d="M140 240h120v100H140z" stroke="#2b3bd6"/></g><path d="M80 140l60-40 60 40 60-40 60 40" stroke="#16161a" stroke-width="2" fill="none"/></svg></figure>
+        <div class="meta"><span>Industrial</span><span>2026</span></div>
+        <h3>A sensor enclosure that survives a winter outdoors.</h3>
+        <p>Sealing, tooling review and supplier swap.</p>
+      </a>
+      <a class="case reveal" href="#contact">
+        <figure><svg viewBox="0 0 400 500" aria-hidden="true"><rect width="400" height="500" fill="#e3dfd6"/><g fill="none" stroke="#16161a" stroke-width="2"><circle cx="200" cy="250" r="110"/><circle cx="200" cy="250" r="70"/></g><path d="M200 140v220" stroke="#2b3bd6" stroke-width="3"/><circle cx="200" cy="250" r="10" fill="#16161a"/></svg></figure>
+        <div class="meta"><span>Start-up</span><span>2026</span></div>
+        <h3>From a 3D-printed prototype to a 500-unit pilot run.</h3>
+        <p>Electronics, firmware and the first factory visit.</p>
+      </a>
+    </div>
+  </section>
+
+  <section class="team" id="studio">
+    <div class="wrap grid">
+      <div class="head reveal">
+        <p class="num"><b>04</b>The studio</p>
+        <h2 style="margin-top:20px">Small on <em>purpose.</em></h2>
+        <p class="lede" style="margin-top:22px">Four engineers who have each shipped products at volume, now working for teams who are about to.</p>
+      </div>
+      <div class="people reveal">
+        <div class="person"><span class="avatar a" aria-hidden="true">MO</span><div><b>Maya Okafor</b><span>Founder · mechanical engineering</span></div></div>
+        <div class="person"><span class="avatar" aria-hidden="true">JL</span><div><b>Jonas Lindqvist</b><span>Electronics and firmware</span></div></div>
+        <div class="person"><span class="avatar" aria-hidden="true">RP</span><div><b>Ruth Patel</b><span>Supply chain and factories</span></div></div>
+        <div class="person"><span class="avatar" aria-hidden="true">TA</span><div><b>Tom Ashworth</b><span>Test and certification</span></div></div>
+      </div>
+      <div class="story reveal">
+        <blockquote>“Good products die between the prototype and the factory. We started Northfold to stand in that gap.”</blockquote>
+        <p>We opened in 2026 after a decade inside larger product companies. We take on four clients at a time, so each one gets a senior engineer for the whole journey.</p>
+      </div>
+    </div>
+  </section>
+
+  <section class="contact" id="contact">
+    <div class="wrap grid">
+      <div class="head reveal">
+        <p class="num"><b>05</b>Contact</p>
+        <h2 style="margin-top:20px">Tell us what you are <em>building.</em></h2>
+        <dl>
+          <div><dt>Email</dt><dd><a href="mailto:hello@northfold.example">hello@northfold.example</a></dd></div>
+          <div><dt>Studio</dt><dd>Kelham Island, Sheffield</dd></div>
+        </dl>
+      </div>
+      <form id="form" class="reveal" novalidate>
+        <label for="f-name">Your name<input id="f-name" name="name" autocomplete="name" required /><span class="err" id="e-name"></span></label>
+        <label for="f-email">Work email<input id="f-email" name="email" type="email" autocomplete="email" required /><span class="err" id="e-email"></span></label>
+        <label for="f-msg">What are you building?<textarea id="f-msg" name="message" required></textarea><span class="err" id="e-msg"></span></label>
+        <div><button class="btn solid" type="submit">Send message <span aria-hidden="true">→</span></button></div>
+        <p class="ok" id="ok" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap"><span>© 2026 Northfold — an Appling template (fictional company)</span><span>Privacy · Terms</span><span>LinkedIn · GitHub</span></div>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+(() => {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // Services: one open at a time.
+  const items = [...document.querySelectorAll(".svc")];
+  items.forEach((li) => li.querySelector("button").addEventListener("click", () => {
+    const open = li.hasAttribute("data-open");
+    items.forEach((x) => { x.removeAttribute("data-open"); x.querySelector("button").setAttribute("aria-expanded", "false"); });
+    if (!open) { li.setAttribute("data-open", ""); li.querySelector("button").setAttribute("aria-expanded", "true"); }
+  }));
+
+  // Mobile menu: full-height panel, focus kept inside, Escape closes.
+  const panel = document.getElementById("panel"), menuBtn = document.getElementById("menuBtn");
+  const focusables = () => [...panel.querySelectorAll("a, button")];
+  const close = () => { panel.classList.remove("open"); menuBtn.setAttribute("aria-expanded", "false"); menuBtn.focus(); };
+  menuBtn.addEventListener("click", () => { panel.classList.add("open"); menuBtn.setAttribute("aria-expanded", "true"); focusables()[1].focus(); });
+  document.getElementById("closeBtn").addEventListener("click", close);
+  panel.querySelectorAll("a").forEach((a) => a.addEventListener("click", close));
+  panel.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") return close();
+    if (e.key !== "Tab") return;
+    const f = focusables(), first = f[0], last = f[f.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  });
+
+  // Contact form: checked in the page, nothing is sent.
+  const form = document.getElementById("form");
+  const rules = [["f-name", "e-name", (v) => v.trim() ? "" : "Please add your name."],
+    ["f-email", "e-email", (v) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) ? "" : "Enter an email like name@company.com."],
+    ["f-msg", "e-msg", (v) => v.trim().length >= 10 ? "" : "A sentence or two is enough."]];
+  form.addEventListener("submit", (e) => {
+    e.preventDefault();
+    let firstBad = null;
+    for (const [id, err, check] of rules) {
+      const input = document.getElementById(id), msg = check(input.value);
+      document.getElementById(err).textContent = msg;
+      input.setAttribute("aria-invalid", msg ? "true" : "false");
+      if (msg && !firstBad) firstBad = input;
+    }
+    if (firstBad) return firstBad.focus();
+    form.querySelectorAll("label, button").forEach((el) => el.style.display = "none");
+    document.getElementById("ok").textContent = "Thank you — Maya will reply within one working day.";
+  });
+
+  if (reduce || !window.gsap) return;
+  gsap.registerPlugin(ScrollTrigger);
+
+  // Headline line by line, then the side copy and the figure.
+  gsap.from(".hero h1 .line > span", { yPercent: 110, duration: 1.1, ease: "power3.out", stagger: .12 });
+  gsap.from(".hero .side > *", { y: 20, opacity: 0, duration: .9, ease: "power3.out", stagger: .08, delay: .45 });
+  gsap.from(".plate", { y: 40, opacity: 0, duration: 1.2, ease: "power3.out", delay: .6 });
+  gsap.from(".flap", { scaleX: 0, transformOrigin: "800px 320px", duration: 1.4, ease: "expo.out", delay: 1 });
+  gsap.to(".orb", { y: -40, ease: "none", scrollTrigger: { trigger: ".plate", start: "top bottom", end: "bottom top", scrub: true } });
+
+  gsap.utils.toArray(".reveal").forEach((el) => {
+    gsap.from(el, { y: 36, opacity: 0, duration: 1, ease: "power3.out", scrollTrigger: { trigger: el, start: "top 88%", once: true } });
+  });
+})();
+</script>
+</body>
+</html>

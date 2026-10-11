@@ -1,0 +1,311 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Paydays — Get paid on time, in five days</title>
+<meta name="description" content="A free five-day email course for freelancers: send invoices that get paid on time, every time." />
+<meta property="og:title" content="Paydays — Get paid on time, in five days" />
+<meta property="og:description" content="A free five-day email course for freelancers. One short lesson a day." />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,500..900&family=Public+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --cream: #f6efe3; --sand: #efe0c8; --ink: #1b1712; --muted: #5c5146; --hot: #ec5333; --error: #b3261e;
+    --display: "Archivo", "Arial Narrow", sans-serif; --text: "Public Sans", system-ui, sans-serif; --r: 18px; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--cream); scroll-behavior: smooth; }
+  body { color: var(--ink); font: 400 18px/1.6 var(--text); overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  :focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; border-radius: 6px; }
+  .wrap { width: min(1180px, 100% - 40px); margin: 0 auto; }
+  .display { font-family: var(--display); font-stretch: 75%; font-weight: 900; line-height: .9; letter-spacing: -.02em; text-transform: uppercase; }
+  .kicker { font: 600 13px/1 var(--text); letter-spacing: .14em; text-transform: uppercase; }
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 54px; padding: 0 26px; border: 2px solid var(--ink);
+    border-radius: 999px; background: var(--hot); color: var(--ink); font: 800 17px/1 var(--display); font-stretch: 90%; text-transform: uppercase;
+    letter-spacing: .02em; cursor: pointer; text-decoration: none; transition: transform .2s, box-shadow .2s; box-shadow: 4px 4px 0 var(--ink); white-space: nowrap; }
+  .btn:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--ink); }
+  .btn.small { min-height: 44px; padding: 0 18px; font-size: 15px; box-shadow: 3px 3px 0 var(--ink); }
+
+  header { position: sticky; top: 0; z-index: 20; background: #f6efe3ee; backdrop-filter: blur(8px); border-bottom: 2px solid var(--ink); }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; height: 72px; }
+  .logo { display: flex; align-items: center; gap: 10px; font: 900 24px/1 var(--display); font-stretch: 80%; text-transform: uppercase; text-decoration: none; }
+  .logo i { width: 26px; height: 26px; border-radius: 50%; background: var(--hot); border: 2px solid var(--ink); }
+
+  .hero { padding: 64px 0 88px; }
+  .hero .wrap { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 48px; align-items: center; }
+  .hero h1 { font-size: clamp(56px, 9.6vw, 136px); margin: 18px 0 22px; }
+  .hero h1 em { font-style: normal; color: var(--hot); -webkit-text-stroke: 2px var(--ink); }
+  .lead { font-size: 21px; max-width: 34ch; color: var(--muted); }
+  form { margin-top: 30px; max-width: 540px; }
+  label { display: block; font-weight: 600; font-size: 15px; margin-bottom: 8px; }
+  .field { display: flex; gap: 10px; flex-wrap: wrap; }
+  input { flex: 1 1 240px; min-height: 54px; padding: 0 20px; border: 2px solid var(--ink); border-radius: 999px; background: #fffaf2; font: 500 17px var(--text); color: var(--ink); }
+  input[aria-invalid="true"] { border-color: var(--error); }
+  .msg { min-height: 26px; margin-top: 10px; font-size: 15px; font-weight: 600; }
+  .msg.err { color: var(--error); }
+  .msg.ok { color: var(--ink); }
+  .note { font-size: 15px; color: var(--muted); }
+
+  .art { position: relative; aspect-ratio: 4 / 5; border: 2px solid var(--ink); border-radius: var(--r); background: var(--sand); overflow: hidden; box-shadow: 10px 10px 0 var(--ink); }
+  .art svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+
+  .problem { background: var(--ink); color: var(--cream); padding: 110px 0; }
+  .problem p.display { font-size: clamp(38px, 5.6vw, 82px); max-width: 15ch; }
+  .problem p.display span { color: var(--hot); }
+  .problem .sub { margin-top: 28px; max-width: 52ch; font-size: 20px; color: #d9cfbf; }
+
+  section.block { padding: 110px 0; }
+  .head { display: flex; justify-content: space-between; align-items: end; gap: 24px; margin-bottom: 48px; flex-wrap: wrap; }
+  .head h2 { font-size: clamp(44px, 6vw, 88px); }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 250px), 1fr)); gap: 18px; }
+  .card { background: #fffaf2; border: 2px solid var(--ink); border-radius: var(--r); padding: 28px; }
+  .card .n { font: 900 64px/1 var(--display); font-stretch: 75%; color: var(--hot); -webkit-text-stroke: 1.5px var(--ink); }
+  .card h3 { font: 800 24px/1.1 var(--display); font-stretch: 85%; text-transform: uppercase; margin: 16px 0 8px; }
+  .card p { color: var(--muted); font-size: 17px; }
+
+  .proof { background: var(--hot); border-top: 2px solid var(--ink); border-bottom: 2px solid var(--ink); }
+  .proof .wrap { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: 48px; align-items: center; }
+  blockquote p { font: 800 clamp(28px, 3.4vw, 44px)/1.12 var(--display); font-stretch: 85%; }
+  blockquote footer { margin-top: 22px; display: flex; align-items: center; gap: 14px; font-size: 16px; }
+  blockquote footer i { width: 52px; height: 52px; border-radius: 50%; border: 2px solid var(--ink); background: var(--cream); display: grid; place-items: center; font: 900 18px var(--display); font-style: normal; }
+  .stat { background: var(--cream); border: 2px solid var(--ink); border-radius: var(--r); padding: 30px; box-shadow: 8px 8px 0 var(--ink); }
+  .stat b { display: block; font: 900 clamp(84px, 11vw, 150px)/.85 var(--display); font-stretch: 75%; }
+  .stat span { display: block; margin-top: 12px; font-weight: 600; }
+  .stat small { display: block; margin-top: 8px; color: var(--muted); font-size: 14px; }
+
+  .steps { counter-reset: s; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0; border: 2px solid var(--ink); border-radius: var(--r); overflow: hidden; }
+  .steps li { list-style: none; padding: 34px 28px; background: #fffaf2; }
+  .steps li + li { border-left: 2px solid var(--ink); }
+  .steps li::before { counter-increment: s; content: "0" counter(s); font: 900 20px var(--display); display: inline-block; padding: 6px 12px; border-radius: 99px; background: var(--ink); color: var(--cream); }
+  .steps h3 { font: 800 26px/1.1 var(--display); font-stretch: 85%; text-transform: uppercase; margin: 22px 0 8px; }
+  .steps p { color: var(--muted); font-size: 17px; }
+
+  .faq { max-width: 860px; }
+  details { border-top: 2px solid var(--ink); }
+  details:last-child { border-bottom: 2px solid var(--ink); }
+  summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; gap: 20px; padding: 24px 4px; font: 800 22px/1.2 var(--display); font-stretch: 90%; text-transform: uppercase; }
+  summary::-webkit-details-marker { display: none; }
+  summary::after { content: "+"; font-size: 30px; line-height: .8; transition: transform .25s; }
+  details[open] summary::after { transform: rotate(45deg); }
+  details p { padding: 0 4px 26px; color: var(--muted); max-width: 62ch; }
+
+  .final { background: var(--ink); color: var(--cream); padding: 120px 0; text-align: center; }
+  .final h2 { font-size: clamp(54px, 9vw, 128px); }
+  .final h2 span { color: var(--hot); }
+  .final .lead { color: #d9cfbf; margin: 22px auto 0; }
+  .final form { margin: 34px auto 0; text-align: left; }
+  .final input { background: var(--cream); }
+  .final .btn { border-color: var(--cream); box-shadow: 4px 4px 0 var(--cream); }
+  .final .msg.ok, .final label { color: var(--cream); }
+  .final .msg.err { color: #ff9b85; }
+  .final :focus-visible { outline-color: var(--cream); }
+
+  footer.site { padding: 34px 0 120px; font-size: 15px; color: var(--muted); }
+  footer.site .wrap { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+
+  .bar { position: fixed; left: 12px; right: 12px; bottom: 12px; z-index: 30; display: none; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 10px 10px 10px 18px; background: var(--ink); color: var(--cream); border-radius: 999px; transform: translateY(140%); transition: transform .45s cubic-bezier(.2, .8, .2, 1); }
+  .bar.on { transform: none; }
+  .bar span { font-weight: 600; font-size: 15px; }
+
+  @media (max-width: 860px) {
+    .hero { padding-top: 40px; }
+    .hero .wrap, .proof .wrap { grid-template-columns: 1fr; }
+    .art { max-width: 420px; aspect-ratio: 1; }
+    .steps { grid-template-columns: 1fr; }
+    .steps li + li { border-left: 0; border-top: 2px solid var(--ink); }
+    .bar { display: flex; }
+    header .btn { display: none; }
+    section.block, .problem, .final { padding: 80px 0; }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="logo" href="#top" aria-label="Paydays home"><i></i>Paydays</a>
+    <a class="btn small" href="#join">Send me day one</a>
+  </div>
+</header>
+
+<main id="top">
+  <section class="hero" aria-labelledby="hero-title">
+    <div class="wrap">
+      <div>
+        <p class="kicker rise">Free 5-day email course for freelancers</p>
+        <h1 id="hero-title" class="display rise">Get paid <em>on time.</em> Every time.</h1>
+        <p class="lead rise">One short lesson a day on pricing, invoices and polite follow-ups — so the money lands when you planned it.</p>
+        <form class="signup rise" id="join" novalidate>
+          <label for="email-1">Your email</label>
+          <div class="field">
+            <input id="email-1" name="email" type="email" autocomplete="email" placeholder="you@studio.com" aria-describedby="msg-1" required />
+            <button class="btn" type="submit">Send me day one</button>
+          </div>
+          <p class="msg" id="msg-1" role="status" aria-live="polite"></p>
+          <p class="note">Five emails, then nothing unless you ask. Unsubscribe in one click.</p>
+        </form>
+      </div>
+      <div class="art" aria-hidden="true">
+        <svg viewBox="0 0 400 500" preserveAspectRatio="xMidYMid slice">
+          <circle class="sun" cx="300" cy="120" r="96" fill="#ec5333" stroke="#1b1712" stroke-width="3" />
+          <g class="cal" transform="translate(40 210)">
+            <rect width="190" height="180" rx="16" fill="#fffaf2" stroke="#1b1712" stroke-width="3" />
+            <rect width="190" height="42" rx="16" fill="#1b1712" />
+            <rect y="26" width="190" height="16" fill="#1b1712" />
+            <g fill="#efe0c8" stroke="#1b1712" stroke-width="2">
+              <rect x="16" y="60" width="34" height="30" rx="6" /><rect x="58" y="60" width="34" height="30" rx="6" /><rect x="100" y="60" width="34" height="30" rx="6" /><rect x="142" y="60" width="34" height="30" rx="6" />
+              <rect x="16" y="98" width="34" height="30" rx="6" /><rect x="58" y="98" width="34" height="30" rx="6" /><rect x="142" y="98" width="34" height="30" rx="6" />
+              <rect x="16" y="136" width="34" height="30" rx="6" /><rect x="58" y="136" width="34" height="30" rx="6" /><rect x="100" y="136" width="34" height="30" rx="6" />
+            </g>
+            <rect x="100" y="98" width="34" height="30" rx="6" fill="#ec5333" stroke="#1b1712" stroke-width="2" />
+          </g>
+          <g class="inv" transform="translate(170 250) rotate(-6)">
+            <rect width="190" height="210" rx="14" fill="#fffaf2" stroke="#1b1712" stroke-width="3" />
+            <rect x="20" y="24" width="90" height="12" rx="6" fill="#1b1712" />
+            <rect x="20" y="52" width="150" height="8" rx="4" fill="#d6c6ad" /><rect x="20" y="70" width="120" height="8" rx="4" fill="#d6c6ad" />
+            <rect x="20" y="88" width="136" height="8" rx="4" fill="#d6c6ad" />
+            <rect x="20" y="150" width="150" height="38" rx="10" fill="#efe0c8" stroke="#1b1712" stroke-width="2" />
+            <text x="34" y="175" font-family="Archivo, sans-serif" font-weight="900" font-size="18" fill="#1b1712">£2,400</text>
+          </g>
+          <g class="stamp" transform="translate(268 370) rotate(-14)">
+            <rect x="-62" y="-26" width="124" height="52" rx="10" fill="none" stroke="#ec5333" stroke-width="5" />
+            <text x="0" y="12" text-anchor="middle" font-family="Archivo, sans-serif" font-weight="900" font-size="32" fill="#ec5333" letter-spacing="2">PAID</text>
+          </g>
+        </svg>
+      </div>
+    </div>
+  </section>
+
+  <section class="problem" aria-label="The problem">
+    <div class="wrap">
+      <p class="display slide">You did the work. <span>Now you're chasing the money.</span></p>
+      <p class="sub slide">Late invoices cost more than cash flow: they cost evenings writing awkward reminders and weeks wondering if you priced it wrong.</p>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="get-title">
+    <div class="wrap">
+      <div class="head"><h2 id="get-title" class="display">What you get</h2><p class="kicker">One lesson a day · 10 minutes each</p></div>
+      <div class="grid">
+        <article class="card"><div class="n">01</div><h3>Terms that stick</h3><p>Payment terms clients actually read, and the one line that makes them agree up front.</p></article>
+        <article class="card"><div class="n">02</div><h3>An invoice that works</h3><p>A layout that answers every question before accounts can ask it.</p></article>
+        <article class="card"><div class="n">03</div><h3>Follow-ups, written</h3><p>Three ready emails for day 1, day 7 and day 14 — friendly, firm, final.</p></article>
+        <article class="card"><div class="n">04</div><h3>Deposits, normally</h3><p>How to ask for 30% up front without it feeling like a trust test.</p></article>
+      </div>
+    </div>
+  </section>
+
+  <section class="proof block" aria-label="What people say">
+    <div class="wrap">
+      <blockquote class="slide">
+        <p>“I sent the day-three email to a client who was 40 days late. Paid by Friday.”</p>
+        <footer><i><svg viewBox="0 0 24 24" width="24" height="24" aria-hidden="true"><circle cx="12" cy="9" r="4" fill="#1b1712"/><path d="M4 21c1-4.5 4.5-6.5 8-6.5s7 2 8 6.5" fill="#1b1712"/></svg></i><span><b>[Name, role]</b> — owner to supply a real quote</span></footer>
+      </blockquote>
+      <div class="stat slide">
+        <b><span class="count" data-to="21">21</span></b>
+        <span>days sooner, on average, invoices were paid</span>
+        <small>[Source — owner to supply]</small>
+      </div>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="how-title">
+    <div class="wrap">
+      <div class="head"><h2 id="how-title" class="display">How it works</h2></div>
+      <ol class="steps">
+        <li class="rise-s"><h3>Sign up</h3><p>Leave your email. Day one arrives within a minute.</p></li>
+        <li class="rise-s"><h3>Ten minutes a day</h3><p>Read the lesson, copy the template, use it on a real invoice.</p></li>
+        <li class="rise-s"><h3>Get paid sooner</h3><p>By day five you have terms, an invoice and follow-ups that run themselves.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="block" aria-labelledby="faq-title" style="padding-top: 0">
+    <div class="wrap">
+      <div class="head"><h2 id="faq-title" class="display">Questions</h2></div>
+      <div class="faq">
+      <details><summary>Is it really free?</summary><p>Yes. Five emails, no card, no upsell hidden on day five.</p></details>
+      <details><summary>I only have two clients. Is it for me?</summary><p>Especially. With two clients, one late payment is half your month.</p></details>
+      <details><summary>Will clients find it pushy?</summary><p>The templates are written to sound like a professional, not a debt collector. Most clients thank you for the clarity.</p></details>
+      <details><summary>What happens to my email?</summary><p>It is used for the course only. Unsubscribe from any email in one click.</p></details>
+      </div>
+    </div>
+  </section>
+
+  <section class="final" id="final" aria-labelledby="final-title">
+    <div class="wrap">
+      <h2 id="final-title" class="display">Your next invoice, <span>paid on time.</span></h2>
+      <p class="lead">Day one arrives in a minute. Ten minutes a day for five days.</p>
+      <form class="signup" novalidate>
+        <label for="email-2">Your email</label>
+        <div class="field">
+          <input id="email-2" name="email" type="email" autocomplete="email" placeholder="you@studio.com" aria-describedby="msg-2" required />
+          <button class="btn" type="submit">Send me day one</button>
+        </div>
+        <p class="msg" id="msg-2" role="status" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+</main>
+
+<footer class="site">
+  <div class="wrap"><span>© 2026 Paydays — an Appling template (fictional company)</span><span><a href="#top">Privacy</a> · <a href="#top">Contact</a></span></div>
+</footer>
+
+<div class="bar" id="bar" aria-hidden="true"><span>Free 5-day course</span><a class="btn small" href="#final" tabindex="-1">Send me day one</a></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script>
+(() => {
+  // Forms: inline validation and a success state (connect to the owner's mailing service).
+  document.querySelectorAll("form.signup").forEach((form) => {
+    const input = form.querySelector("input"), msg = form.querySelector(".msg");
+    form.addEventListener("submit", (e) => {
+      e.preventDefault();
+      const ok = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(input.value.trim());
+      input.setAttribute("aria-invalid", ok ? "false" : "true");
+      msg.className = "msg " + (ok ? "ok" : "err");
+      msg.textContent = ok ? "Done — day one is on its way. Check your inbox." : "Please enter an email like you@studio.com.";
+      if (ok) input.value = "";
+      else input.focus();
+    });
+  });
+
+  // Phone bar: shown once the hero has gone, hidden again at the final form.
+  const bar = document.getElementById("bar");
+  let pastHero = false, atFinal = false;
+  const sync = () => {
+    const on = pastHero && !atFinal;
+    bar.classList.toggle("on", on);
+    bar.setAttribute("aria-hidden", on ? "false" : "true");
+    bar.querySelector("a").tabIndex = on ? 0 : -1;
+  };
+  new IntersectionObserver(([e]) => { pastHero = !e.isIntersecting && e.boundingClientRect.top < 0; sync(); }).observe(document.querySelector(".hero"));
+  new IntersectionObserver(([e]) => { atFinal = e.isIntersecting; sync(); }, { rootMargin: "0px 0px -20% 0px" }).observe(document.getElementById("final"));
+
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  if (reduce || !window.gsap) return;
+  gsap.registerPlugin(ScrollTrigger);
+
+  gsap.from(".hero .rise", { y: 40, opacity: 0, duration: 1, ease: "power3.out", stagger: .09 });
+  const art = gsap.timeline({ delay: .3 });
+  art.from(".art", { y: 40, rotate: 2, opacity: 0, duration: 1, ease: "expo.out" })
+     .from(".art .sun", { scale: .4, opacity: 0, transformOrigin: "50% 50%", duration: .9, ease: "back.out(1.6)" }, "-=.6")
+     .from(".art .cal", { y: 60, opacity: 0, duration: .8, ease: "power3.out" }, "-=.6")
+     .from(".art .inv", { y: 80, opacity: 0, duration: .8, ease: "power3.out" }, "-=.55")
+     .from(".art .stamp", { scale: 2.2, opacity: 0, transformOrigin: "50% 50%", duration: .5, ease: "power4.in" }, "+=.1");
+
+  gsap.utils.toArray(".slide").forEach((el) => gsap.from(el, { x: -50, opacity: 0, duration: 1, ease: "power3.out", scrollTrigger: { trigger: el, start: "top 85%" } }));
+  gsap.utils.toArray(".card, .rise-s, details").forEach((el, i) => gsap.from(el, { y: 40, opacity: 0, duration: .8, ease: "power3.out", delay: (i % 4) * .07, scrollTrigger: { trigger: el, start: "top 90%" } }));
+
+  const count = document.querySelector(".count"), to = +count.dataset.to, n = { v: 0 };
+  ScrollTrigger.create({ trigger: count, start: "top 85%", once: true, onEnter: () => gsap.to(n, { v: to, duration: 1.4, ease: "expo.out", onUpdate: () => { count.textContent = Math.round(n.v); } }) });
+})();
+</script>
+</body>
+</html>

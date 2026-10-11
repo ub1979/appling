@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "software-product",
+  "name": "Software Product",
+  "tagline": "A bright product page with a bento grid and a light/dark switch.",
+  "best_for": "SaaS, B2B software, finance and productivity tools",
+  "palette": [
+    "#f6f5f1",
+    "#17181b",
+    "#f24e14",
+    "#13773a"
+  ],
+  "has_demo": true
+}

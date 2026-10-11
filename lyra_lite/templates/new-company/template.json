@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "new-company",
+  "name": "New Company",
+  "tagline": "A calm, credible first website: who you are, what you do, how to start.",
+  "best_for": "New consultancies, studios, engineering and services firms",
+  "palette": [
+    "#ece9e2",
+    "#16161a",
+    "#2b3bd6",
+    "#57544d"
+  ],
+  "has_demo": true
+}

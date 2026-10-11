@@ -32,6 +32,12 @@ appears in the team picker and is the default builder for its project kind.
   timing in frames, reading holds, three stills approved before animating,
   fixes written against exact frames, and export checks (size, frame rate,
   loudness). Premium 3D commercials still use the business film playbook.
+- **Five new website templates**, each with a live demo: **AI Product**
+  (an assistant answering live with sources), **Software Product** (bento
+  grid, light/dark switch), **Landing Page** (one offer, one button),
+  **New Company** (a calm, credible first site) and **Developer Tool**
+  (install command, live terminal, code tabs). Templates are folders in
+  `lyra_lite/templates/` — adding or removing one needs no code change.
 - The Data Report deck template's source lines are 16 px, so the template
   passes its own deck check.
 

@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "developer-tool",
+  "name": "Developer Tool",
+  "tagline": "Install command, live terminal and code tabs for your API or SDK.",
+  "best_for": "APIs, SDKs, CLIs, open-source and developer products",
+  "palette": [
+    "#1a1b26",
+    "#c0caf5",
+    "#73daca",
+    "#bb9af7"
+  ],
+  "has_demo": true
+}

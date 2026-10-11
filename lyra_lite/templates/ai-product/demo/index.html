@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Quire — answers from your team's documents</title>
+<meta name="description" content="Quire answers your team's questions from your own documents, in seconds, and shows the source for every line." />
+<meta property="og:title" content="Quire — answers from your team's documents" />
+<meta property="og:description" content="Ask a question. Get the answer and the page it came from." />
+<meta property="og:type" content="website" />
+<meta name="twitter:card" content="summary_large_image" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=DM+Sans:opsz,wght@9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet" />
+<style>
+  :root { --paper: #f6f3ec; --card: #fffdf8; --ink: #16150f; --muted: #5f5b50; --line: #e3ddd0; --accent: #1f5c45;
+    --accent-soft: #1f5c4514; --mark: #f3e3b8; --serif: "Instrument Serif", Georgia, serif; --sans: "DM Sans", system-ui, sans-serif; }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html { background: var(--paper); }
+  body { color: var(--ink); font-family: var(--sans); font-size: 17px; line-height: 1.55; overflow-x: hidden; -webkit-font-smoothing: antialiased; }
+  a { color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 4px; }
+  .wrap { width: min(1160px, 100% - 40px); margin: 0 auto; }
+  .eyebrow { font-size: 13px; font-weight: 600; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+  h1, h2, h3 { font-family: var(--serif); font-weight: 400; letter-spacing: -.01em; line-height: 1.02; }
+  h2 { font-size: clamp(38px, 5vw, 64px); margin-top: 14px; }
+  h2 em, h1 em { color: var(--accent); }
+  .lede { color: var(--muted); max-width: 560px; margin-top: 16px; }
+  .btn { display: inline-flex; align-items: center; gap: 8px; padding: 13px 22px; border-radius: 999px; font: 600 15px var(--sans); text-decoration: none; border: 1px solid var(--ink); cursor: pointer; background: transparent; color: var(--ink); }
+  .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+  section { padding: 120px 0 0; }
+  .rule { border-top: 1px solid var(--line); }
+
+  header { position: sticky; top: 0; z-index: 20; background: #f6f3ecdd; backdrop-filter: blur(10px); border-bottom: 1px solid var(--line); }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; height: 64px; gap: 16px; }
+  .logo { font-family: var(--serif); font-size: 28px; text-decoration: none; }
+  .logo span { color: var(--accent); }
+  header nav { display: flex; gap: 28px; font-size: 15px; color: var(--muted); }
+  header nav a { text-decoration: none; }
+  header .btn { padding: 9px 16px; font-size: 14px; }
+
+  /* hero */
+  .hero { padding: 88px 0 0; display: grid; grid-template-columns: minmax(0, 6fr) minmax(0, 5fr); gap: 56px; align-items: center; }
+  .hero h1 { font-size: clamp(50px, 6.4vw, 92px); }
+  .hero .lede { font-size: 19px; }
+  .ctas { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 30px; }
+  .note { margin-top: 16px; font-size: 14px; color: var(--muted); }
+
+  .window { background: var(--card); border: 1px solid var(--line); border-radius: 18px; box-shadow: 0 1px 0 #fff inset, 0 30px 80px -30px #3a2f1a40; overflow: hidden; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+  .bar i { width: 10px; height: 10px; border-radius: 50%; background: var(--line); }
+  .bar b { margin-left: 8px; font-weight: 500; }
+  .chat { padding: 22px; display: grid; gap: 16px; align-content: start; }
+  .input { margin: 0 22px 22px; display: flex; justify-content: space-between; align-items: center; gap: 12px; border: 1px solid var(--line); border-radius: 12px; padding: 10px 10px 10px 16px; color: var(--muted); font-size: 14px; background: var(--paper); }
+  .input b { width: 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 15px; }
+  .ask { justify-self: end; max-width: 85%; background: var(--ink); color: var(--paper); padding: 12px 16px; border-radius: 14px 14px 4px 14px; font-size: 15px; min-height: 46px; }
+  .ask .caret { display: inline-block; width: 2px; height: 1em; background: currentColor; vertical-align: -2px; margin-left: 2px; }
+  .answer { font-size: 16px; line-height: 1.6; }
+  .answer .w { opacity: 0; }
+  .answer mark { background: var(--mark); color: inherit; padding: 0 2px; border-radius: 3px; }
+  .answer sup { color: var(--accent); font-weight: 600; font-size: 11px; }
+  .sources { display: flex; gap: 8px; flex-wrap: wrap; }
+  .src { display: inline-flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 999px; padding: 6px 12px; font-size: 13px; background: var(--paper); }
+  .src b { color: var(--accent); }
+  .meta { font-size: 13px; color: var(--muted); display: flex; gap: 14px; }
+
+  .proof { margin-top: 88px; padding: 26px 0; display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap; color: var(--muted); font-size: 15px; }
+  .proof ul { display: flex; gap: 40px; list-style: none; flex-wrap: wrap; }
+  .proof li { font-family: var(--serif); font-size: 26px; color: var(--ink); opacity: .7; }
+
+  /* how */
+  .steps { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; margin-top: 48px; }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 24px; }
+  .step .n { font-family: var(--serif); font-size: 44px; color: var(--accent); line-height: 1; }
+  .step h3 { font-size: 30px; margin-top: 12px; }
+  .step p { color: var(--muted); margin-top: 8px; font-size: 15px; }
+  .mini { margin-top: 18px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--paper); display: grid; gap: 8px; font-size: 13px; }
+  .row { display: flex; justify-content: space-between; gap: 10px; padding: 7px 10px; border-radius: 7px; background: var(--card); }
+  .row em { font-style: normal; color: var(--accent); font-weight: 600; }
+
+  /* use cases */
+  .cases { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 24px; margin-top: 48px; }
+  .case { border-top: 1px solid var(--ink); padding-top: 20px; }
+  .case h3 { font-size: 32px; }
+  .case p { color: var(--muted); margin-top: 8px; }
+  .ba { display: flex; gap: 12px; margin-top: 16px; flex-wrap: wrap; font-size: 14px; }
+  .ba span { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--line); }
+  .ba .after { background: var(--accent-soft); border-color: transparent; color: var(--accent); font-weight: 600; }
+
+  /* worked example */
+  .work { display: grid; grid-template-columns: minmax(0, 4fr) minmax(0, 7fr); gap: 56px; align-items: start; }
+  .doc { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 28px; display: grid; gap: 18px; }
+  .doc dt { font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+  .doc dd { margin-top: 6px; }
+  .doc .q { font-family: var(--serif); font-size: 28px; line-height: 1.15; }
+  .limits { border-left: 3px solid var(--accent); padding-left: 16px; color: var(--muted); font-size: 15px; }
+  .line { opacity: 1; }
+
+  /* trust */
+  .trust { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0; margin-top: 48px; border-top: 1px solid var(--line); }
+  .trust div { padding: 24px 24px 0 0; }
+  .trust h3 { font-family: var(--sans); font-size: 17px; font-weight: 600; }
+  .trust p { color: var(--muted); font-size: 15px; margin-top: 6px; }
+
+  .apps { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 12px; margin-top: 40px; list-style: none; }
+  .apps li { border: 1px solid var(--line); border-radius: 12px; padding: 18px 12px; text-align: center; font-weight: 500; background: var(--card); font-size: 15px; }
+
+  /* pricing */
+  .plans { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 20px; margin-top: 48px; align-items: stretch; }
+  .plan { border: 1px solid var(--line); border-radius: 18px; padding: 28px; background: var(--card); display: flex; flex-direction: column; gap: 14px; }
+  .plan.best { border: 2px solid var(--accent); }
+  .plan .tag { align-self: flex-start; font-size: 12px; font-weight: 600; color: #fff; background: var(--accent); padding: 4px 10px; border-radius: 999px; }
+  .plan h3 { font-size: 34px; }
+  .price { font-family: var(--serif); font-size: 52px; line-height: 1; }
+  .price small { font: 400 15px var(--sans); color: var(--muted); }
+  .plan ul { list-style: none; display: grid; gap: 8px; color: var(--muted); font-size: 15px; flex: 1; }
+  .plan li::before { content: "✓  "; color: var(--accent); font-weight: 600; }
+
+  .faq { max-width: 820px; margin-top: 36px; }
+  details { border-bottom: 1px solid var(--line); padding: 20px 0; }
+  summary { cursor: pointer; font-family: var(--serif); font-size: 26px; list-style: none; display: flex; justify-content: space-between; gap: 16px; }
+  summary::after { content: "+"; color: var(--accent); }
+  details[open] summary::after { content: "–"; }
+  details p { color: var(--muted); margin-top: 10px; max-width: 680px; }
+
+  .cta { margin-top: 120px; background: var(--ink); color: var(--paper); border-radius: 28px; padding: 88px 40px; text-align: center; }
+  .cta h2 { font-size: clamp(44px, 6.4vw, 88px); }
+  .cta h2 em { color: #9fd3b8; }
+  .cta p { color: #cfc9bb; margin: 18px auto 0; max-width: 520px; }
+  .cta .btn.primary { margin-top: 30px; background: var(--paper); color: var(--ink); border-color: var(--paper); }
+  footer { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; padding: 40px 0 56px; color: var(--muted); font-size: 14px; }
+
+  @media (max-width: 900px) {
+    header nav { display: none; }
+    .hero, .work { grid-template-columns: minmax(0, 1fr); gap: 40px; }
+    .hero { padding-top: 48px; }
+    .steps, .plans { grid-template-columns: minmax(0, 1fr); }
+    .cases, .trust { grid-template-columns: minmax(0, 1fr); }
+    .apps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    section { padding-top: 88px; }
+    .cta { padding: 64px 22px; border-radius: 20px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .answer .w { opacity: 1; } }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="logo" href="#top">Quire<span>.</span></a>
+    <nav aria-label="Main"><a href="#how">How it works</a><a href="#trust">Security</a><a href="#pricing">Pricing</a><a href="#faq">FAQ</a></nav>
+    <a class="btn primary" href="#start">Try it free</a>
+  </div>
+</header>
+
+<main id="top">
+  <div class="wrap hero">
+    <div>
+      <p class="eyebrow">For teams with too many documents</p>
+      <h1>Answers from your docs, <em>with the page</em> they came from.</h1>
+      <p class="lede">Quire reads your wikis, contracts and tickets, answers questions in seconds, and shows the source for every line — so you can check it before you act.</p>
+      <div class="ctas"><a class="btn primary" href="#start">Try it free for 14 days</a><a class="btn" href="#work">See a real answer</a></div>
+      <p class="note">No card needed · Works with Google Drive, Notion and Slack</p>
+    </div>
+    <div class="window" aria-label="Quire answering a question">
+      <div class="bar"><i></i><i></i><i></i><b>Quire · Northwind workspace</b></div>
+      <div class="chat">
+        <p class="ask"><span id="q">What is our refund window for annual plans?</span><span class="caret" aria-hidden="true"></span></p>
+        <p class="answer" id="answer">Annual plans can be refunded in full within <mark>30 days of purchase</mark><sup>1</sup>. After that, unused months are refunded pro rata, minus a one-month fee<sup>2</sup>. Enterprise contracts follow their own terms.</p>
+        <div class="sources">
+          <span class="src"><b>1</b> Billing policy · §4.2</span>
+          <span class="src"><b>2</b> Terms of service · p. 7</span>
+        </div>
+        <p class="meta"><span>Answered in 2.1 s</span><span>2 sources checked</span></p>
+      </div>
+      <div class="input" aria-hidden="true"><span>Ask a follow-up…</span><b>↑</b></div>
+    </div>
+  </div>
+
+  <div class="wrap proof rule" aria-label="Customers">
+    <span>Used by teams at [customer logos — owner to supply]</span>
+    <ul><li>Northwind</li><li>Halden &amp; Co</li><li>Brightmoor</li><li>Fennick</li></ul>
+  </div>
+
+  <section id="how" class="wrap">
+    <p class="eyebrow">How it works</p>
+    <h2>Three steps, <em>one afternoon.</em></h2>
+    <div class="steps">
+      <article class="step reveal">
+        <span class="n">1</span><h3>Connect</h3><p>Link the places your knowledge already lives. Quire respects every existing permission.</p>
+        <div class="mini"><div class="row">Google Drive <em>Connected</em></div><div class="row">Notion <em>Connected</em></div><div class="row">Slack <em>Syncing…</em></div></div>
+      </article>
+      <article class="step reveal">
+        <span class="n">2</span><h3>Ask</h3><p>Type a question the way you would ask a colleague, in chat or right inside Slack.</p>
+        <div class="mini"><div class="row">"Who approves travel over £2k?"</div><div class="row">"Latest SLA for Brightmoor?"</div></div>
+      </article>
+      <article class="step reveal">
+        <span class="n">3</span><h3>Act</h3><p>Check the cited page, copy the answer, or turn it into a reply, a summary or a task.</p>
+        <div class="mini"><div class="row">Draft reply <em>Ready</em></div><div class="row">Add to ticket #4182 <em>Done</em></div></div>
+      </article>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <p class="eyebrow">Use cases</p>
+    <h2>The questions your team <em>asks every day.</em></h2>
+    <div class="cases">
+      <article class="case reveal"><h3>Support</h3><p>Agents answer policy questions without leaving the ticket.</p><div class="ba"><span>Before: 9 min searching</span><span class="after">With Quire: 40 s</span></div></article>
+      <article class="case reveal"><h3>Sales</h3><p>Security questionnaires filled from last year's approved answers.</p><div class="ba"><span>Before: 2 days</span><span class="after">With Quire: 2 hours</span></div></article>
+      <article class="case reveal"><h3>Onboarding</h3><p>New hires ask the handbook instead of interrupting their team.</p><div class="ba"><span>Before: 30 questions a week</span><span class="after">With Quire: 6</span></div></article>
+      <article class="case reveal"><h3>Legal &amp; finance</h3><p>Find the clause, the renewal date or the signed version in seconds.</p><div class="ba"><span>Before: email the lawyer</span><span class="after">With Quire: read the clause</span></div></article>
+    </div>
+    <p class="note">Figures are illustrative — replace them with your own measurements.</p>
+  </section>
+
+  <section id="work" class="wrap work">
+    <div>
+      <p class="eyebrow">Show your working</p>
+      <h2>Every answer <em>cites its source.</em></h2>
+      <p class="lede">Quire only answers from documents you connected. When it can't find something, it says so — it never fills the gap with a guess.</p>
+    </div>
+    <dl class="doc reveal">
+      <div class="line"><dt>Question</dt><dd class="q">Can contractors access the finance folder?</dd></div>
+      <div class="line"><dt>Answer</dt><dd>No. Finance folders are limited to employees in the Finance group; contractors need a time-limited exception approved by the CFO<sup>1</sup>.</dd></div>
+      <div class="line"><dt>Sources</dt><dd><span class="src"><b>1</b> Access policy · v3, updated 12 Aug</span></dd></div>
+      <div class="line limits"><dt>What it won't do</dt><dd>Quire won't change permissions or answer from documents you can't open yourself.</dd></div>
+    </dl>
+  </section>
+
+  <section id="trust" class="wrap">
+    <p class="eyebrow">Trust &amp; data</p>
+    <h2>Your documents <em>stay yours.</em></h2>
+    <div class="trust">
+      <div><h3>No training on your data</h3><p>Your documents are never used to train models.</p></div>
+      <div><h3>Permission-aware</h3><p>People only get answers from files they can already open.</p></div>
+      <div><h3>Your region</h3><p>Data stored in the EU or US, encrypted at rest and in transit.</p></div>
+      <div><h3>Certifications</h3><p>[SOC 2 / ISO 27001 — owner to confirm what is held]</p></div>
+    </div>
+  </section>
+
+  <section class="wrap">
+    <p class="eyebrow">Integrations</p>
+    <h2>Works where <em>you work.</em></h2>
+    <ul class="apps"><li>Google Drive</li><li>Notion</li><li>Slack</li><li>Confluence</li><li>Zendesk</li><li>SharePoint</li></ul>
+  </section>
+
+  <section id="pricing" class="wrap">
+    <p class="eyebrow">Pricing</p>
+    <h2>Simple plans, <em>no surprises.</em></h2>
+    <div class="plans">
+      <article class="plan reveal"><h3>Starter</h3><p class="price">£0 <small>/ up to 3 people</small></p><ul><li>2 connected sources</li><li>200 questions a month</li><li>Cited answers</li></ul><a class="btn" href="#start">Start free</a></article>
+      <article class="plan best reveal"><span class="tag">Most teams</span><h3>Team</h3><p class="price">£12 <small>/ person / month</small></p><ul><li>Unlimited sources</li><li>Unlimited questions</li><li>Slack app</li><li>Admin controls</li></ul><a class="btn primary" href="#start">Try Team free</a></article>
+      <article class="plan reveal"><h3>Enterprise</h3><p class="price">Custom</p><ul><li>SSO and audit log</li><li>Data residency</li><li>Dedicated support</li></ul><a class="btn" href="#start">Talk to us</a></article>
+    </div>
+  </section>
+
+  <section id="faq" class="wrap">
+    <p class="eyebrow">Questions</p>
+    <h2>Before you <em>ask Quire.</em></h2>
+    <div class="faq">
+      <details><summary>How accurate are the answers?</summary><p>Every answer links to the passages it used, so you can check it in one click. If the documents don't contain the answer, Quire says it couldn't find one.</p></details>
+      <details><summary>Do you train on our documents?</summary><p>No. Your content is used only to answer your team's questions.</p></details>
+      <details><summary>How long does setup take?</summary><p>Most teams connect their first source in under ten minutes and are asking questions the same afternoon.</p></details>
+      <details><summary>Can we cancel any time?</summary><p>Yes. Monthly plans stop at the end of the month; you can export your settings first.</p></details>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <section class="cta" id="start" aria-label="Get started">
+      <h2>Stop searching. <em>Start asking.</em></h2>
+      <p>Connect one source and ask your first question in minutes. Free for 14 days.</p>
+      <a class="btn primary" href="#top">Try it free for 14 days</a>
+    </section>
+  </div>
+</main>
+
+<footer class="wrap">
+  <span>© 2026 Quire — an Appling template (fictional company)</span>
+  <span>Privacy · Terms · Security · Status</span>
+</footer>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/ScrollTrigger.min.js"></script>
+<script src="https://unpkg.com/lenis@1.1.13/dist/lenis.min.js"></script>
+<script>
+(() => {
+  const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const answer = document.getElementById("answer");
+  // Wrap each word of the answer so it can stream in, keeping marks and citations intact.
+  const wrapWords = (node) => {
+    [...node.childNodes].forEach((child) => {
+      if (child.nodeType === 3) {
+        const frag = document.createDocumentFragment();
+        child.textContent.split(/(\s+)/).forEach((part) => {
+          if (!part) return;
+          if (/^\s+$/.test(part)) { frag.append(part); return; }
+          const s = document.createElement("span"); s.className = "w"; s.textContent = part; frag.append(s);
+        });
+        child.replaceWith(frag);
+      } else if (child.nodeName === "MARK" || child.nodeName === "SUP") {
+        child.classList.add("w");
+      }
+    });
+  };
+  wrapWords(answer);
+  const words = answer.querySelectorAll(".w");
+  const caret = document.querySelector(".caret");
+  if (reduce || !window.gsap) { words.forEach((w) => (w.style.opacity = 1)); caret.style.display = "none"; return; }
+
+  gsap.registerPlugin(ScrollTrigger);
+  const lenis = new Lenis({ lerp: .1 });
+  lenis.on("scroll", ScrollTrigger.update);
+  gsap.ticker.add((t) => lenis.raf(t * 1000));
+  gsap.ticker.lagSmoothing(0);
+
+  // Hero: copy rises in; the question types itself, then the answer streams and cites.
+  gsap.from(".hero > div:first-child > *", { y: 24, opacity: 0, duration: 1, ease: "power3.out", stagger: .08 });
+  gsap.from(".window", { y: 40, opacity: 0, duration: 1.2, ease: "expo.out", delay: .2 });
+  const q = document.getElementById("q"), full = q.textContent;
+  q.textContent = "";
+  const typed = { n: 0 };
+  const tl = gsap.timeline({ delay: .25 });
+  tl.to(typed, { n: full.length, duration: .6, ease: "none", onUpdate: () => (q.textContent = full.slice(0, Math.round(typed.n))) })
+    .to(caret, { opacity: 0, duration: .15 })
+    .to(words, { opacity: 1, duration: .18, stagger: .012, ease: "power1.out" })
+    .from(".sources .src", { y: 12, opacity: 0, duration: .5, stagger: .12, ease: "power3.out" }, "-=.2")
+    .from(".meta", { opacity: 0, duration: .5 }, "-=.2");
+
+  gsap.utils.toArray(".reveal").forEach((el, i) => {
+    gsap.from(el, { y: 36, opacity: 0, duration: .9, ease: "power3.out", delay: (i % 3) * .06, scrollTrigger: { trigger: el, start: "top 88%" } });
+  });
+  gsap.from(".doc .line", { y: 16, opacity: 0, duration: .7, stagger: .15, ease: "power3.out", scrollTrigger: { trigger: ".doc", start: "top 80%" } });
+  gsap.from(".cta", { scale: .96, opacity: 0, duration: 1, ease: "expo.out", scrollTrigger: { trigger: ".cta", start: "top 85%" } });
+})();
+</script>
+</body>
+</html>
