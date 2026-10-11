@@ -83,7 +83,7 @@ def test_website_project_hands_template_to_requirements(env):
             text = start["text"]
             payload = json.loads(text[len("IDRAK_INTERNAL_SETUP_BEGIN"):text.rindex("IDRAK_INTERNAL_SETUP_END")])
             assert payload["project_kind"] == "website"
-            assert payload["kind_skill"] == "ultimate-builder:web-cinematic"
+            assert payload["kind_skill"] == "ultimate-builder:website-builder"
             assert payload["template"]["id"] == "cinematic-parallax"
             assert "Pinned story" in payload["template_spec"] and "delta interview" in payload["template_gate"]
             assert start["display"] == "A site for my cabin retreat"
@@ -168,10 +168,12 @@ def test_deck_project_gets_its_reference_deck_and_kit(env):
             start = _wait_event(path, lambda e: e["type"] == "turn_start")
             text = start["text"]
             payload = json.loads(text[len("IDRAK_INTERNAL_SETUP_BEGIN"):text.rindex("IDRAK_INTERNAL_SETUP_END")])
-            assert "kind_skill" not in payload  # the deck template's spec leads, not PowerPoint
+            assert payload["kind_skill"] == "ultimate-builder:deck-builder"
             _wait_event(path, lambda e: e["type"] == "turn_end")
             demo = REPO / "lyra_lite/templates/deck-pitch/demo/index.html"
             assert (path / ".lyra/kit/reference/index.html").read_bytes() == demo.read_bytes()
             assert os.access(path / ".lyra/kit/frames", os.X_OK)
+            checker = REPO / "plugins/ultimate-builder/skills/ultimate-app-builder/references/workflows/deck-builder/scripts/deck-check.mjs"
+            assert (path / ".lyra/kit/deck-check.mjs").read_bytes() == checker.read_bytes()
         finally:
             daemon.stop()

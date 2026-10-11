@@ -95,6 +95,9 @@ skill does not count as running a specialist.
 | Agent task graph | `task-planner` | `task-graph.md` |
 | Human project plan | `proj-manager` | `project-plan.md` |
 | Development | `sw-developer` | working code + task evidence |
+| Website build | `website-builder` | built site + site-check report |
+| Slide deck build | `deck-builder` | deck + deck-check report (and PDF / PPTX) |
+| Video build | `video-builder` | rendered MP4 + export checks |
 | Debugging | `debugger` | root-cause evidence + regression test |
 | Review | `code-reviewer` | `review-report.md` |
 | QA | `qa-engineer` | `bug-report.md` |

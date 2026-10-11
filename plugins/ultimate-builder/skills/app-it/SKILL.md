@@ -73,18 +73,22 @@ The setup message may carry `project_kind` (app, website, slides, video), the
 playbook for that kind (`kind_skill`) and a chosen `template` with its full
 `template_spec`:
 
-- **website** — the building agent loads `ultimate-builder:web-cinematic`; a
-  chosen template's spec is the starting design and its live demo
+- **website** — the building agent loads `ultimate-builder:website-builder`
+  (site blueprints, copy, pictures, quality checklist), which pulls in
+  `ultimate-builder:web-cinematic` for parallax, pinned-scroll and 3D
+  sections; a chosen template's spec is the starting design and its live demo
   (`.lyra/kit/reference/index.html`) is the approved look and motion. Follow
   `website_gate`: name the reference in every developer and QA delegation, and
   QA always runs the site check in a real browser. Websites come with the
   Reusable profile; do not ask the owner for a build size.
-- **video** — with a template, build it with HyperFrames from the blocks
-  its spec names (the spec has the exact commands); without one, use
+- **video** — the building agent loads `ultimate-builder:video-builder`
+  (HyperFrames; a template's spec names the blocks and exact commands); it
+  hands premium 3D / AI-footage commercials to
   `ultimate-builder:business-motion-film`. Ask for footage, logo and music.
-- **slides** — with a template, an HTML deck on reveal.js copied from its
-  live demo (PDF export included); use the `powerpoint` skill when the owner
-  needs a `.pptx`, keeping the template's layout and palette.
+- **slides** — the building agent loads `ultimate-builder:deck-builder`
+  (story, slide design, deck check). With a template, an HTML deck on
+  reveal.js copied from its live demo (PDF export included); without one, a
+  `.pptx` through the `powerpoint` skill unless the owner prefers an HTML deck.
 - **app** — the setup message's `platforms` and `platform_gate` say where
   it runs: web, phone (Expo, tested live by the owner via the QR code in the
   preview panel — `ultimate-builder:mobile-expo`) and/or computer (Tauri).
@@ -290,6 +294,9 @@ both follow `qa-evidence`. The rest is a judgement call:
 - shipping a UI to real users: `a11y-auditor`;
 - consequential system or data decisions: `sw-architect`;
 - implementation: `sw-developer`;
+- building a website, slide deck or video project: `website-builder`,
+  `deck-builder` or `video-builder` (each builds and checks its own output;
+  add `sw-developer` only for back-end work such as forms or log-ins);
 - bugs: `debugger`;
 - independent correctness review: `code-reviewer`;
 - user-flow and release verification: `qa-engineer`;

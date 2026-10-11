@@ -9,6 +9,32 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.05 beta — 2026-10-11
+
+Three new studio agents for the things Appling makes besides apps. Each
+appears in the team picker and is the default builder for its project kind.
+
+- **Website studio** (`website-builder`): professional product and company
+  sites — blueprints for AI products, software/SaaS, one-offer landing
+  pages, new companies and developer sites; headline, proof and call-to-action
+  rules that never invent customers or numbers; real screens first, AI
+  pictures (on your ChatGPT plan) only with your yes; a quality checklist for
+  speed, light/dark contrast, phones, accessibility and sharing. Parallax and
+  scroll films still use the cinematic playbook.
+- **Presentation studio** (`deck-builder`): story structures (pitch, sales
+  demo, company intro, report, keynote, lesson, proposal), slide design and
+  chart rules. A new **deck check** opens the deck in Chrome, shows every
+  slide with all its build-ups, flags text that runs off a slide, tiny text
+  and crowded slides, and exports a one-page-per-slide PDF. Decks without a
+  template are still PowerPoint by default.
+- **Video studio** (`video-builder`): launch clips, app promos, social
+  reels, explainers, announcements and data stories with HyperFrames;
+  timing in frames, reading holds, three stills approved before animating,
+  fixes written against exact frames, and export checks (size, frame rate,
+  loudness). Premium 3D commercials still use the business film playbook.
+- The Data Report deck template's source lines are 16 px, so the template
+  passes its own deck check.
+
 ### Appling v0.04 beta — 2026-10-02
 
 APP IT is now **Appling** — a little app that grows. New name on every screen

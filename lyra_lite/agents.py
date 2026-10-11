@@ -15,6 +15,9 @@ AGENTS: list[tuple[str, str, str]] = [
     ("researcher", "Research", "Investigate markets, competitors, standards, and technical choices with verified sources."),
     ("spec", "Technical specification", "Turn the request into detailed, testable behavior."),
     ("ui-designer", "Design", "Set the look and feel from real references, then review the build against it."),
+    ("website-builder", "Website studio", "Plan, write and build a professional website, then check it in a real browser."),
+    ("deck-builder", "Presentation studio", "Shape the story and design the slides, then check every slide and the PDF."),
+    ("video-builder", "Video studio", "Script, animate and render short promo, social and explainer videos."),
     ("sw-architect", "Architecture", "Design the system, data, APIs, and boundaries."),
     ("task-planner", "Task planning", "Create an ordered implementation graph."),
     ("proj-manager", "Project planning", "Build milestones, checkpoints, and delivery plans."),
@@ -136,9 +139,9 @@ WEBSITE_GATE = (
     "APPROVED. A website that was not opened in a real browser cannot pass QA.")
 
 KIND_SKILLS = {
-    "website": "ultimate-builder:web-cinematic",
-    "video": "ultimate-builder:business-motion-film",
-    "slides": "powerpoint",
+    "website": "ultimate-builder:website-builder",
+    "video": "ultimate-builder:video-builder",
+    "slides": "ultimate-builder:deck-builder",
 }
 
 
@@ -178,9 +181,9 @@ def setup_message(root: Path, team: list[str], models: dict | None, brief: str,
         payload["build_profile"] = profile
     if kind in KIND_SKILLS or kind == "app":
         payload["project_kind"] = kind
-        # A chosen deck template is built from its spec (HTML deck); PowerPoint
-        # stays the default without one, or when the owner asks for .pptx.
-        if kind in KIND_SKILLS and not (kind == "slides" and template):
+        # deck-builder covers both decks: an HTML deck from a chosen template,
+        # PowerPoint (through the powerpoint skill) without one.
+        if kind in KIND_SKILLS:
             payload["kind_skill"] = KIND_SKILLS[kind]
         if kind == "website":
             payload["website_gate"] = WEBSITE_GATE

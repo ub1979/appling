@@ -7,9 +7,9 @@ const REQUIRED = ["req-engineer", "task-planner"];
 
 const KINDS: { id: ProjectKind; name: string; text: string; icon: string; team: string[] }[] = [
   { id: "app", name: "App", text: "Something people use: a tool, tracker, game or service.", icon: "◫", team: [] },
-  { id: "website", name: "Website", text: "A beautiful site: landing page, portfolio or product page — with motion.", icon: "◎", team: ["ui-designer", "sw-developer", "qa-engineer"] },
-  { id: "slides", name: "Slides", text: "A presentation you click through and can share.", icon: "▭", team: ["tech-writer"] },
-  { id: "video", name: "Video", text: "A short business film, ad or explainer.", icon: "▶", team: ["sw-developer"] },
+  { id: "website", name: "Website", text: "A professional site: product, company or landing page — with motion.", icon: "◎", team: ["ui-designer", "website-builder", "qa-engineer"] },
+  { id: "slides", name: "Slides", text: "A presentation you click through and can share.", icon: "▭", team: ["deck-builder"] },
+  { id: "video", name: "Video", text: "A short promo, social clip, ad or explainer.", icon: "▶", team: ["video-builder"] },
 ];
 
 const PLATFORMS: { id: Platform; name: string; text: string; icon: string }[] = [

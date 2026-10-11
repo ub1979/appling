@@ -19,6 +19,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 SITE_CHECK = (Path(__file__).resolve().parent.parent / "plugins" / "ultimate-builder" / "skills"
               / "ultimate-app-builder" / "references" / "workflows" / "web-cinematic" / "scripts"
               / "site-check.mjs")
+DECK_CHECK = SITE_CHECK.parents[2] / "deck-builder" / "scripts" / "deck-check.mjs"
 KIT_DIR = Path(".lyra") / "kit"
 SKILL_SCRIPTS = SITE_CHECK.parent
 KINDS = ("app", "website", "slides", "video")
@@ -147,7 +148,7 @@ def _write_tools(kit: Path) -> None:
     kit.mkdir(parents=True, exist_ok=True)
     for name, line in tools.items():
         path = kit / name
-        body = f"#!/bin/sh\n# Appling kit: {name} — see the web-cinematic skill.\n{line}\n"
+        body = f"#!/bin/sh\n# Appling kit: {name} — see the website-builder and web-cinematic skills.\n{line}\n"
         try:
             if not path.is_file() or path.read_text() != body:
                 path.write_text(body)
@@ -157,12 +158,13 @@ def _write_tools(kit: Path) -> None:
 
 
 def ensure_website_kit(root: Path, tid: str | None) -> None:
-    """Put the site checker, and the chosen template's live demo as the
-    reference design, inside the project (``.lyra/kit/``, git-ignored) so
+    """Put the site and deck checkers, and the chosen template's live demo as
+    the reference design, inside the project (``.lyra/kit/``, git-ignored) so
     every helper on any engine can run and read them."""
     kit = Path(root) / KIT_DIR
-    if SITE_CHECK.is_file():
-        _copy_if_changed(SITE_CHECK, kit / "site-check.mjs")
+    for check in (SITE_CHECK, DECK_CHECK):
+        if check.is_file():
+            _copy_if_changed(check, kit / check.name)
     _write_tools(kit)
     demo = demo_dir(tid) if tid else None
     if demo is None:
