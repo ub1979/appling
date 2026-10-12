@@ -88,11 +88,14 @@ def test_runtime_credentials_return_cli_marker(monkeypatch):
         "args": [],
         "source": "process",
     }
+    # No live /v1/models call from a unit test — the curated fallback is what's checked here.
+    monkeypatch.setattr("hermes_cli.models._fetch_anthropic_models", lambda *a, **k: None)
     assert "claude-sonnet-4-6" in provider_model_ids("claude-cli")
 
 
 def test_authenticated_cli_picker_row_contains_curated_models(monkeypatch):
     monkeypatch.setattr("agent.models_dev.fetch_models_dev", lambda: {})
+    monkeypatch.setattr("hermes_cli.models._fetch_anthropic_models", lambda *a, **k: None)
     monkeypatch.setattr(
         "hermes_cli.auth.get_external_process_provider_status",
         lambda provider: {

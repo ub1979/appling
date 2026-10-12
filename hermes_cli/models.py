@@ -275,7 +275,12 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "copilot-acp",
     ],
     "claude-cli": [
+        "claude-opus-5-5",
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5",
+        "claude-fable-5-1",
         "claude-fable-5",
+        "claude-opus-5",
         "claude-sonnet-5",
         "claude-opus-4-8",
         "claude-opus-4-7",
@@ -384,7 +389,12 @@ _PROVIDER_MODELS: dict[str, list[str]] = {
         "MiniMax-M2",
     ],
     "anthropic": [
+        "claude-opus-5-5",
+        "claude-sonnet-5-5",
+        "claude-haiku-5-5",
+        "claude-fable-5-1",
         "claude-fable-5",
+        "claude-opus-5",
         "claude-sonnet-5",
         "claude-opus-4-8",
         "claude-opus-4-7",
@@ -2605,7 +2615,12 @@ def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) 
     if normalized == "xai-oauth":
         return list(_PROVIDER_MODELS.get("xai-oauth", _PROVIDER_MODELS.get("xai", [])))
     if normalized == "claude-cli":
-        return list(_PROVIDER_MODELS.get("claude-cli", []))
+        # The Claude Code CLI runs whatever model the signed-in account can
+        # reach, so ask Anthropic (resolve_anthropic_token() finds the Claude
+        # Code login) instead of trusting a list that goes stale every release.
+        return _merge_anthropic_catalog(
+            _PROVIDER_MODELS.get("claude-cli", []), _fetch_anthropic_models()
+        )
     if normalized in {"copilot", "copilot-acp"}:
         try:
             live = _fetch_github_models(_resolve_copilot_catalog_api_key())
@@ -2658,23 +2673,9 @@ def provider_model_ids(provider: Optional[str], *, force_refresh: bool = False) 
             base_url=cfg_base_url or None,
             api_key=cfg_api_key or None,
         )
-        if live:
-            if cfg_base_url:
-                return live
-            # The live /v1/models dump lags newly-routed curated aliases
-            # (e.g. claude-fable-5, which is reachable on Anthropic before it
-            # is enumerated by the models endpoint). Surface curated entries
-            # first, then append any live-only models, so a fresh curated
-            # model never disappears just because the API hasn't listed it yet.
-            curated = list(_PROVIDER_MODELS.get("anthropic", []))
-            merged = list(curated)
-            merged_lower = {m.lower() for m in curated}
-            for m in live:
-                if m.lower() not in merged_lower:
-                    merged.append(m)
-                    merged_lower.add(m.lower())
-            return merged
-        return list(_PROVIDER_MODELS.get("anthropic", []))
+        if live and cfg_base_url:
+            return live
+        return _merge_anthropic_catalog(_PROVIDER_MODELS.get("anthropic", []), live)
     if normalized == "deepinfra":
         # DeepInfra's generic /models endpoint mixes chat, image, video,
         # speech, and embedding models. The tagged catalog helper is the only
@@ -2883,6 +2884,10 @@ def _credential_fingerprint(provider: str) -> str:
     except Exception:
         pass
 
+    # The shipped curated list: a release that adds models must not keep
+    # serving the previous release's cached catalog for up to an hour.
+    parts.append("curated=" + ",".join(_PROVIDER_MODELS.get(provider, [])))
+
     # OAuth / external-file mtimes that change on re-auth
     try:
         from hermes_constants import get_hermes_home
@@ -3023,6 +3028,45 @@ def clear_provider_models_cache(provider: Optional[str] = None) -> None:
         pass
 
 
+_CLAUDE_TIER_RANK = {"fable": 0, "opus": 1, "sonnet": 2, "haiku": 3}
+_CLAUDE_ID_RE = re.compile(r"^claude-([a-z]+)-(\d+)(?:[-.](\d{1,2}))?(?![\d])")
+
+
+def _claude_newest_first_key(model_id: str) -> tuple:
+    """Sort key putting the newest Claude release first.
+
+    ``claude-opus-5-5`` -> (5, 5), ``claude-fable-5`` -> (5, 0),
+    ``claude-opus-4-20250514`` -> (4, 0) (an 8-digit date is not a minor
+    version). Within one version the bigger tier leads. IDs that don't parse
+    (old ``claude-3-5-sonnet-…`` style) sort after every parsed one.
+    """
+    m = _CLAUDE_ID_RE.match(model_id.lower())
+    if not m:
+        return (1, 0, 0, 99)
+    tier, major, minor = m.group(1), int(m.group(2)), int(m.group(3) or 0)
+    return (0, -major, -minor, _CLAUDE_TIER_RANK.get(tier, 50))
+
+
+def _merge_anthropic_catalog(curated: list[str], live: Optional[list[str]]) -> list[str]:
+    """Union of the curated list and Anthropic's live /v1/models, newest first.
+
+    The live list is what makes new releases appear without a Hermes update;
+    curated entries stay so an alias that is routable before /v1/models
+    enumerates it (claude-fable-5 was) never disappears. Ordering is by
+    version, not by source — curated-first buried every new release under
+    the previous generation.
+    """
+    if not live:
+        return list(curated)
+    merged: list[str] = []
+    seen: set[str] = set()
+    for m in [*live, *curated]:
+        if m.lower() not in seen:
+            seen.add(m.lower())
+            merged.append(m)
+    return sorted(merged, key=_claude_newest_first_key)
+
+
 def _fetch_anthropic_models(
     timeout: float = 5.0,
     *,
@@ -3088,13 +3132,7 @@ def _fetch_anthropic_models(
             else:
                 raise
         models = [m["id"] for m in data.get("data", []) if m.get("id")]
-        # Sort: latest/largest first (opus > sonnet > haiku, higher version first)
-        return sorted(models, key=lambda m: (
-            "opus" not in m,      # opus first
-            "sonnet" not in m,    # then sonnet
-            "haiku" not in m,     # then haiku
-            m,                    # alphabetical within tier
-        ))
+        return sorted(models, key=_claude_newest_first_key)
     except Exception as e:
         import logging
         logging.getLogger(__name__).debug("Failed to fetch Anthropic models: %s", e)

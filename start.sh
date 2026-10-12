@@ -26,6 +26,12 @@ if [[ ! -x ".venv/bin/python" ]]; then
   uv sync --extra dev --extra lyra-claude
 fi
 
+# A .venv carried over from another folder can lack the Claude engine's SDK.
+if ! ".venv/bin/python" -c "import claude_agent_sdk" >/dev/null 2>&1; then
+  echo "Installing the Claude engine..."
+  uv pip install --python .venv/bin/python -r pyproject.toml --extra lyra-claude
+fi
+
 UI=lyra_lite/ui
 if [[ ! -f "$UI/dist/index.html" ]] || [[ -n "$(find "$UI/src" "$UI/index.html" -newer "$UI/dist/index.html" 2>/dev/null | head -1)" ]]; then
   echo "Building Appling's screen..."
@@ -35,9 +41,26 @@ fi
 echo "Enabling the Ultimate Builder plugin..."
 "$PROJECT_DIR/.venv/bin/hermes" plugins enable ultimate-builder >/dev/null 2>&1 || true
 
+# Runs in the background so this Terminal is free again; ./stop.sh stops it.
 # Absolute interpreter path: stop.sh uses it to find this folder's Appling.
-"$PROJECT_DIR/.venv/bin/python" -m lyra_lite --port "$PORT" &
+LOG_DIR="${HERMES_HOME:-$HOME/.hermes}/logs"
+mkdir -p "$LOG_DIR"
+LOG="$LOG_DIR/appling.log"
+nohup "$PROJECT_DIR/.venv/bin/python" -m lyra_lite --port "$PORT" </dev/null >>"$LOG" 2>&1 &
 LYRA_PID=$!
-trap 'kill "$LYRA_PID" 2>/dev/null || true' INT TERM
-command -v caffeinate >/dev/null && caffeinate -i -s -w "$LYRA_PID" &
-wait "$LYRA_PID"
+command -v caffeinate >/dev/null && { nohup caffeinate -i -s -w "$LYRA_PID" >/dev/null 2>&1 & }
+
+for _ in {1..120}; do
+  if lsof -nP -iTCP:"$PORT" -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "Appling is running at $URL"
+    echo "Stop it with ./stop.sh. Log: $LOG"
+    exit 0
+  fi
+  if ! kill -0 "$LYRA_PID" 2>/dev/null; then
+    echo "Appling did not start. Last lines of $LOG:"
+    tail -n 20 "$LOG"
+    exit 1
+  fi
+  sleep 0.5
+done
+echo "Appling is still starting (pid $LYRA_PID). Watch $LOG, or stop it with ./stop.sh."

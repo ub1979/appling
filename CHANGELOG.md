@@ -47,6 +47,16 @@ appears in the team picker and is the default builder for its project kind.
   split-flap reveal, a headline that lands, one detail, your logo).
 - The Data Report deck template's source lines are 16 px, so the template
   passes its own deck check.
+- **Always the newest Claude models**: the model lists for "Your Claude
+  plan" and "Anthropic API key" now ask Anthropic which models your account
+  can use, newest first (Opus 5.5, Sonnet 5.5, Haiku 5.5, Fable 5.1 today),
+  so new releases appear without an Appling update. A new Appling version no
+  longer shows an hour-old saved list.
+- **`./start.sh` gives the Terminal back**: Appling runs in the background
+  (log in `~/.hermes/logs/appling.log`) and keeps running if the Terminal
+  closes; stop it with `./stop.sh`. It also installs the Claude Code engine
+  if it is missing, instead of failing on the first Claude reply with
+  "No module named 'claude_agent_sdk'".
 
 ### Appling v0.04 beta — 2026-10-02
 

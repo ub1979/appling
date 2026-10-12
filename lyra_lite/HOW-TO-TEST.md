@@ -9,10 +9,11 @@ between the screen and the engine.
 1. If another Lyra is building, stop it first with `./stop.sh` in its own
    folder. Only one Lyra should be building at a time.
 2. In a Terminal, go to the Lyra Lite folder and run `./start.sh`.
-3. Your browser opens <http://127.0.0.1:9200/>. Keep the Terminal window
-   open; closing it stops Lyra. It also keeps your Mac awake while Lyra works.
+3. Your browser opens <http://127.0.0.1:9200/> and the Terminal is free
+   again. Lyra keeps running (and keeps your Mac awake while it works) even
+   if you close the Terminal. Its log is `~/.hermes/logs/appling.log`.
 
-To stop Lyra Lite, press **Ctrl+C** in that Terminal window.
+To stop Lyra Lite, run `./stop.sh` in the same folder.
 
 ## 2. Test A: build a small app with Hermes (your usual models)
 
