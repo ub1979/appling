@@ -14,8 +14,15 @@ import threading
 from typing import Any
 
 from lyra_lite.engines.base import TurnHooks, TurnResult
+from lyra_lite.settings import DEFAULT_EFFORT
 
 logger = logging.getLogger(__name__)
+
+
+def appling_reasoning(configured: dict | None) -> dict:
+    """Hermes' saved effort (including "off"), else Appling's default — never
+    each model's own default, which ranges from no thinking to medium."""
+    return configured if configured is not None else {"enabled": True, "effort": DEFAULT_EFFORT}
 
 # The platform tag shapes the system prompt ("graphical chat surface, markdown
 # renders") and puts approvals on the gateway round-trip path.
@@ -161,7 +168,7 @@ class HermesEngine:
             credential_pool=runtime.get("credential_pool"),
             quiet_mode=True,
             verbose_logging=False,
-            reasoning_config=gw._load_reasoning_config(str(model or "")),
+            reasoning_config=appling_reasoning(gw._load_reasoning_config(str(model or ""))),
             service_tier=gw._load_service_tier(),
             enabled_toolsets=toolsets,
             skip_memory=True,

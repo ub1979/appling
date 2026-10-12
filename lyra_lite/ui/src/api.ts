@@ -59,7 +59,8 @@ export interface ProjectDetail {
 export interface AiSettings {
   engine: string;
   hermes: { provider: string; model: string };
-  claude: { model: string; base_url: string; route: string; has_token: boolean };
+  hermes_effort: { effort: string; effective: string; overridden: boolean };
+  claude: { model: string; base_url: string; route: string; has_token: boolean; effort: string };
   anthropic_key: boolean;
   about_me: string;
 }
@@ -188,6 +189,7 @@ export const api = {
   settings: (id: string, body: Record<string, unknown>) => call("POST", `/api/projects/${id}/settings`, body),
   settingsGet: () => call<AiSettings>("GET", "/api/settings"),
   settingsSave: (body: Record<string, unknown>) => call<AiSettings>("POST", "/api/settings", body),
+  effortSave: (effort: string) => call<AiSettings["hermes_effort"]>("POST", "/api/settings/effort", { effort }),
   modelOptions: (refresh = false) => call<ModelOptions>("GET", `/api/settings/models${refresh ? "?refresh=true" : ""}`),
   modelSave: (provider: string, model: string, confirm: boolean) =>
     call<{ ok: boolean; confirm_required?: boolean; message?: string }>("POST", "/api/settings/model", { provider, model, confirm }),

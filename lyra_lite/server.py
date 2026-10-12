@@ -466,8 +466,10 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         return {
             "engine": st.default_engine(),
             "hermes": st.hermes_model(),
+            "hermes_effort": st.hermes_effort(),
             "claude": {"model": claude.get("model", ""), "base_url": claude.get("base_url", ""),
-                       "route": claude_route(claude), "has_token": bool(claude.get("auth_token"))},
+                       "route": claude_route(claude), "has_token": bool(claude.get("auth_token")),
+                       "effort": claude.get("effort", "")},
             "anthropic_key": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()),
             "about_me": st.about_me(),
         }
@@ -499,7 +501,10 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             changes["engine"] = body["engine"]
         if isinstance(body.get("claude"), dict):
             current = st.claude_defaults()
-            for key in ("model", "base_url", "auth_token", "route"):
+            effort = str(body["claude"].get("effort") or "").strip()
+            if effort and effort not in st.EFFORTS:
+                raise HTTPException(status_code=400, detail="Unknown effort level")
+            for key in ("model", "base_url", "auth_token", "route", "effort"):
                 if key in body["claude"]:
                     value = str(body["claude"][key] or "").strip()
                     if key == "auth_token" and not value:
@@ -530,6 +535,17 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         result = await asyncio.to_thread(set_hermes_model, provider, model, bool(body.get("confirm")))
         if result.get("ok"):
             _apply_everywhere()
+        return result
+
+    @app.post("/api/settings/effort")
+    async def save_effort(body: dict = Body(...)):
+        from lyra_lite.settings import set_hermes_effort
+
+        try:
+            result = await asyncio.to_thread(set_hermes_effort, str(body.get("effort") or "").strip())
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Unknown effort level")
+        _apply_everywhere()
         return result
 
     @app.get("/api/engines")

@@ -35,6 +35,29 @@ def claude_route(settings: dict) -> str:
     return "custom" if settings.get("base_url") else "subscription"
 
 
+NO_EFFORT_MODELS = ("claude-3", "haiku-4", "sonnet-4-5", "sonnet-4-2025", "opus-4-2025", "opus-4-1")
+
+
+def claude_effort(settings: dict) -> str | None:
+    """The --effort to give the Claude program: the owner's choice, else Appling's default.
+
+    Only Anthropic's own models take an effort level; an Ollama or custom
+    address gets none, since those servers may reject the field.
+    """
+    from lyra_lite.settings import DEFAULT_EFFORT, EFFORTS
+
+    if claude_route(settings) not in ("subscription", "api"):
+        return None
+    effort = str(settings.get("effort") or "")
+    if effort in EFFORTS:
+        return effort
+    # Older models take no effort level; the default isn't forced on them.
+    model = str(settings.get("model") or "").lower()
+    if any(old in model for old in NO_EFFORT_MODELS):
+        return None
+    return DEFAULT_EFFORT
+
+
 def find_claude_cli() -> str | None:
     import shutil
 
@@ -312,6 +335,7 @@ class ClaudeEngine:
             # On the owner's plan, no model means the Claude program's own default.
             model=str(self.settings.get("model") or "") or (
                 None if claude_route(self.settings) == "subscription" else DEFAULT_MODEL),
+            effort=claude_effort(self.settings),
             permission_mode="acceptEdits",
             system_prompt={"type": "preset", "preset": "claude_code",
                            "append": self.system_prompt + engine_notes()},

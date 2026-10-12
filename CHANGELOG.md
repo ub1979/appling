@@ -57,6 +57,11 @@ appears in the team picker and is the default builder for its project kind.
   closes; stop it with `./stop.sh`. It also installs the Claude Code engine
   if it is missing, instead of failing on the first Claude reply with
   "No module named 'claude_agent_sdk'".
+- **Choose how hard the model thinks**: Settings has an Effort choice next to
+  the model, on both engines — low, medium, high, extra high or max (Hermes
+  can also turn thinking off). Nothing chosen means **high**, never more:
+  without it, Opus 5.5 ran at medium and Hermes on older Claude models didn't
+  think at all. Applies from the next message.
 
 ### Appling v0.04 beta — 2026-10-02
 

@@ -245,3 +245,31 @@ def test_claude_engine_recalls_project_memory(env):
             assert not [e for e in _events(path) if e["type"] == "inbox"]
         finally:
             daemon.stop()
+
+
+def test_effort_choices_save_where_each_engine_reads_them(env):
+    with FakeOpenAIServer([]) as hermes_llm:
+        _write_config(env["hermes_home"], hermes_llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            view = daemon.get("/api/settings").json()
+            assert view["claude"]["effort"] == "" and view["hermes_effort"]["effort"] == ""
+            assert view["hermes_effort"]["effective"] == "high"  # nothing chosen: Appling's default
+
+            saved = daemon.post("/api/settings", {"claude": {"route": "subscription", "effort": "xhigh"}}).json()
+            assert saved["claude"]["effort"] == "xhigh"
+            assert daemon.post("/api/settings", {"claude": {"effort": "turbo"}}).status_code == 400
+
+            assert daemon.post("/api/settings/effort", {"effort": "high"}).json()["effective"] == "high"
+            off = daemon.post("/api/settings/effort", {"effort": "off"}).json()
+            assert off["effort"] == "off" and off["effective"] == "off"
+            assert daemon.post("/api/settings/effort", {"effort": "turbo"}).status_code == 400
+
+            config = yaml.safe_load((env["hermes_home"] / "config.yaml").read_text())
+            assert config["lyra_lite"]["claude"]["effort"] == "xhigh"
+            assert config["agent"]["reasoning_effort"] == "none"  # Hermes' own setting, read by every Hermes surface
+
+            back = daemon.post("/api/settings/effort", {"effort": ""}).json()
+            assert back["effort"] == "" and back["effective"] == "high" and back["overridden"] is False
+        finally:
+            daemon.stop()

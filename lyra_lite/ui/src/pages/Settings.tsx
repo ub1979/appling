@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type AiSettings, type ModelOptions, type ProjectDetail } from "../api";
 import { Brand, PrefButtons } from "../components/common";
+import { DEFAULT_EFFORT_LABEL, EFFORT_LEVELS, HERMES_EFFORT_LEVELS, effortName } from "../effort";
 import { go } from "../router";
 
 const ENGINE_CARDS = [
@@ -124,6 +125,12 @@ export function Settings({ projectId }: { projectId: string | null }) {
                   setNote(`Appling now uses ${model}.`);
                 })
               }
+              onSaveEffort={(effort) =>
+                run(async () => {
+                  await api.effortSave(effort);
+                  setSettings(await api.settingsGet());
+                }, `Effort saved: ${effortName(effort)}. Applies from the next message.`)
+              }
             />
           ) : (
             <ClaudeModel
@@ -181,14 +188,20 @@ function HermesModel({
   loading,
   onRefresh,
   onSave,
+  onSaveEffort,
 }: {
   settings: AiSettings;
   options: ModelOptions | null;
   loading: boolean;
   onRefresh: () => void;
   onSave: (provider: string, model: string, confirm: boolean) => Promise<void>;
+  onSaveEffort: (effort: string) => Promise<void>;
 }) {
   const providers = options?.providers ?? [];
+  const [effort, setEffort] = useState(settings.hermes_effort.effort);
+  useEffect(() => {
+    setEffort(settings.hermes_effort.effort);
+  }, [settings.hermes_effort.effort]);
   const [provider, setProvider] = useState(settings.hermes.provider);
   const [model, setModel] = useState(settings.hermes.model);
   useEffect(() => {
@@ -236,6 +249,23 @@ function HermesModel({
           </button>
         </div>
       )}
+      <div className="folder-row" style={{ marginTop: 12, gridTemplateColumns: "minmax(0,1fr) auto" }}>
+        <label>
+          <span className="field-label">Effort</span>
+          <select className="input" value={effort} onChange={(e) => setEffort(e.target.value)}>
+            <option value="">{DEFAULT_EFFORT_LABEL}</option>
+            {HERMES_EFFORT_LEVELS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+          </select>
+        </label>
+        <button className="btn primary" disabled={effort === settings.hermes_effort.effort} onClick={() => void onSaveEffort(effort)}>
+          Save
+        </button>
+      </div>
+      {settings.hermes_effort.overridden && (
+        <p className="small muted" style={{ margin: "8px 0 0" }}>
+          A per-model setting in config.yaml gives {settings.hermes.model} effort “{effortName(settings.hermes_effort.effective)}”, and it wins over this one.
+        </p>
+      )}
     </section>
   );
 }
@@ -281,6 +311,7 @@ function ClaudeModel({
 }) {
   const [route, setRoute] = useState(settings.claude.route === "custom" ? "ollama" : settings.claude.route || "subscription");
   const [model, setModel] = useState(settings.claude.model);
+  const [effort, setEffort] = useState(settings.claude.effort || "");
   const [baseUrl, setBaseUrl] = useState(settings.claude.base_url || "http://localhost:11434");
   const [cli, setCli] = useState<{ found: boolean; logged_in: boolean; plan?: string } | null>(null);
   useEffect(() => {
@@ -340,6 +371,16 @@ function ClaudeModel({
             {models.map((m) => <option key={m} value={m}>{m}</option>)}
           </select>
         </label>
+        {route !== "ollama" && (
+          <label>
+            <span className="field-label">Effort</span>
+            <select className="input" value={effort} onChange={(e) => setEffort(e.target.value)}>
+              <option value="">{DEFAULT_EFFORT_LABEL}</option>
+              {EFFORT_LEVELS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+            </select>
+            <span className="tiny muted">How hard Claude thinks before answering. Higher is slower and uses more of your plan. Applies from the next message.</span>
+          </label>
+        )}
         {route === "ollama" && models.length === 0 && (
           <p className="small muted" style={{ margin: 0 }}>No Ollama models found. Open the Ollama app, then use ↻ Refresh in the Hermes model list.</p>
         )}
@@ -347,7 +388,7 @@ function ClaudeModel({
           <button
             className="btn primary"
             disabled={route !== "subscription" && !model}
-            onClick={() => void onSave({ route, model, base_url: route === "ollama" ? baseUrl : "" })}
+            onClick={() => void onSave({ route, model, base_url: route === "ollama" ? baseUrl : "", effort: route === "ollama" ? "" : effort })}
           >
             Save
           </button>
