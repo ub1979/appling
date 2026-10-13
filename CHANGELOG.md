@@ -62,6 +62,18 @@ appears in the team picker and is the default builder for its project kind.
   can also turn thinking off). Nothing chosen means **high**, never more:
   without it, Opus 5.5 ran at medium and Hermes on older Claude models didn't
   think at all. Applies from the next message.
+- **You can always talk to Appling on Claude Code**: helper agents now run in
+  the background, as on Hermes. Appling's reply ends as soon as it has
+  started them, so your next message is answered straight away instead of
+  waiting hours for a whole wave; each helper's report arrives as its own
+  short message. Stop also stops background helpers. When a reply fails,
+  Appling shows Claude's own words (for example "You've hit your session
+  limit · resets 12:20am") instead of "Claude engine: success".
+- **Appling no longer gets stuck "working" after a helper report**: a
+  usage notice from Claude Code between replies used to open a reply nothing
+  would ever finish, so new messages waited in the queue for hours. Notices
+  no longer start a reply, a reply left open is closed when the next one
+  begins, and Stop always ends the reply within 15 seconds.
 
 ### Appling v0.04 beta — 2026-10-02
 

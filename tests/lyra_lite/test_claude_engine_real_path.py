@@ -85,7 +85,7 @@ def test_claude_engine_asks_before_risky_commands(env):
             daemon.stop()
 
 
-def test_claude_engine_agents_show_as_helpers(env):
+def test_claude_helpers_run_in_background_and_the_owner_can_always_talk(env):
     with FakeOpenAIServer([]) as hermes_llm, FakeAnthropicServer([]) as claude:
         _write_config(env["hermes_home"], hermes_llm.base_url)
         daemon = Daemon(env).start()
@@ -96,21 +96,78 @@ def test_claude_engine_agents_show_as_helpers(env):
                 tool_step("Agent", {"description": "Write agent.txt",
                                     "prompt": f"HELPER-C write {target}",
                                     "subagent_type": "general-purpose"}),
-                text_step("The agent wrote agent.txt."),
+                text_step("MAIN-STARTED: a helper is writing agent.txt."),
+                text_step("MAIN-ANSWER: the helper is still writing."),
+                text_step("MAIN-REPORT: the helper wrote agent.txt."),
             ]
             claude.side_scripts = {"HELPER-C": [
-                tool_step("Write", {"file_path": str(target), "content": "from agent"}),
+                {**tool_step("Write", {"file_path": str(target), "content": "from agent"}), "delay": 12},
                 text_step("Wrote it."),
             ]}
             _use_claude(daemon, pid, claude.base_url)
+
+            # The turn that starts a helper ends without waiting for it.
             daemon.post(f"/api/projects/{pid}/messages", {"text": "use an agent"})
-            end = _wait_event(path, lambda e: e["type"] == "turn_end", 120)
-            assert end["reply"] == "The agent wrote agent.txt."
+            first = _wait_event(path, lambda e: e["type"] == "turn_end", 120)
+            assert first["reply"] == "MAIN-STARTED: a helper is writing agent.txt."
+            assert not target.exists()
+            assert [h["goal"] for h in daemon.get(f"/api/projects/{pid}").json()["helpers"]] == ["Write agent.txt"]
+
+            # The owner asks while it works and gets an answer straight away.
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "what is happening?"})
+            answer = _wait_event(path, lambda e: e["type"] == "turn_end" and e["turn"] != first["turn"], 60)
+            assert answer["reply"] == "MAIN-ANSWER: the helper is still writing."
+            assert not target.exists()
+
+            # The helper's report arrives as its own turn.
+            report = _wait_event(path, lambda e: e["type"] == "turn_end"
+                                 and e["reply"] == "MAIN-REPORT: the helper wrote agent.txt.", 120)
+            start = next(e for e in _events(path) if e["type"] == "turn_start" and e["turn"] == report["turn"])
+            assert start["kind"] == "helper_done" and "Write agent.txt" in start["display"]
             assert target.read_text() == "from agent"
-            helper = [e for e in _events(path) if e["type"] == "helper"]
-            assert [h["event"] for h in helper if h["event"] != "tool"] == ["start", "complete"]
+            helper = [e for e in _events(path) if e["type"] == "helper" and e["event"] != "tool"]
+            assert [h["event"] for h in helper] == ["start", "complete"]
             assert helper[-1]["status"] == "completed"
+            detail = daemon.get(f"/api/projects/{pid}").json()
+            assert detail["helpers"] == []
+            shown = [(m["role"], m.get("kind"), m["content"].split("\n")[0]) for m in detail["messages"]]
+            assert ("user", "system", "[A helper finished: Write agent.txt]") in shown
+            assert shown[-1] == ("assistant", "chat", "MAIN-REPORT: the helper wrote agent.txt.")
+        finally:
+            daemon.stop()
+
+
+def test_stop_ends_background_helpers_and_ignores_their_reports(env):
+    with FakeOpenAIServer([]) as hermes_llm, FakeAnthropicServer([]) as claude:
+        _write_config(env["hermes_home"], hermes_llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            target = path / "never.txt"
+            claude.script = [
+                tool_step("Agent", {"description": "Slow job", "prompt": f"HELPER-S write {target}",
+                                    "subagent_type": "general-purpose"}),
+                text_step("MAIN-STARTED"),
+                text_step("MAIN-SHOULD-NOT-RUN"),
+                text_step("MAIN-SHOULD-NOT-RUN"),
+            ]
+            claude.side_scripts = {"HELPER-S": [
+                {**tool_step("Write", {"file_path": str(target), "content": "late"}), "delay": 10},
+                text_step("Wrote it."),
+            ]}
+            _use_claude(daemon, pid, claude.base_url)
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "start a slow helper"})
+            _wait_event(path, lambda e: e["type"] == "turn_end", 120)
+            assert daemon.get(f"/api/projects/{pid}").json()["helpers"]
+
+            daemon.post(f"/api/projects/{pid}/stop", {})
+            stopped = _wait_event(path, lambda e: e["type"] == "stop_requested", 30)
+            assert stopped["helpers_stopped"] == 1
+            time.sleep(14)  # past the helper's write
+            assert not target.exists()
             assert daemon.get(f"/api/projects/{pid}").json()["helpers"] == []
+            ends = [e for e in _events(path) if e["type"] == "turn_end"]
+            assert [e["reply"] for e in ends] == ["MAIN-STARTED"]
         finally:
             daemon.stop()
 

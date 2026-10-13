@@ -82,6 +82,17 @@ class _Hooks:
     def expire(self, item_id: str) -> None:
         self.runner._close_inbox(item_id, "expired")
 
+    def begin_external_turn(self, kind: str, text: str, display: str | None = None):
+        """An engine started a turn on its own (Claude Code reading a helper's
+        report). Returns the turn, None while another turn is running (the
+        engine folds it into that one), or False while the owner has Appling
+        stopped (the engine drops it)."""
+        return self.runner._begin_external_turn(kind, text, display)
+
+    def end_external_turn(self, turn: dict, *, reply: str, usage: dict | None = None,
+                          error: str | None = None) -> None:
+        self.runner._end_external_turn(turn, reply=reply, usage=usage or {}, error=error)
+
 
 WEBSITE_FOCUS = (
     "Website rule: the template's live demo at .lyra/kit/reference/index.html (when present) "
@@ -430,7 +441,8 @@ class ProjectRunner:
         while True:
             with self._cond:
                 while not self._stop and (
-                    self.store.state().get("paused") or not (self.store.state().get("queue") or [])
+                    self._busy or self.store.state().get("paused")
+                    or not (self.store.state().get("queue") or [])
                 ):
                     self._cond.wait(timeout=5)
                 if self._stop:
@@ -447,11 +459,14 @@ class ProjectRunner:
                 self._run_turn(turn)
             except Exception:
                 logger.exception("lyra-lite: turn crashed")
-                self.store.append_event("turn_end", turn=turn["id"], status="crashed")
-            finally:
+                # _finish_turn is the one place that releases busy; a crash
+                # never got there. Release only if no other turn took over.
                 with self._cond:
-                    self._busy = False
-                    self.store.update_state(running=False, turn=None)
+                    if (self.store.state().get("turn") or {}).get("id") == turn["id"]:
+                        self._busy = False
+                        self.store.update_state(running=False, turn=None)
+                        self._cond.notify_all()
+                self.store.append_event("turn_end", turn=turn["id"], status="crashed")
 
     def _run_turn(self, turn: dict) -> None:
         turn_id = turn["id"]
@@ -474,6 +489,42 @@ class ProjectRunner:
             result: TurnResult = engine.run_turn(engine_text, history, hooks)
         finally:
             hooks.turn_id = None
+        self._finish_turn(turn, result)
+
+    def _begin_external_turn(self, kind: str, text: str, display: str | None):
+        with self._cond:
+            state = self.store.state()
+            if state.get("paused"):
+                return False
+            if self._busy:
+                return None
+            turn = {"id": uuid.uuid4().hex[:10], "text": text, "kind": kind, "display": display,
+                    "started": round(time.time(), 3)}
+            self.store.update_state(running=True, turn=turn, turn_start_offset=self.store.events_size())
+            self._busy = True
+        self.store.append_event("turn_start", turn=turn["id"], kind=kind, text=text, display=display)
+        self._hooks.turn_id = turn["id"]
+        return turn
+
+    def _end_external_turn(self, turn: dict, *, reply: str, usage: dict, error: str | None) -> None:
+        history = self.store.messages()
+        messages = history + [{"role": "user", "content": turn["text"]}]
+        if reply:
+            messages.append({"role": "assistant", "content": reply})
+        result = TurnResult(reply=reply, messages=messages, completed=error is None, error=error, usage=usage)
+        self._hooks.turn_id = None
+        try:
+            self._finish_turn(turn, result)
+        except Exception:
+            logger.exception("lyra-lite: could not finish a report turn")
+            with self._cond:
+                if (self.store.state().get("turn") or {}).get("id") == turn["id"]:
+                    self._busy = False
+                    self.store.update_state(running=False, turn=None)
+                    self._cond.notify_all()
+
+    def _finish_turn(self, turn: dict, result: TurnResult) -> None:
+        turn_id = turn["id"]
         # The engine's working conversation is saved even when it shrank:
         # context compression replaces old turns with a summary on purpose.
         # The owner's full chat lives in the append-only transcript.
@@ -504,6 +555,7 @@ class ProjectRunner:
         with self._cond:
             self._busy = False
             self.store.update_state(running=False, turn=None)
+            self._cond.notify_all()
         self.store.append_event(
             "turn_end", turn=turn_id, status=status, reply=result.reply,
             error=result.error, usage=result.usage, checkpoint=sha,
