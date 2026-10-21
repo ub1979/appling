@@ -1,6 +1,6 @@
 """Summarise a project's run from its files, for comparing engines fairly.
 
-    .venv/bin/python -m lyra_lite.report "~/Lyra Projects/pocket-tasks-hermes" [...more]
+    .venv/bin/python -m lyra_lite.report "~/Appling Projects/pocket-tasks-hermes" [...more]
 """
 
 from __future__ import annotations

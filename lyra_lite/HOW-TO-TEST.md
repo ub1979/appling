@@ -63,7 +63,7 @@ When both builds are finished (or you stop them), run this in a Terminal, in
 the Lyra folder:
 
 ```
-.venv/bin/python -m lyra_lite.report "~/Lyra Projects/pocket-tasks-hermes" "~/Lyra Projects/pocket-tasks-claude"
+.venv/bin/python -m lyra_lite.report "~/Appling Projects/pocket-tasks-hermes" "~/Appling Projects/pocket-tasks-claude"
 ```
 
 It prints both projects side by side, with these rows:

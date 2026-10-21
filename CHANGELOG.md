@@ -9,6 +9,34 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.07 beta — 2026-10-21
+
+Browse opens your computer's own folder dialog, Appling runs on Windows with
+`start.bat`, and new projects go to `~/Appling Projects`.
+
+- **Browse uses your computer's folder dialog**: choosing where a project
+  lives, or which folder to open, now shows Finder on a Mac, Explorer on
+  Windows and the GTK/KDE dialog on Linux (needs `zenity` or `kdialog`).
+  Where there is no dialog — or Appling is open on another device, such as a
+  phone — Appling's own folder list appears as before.
+- **New projects go to `~/Appling Projects`** (was `~/Lyra Projects`).
+  Projects already in the old folder keep working where they are.
+- **Windows**: `start.bat` prepares and starts Appling in the background and
+  `stop.bat` stops it (log in `%LOCALAPPDATA%\hermes\logs\appling.log`).
+  Stopping a phone preview no longer fails on Windows.
+- **Other websites can no longer reach Appling**: a page that re-points its
+  own domain at Appling's port could read Appling's private key and send it
+  messages. Appling now answers only when opened by IP address or
+  `localhost` (`http://<name>.local:9200` is refused — use the IP).
+- **The red problem bar no longer outlives a restart**: a problem from before
+  Appling restarted is not shown again, and the bar has a × to hide it.
+- **Your own templates show their thumbnail**: a private template with
+  `demo/thumb.jpg` now shows it in the library, like the built-in ones.
+- **The Claude Code engine is split into small modules** (model routes,
+  turn handling, helpers, permissions, playbooks) with no change in how it
+  works. A reply now still ends if saving it fails, or if the Claude program
+  stops while Appling is closing a helper report, instead of staying "busy".
+
 ### Appling v0.06 beta — 2026-10-13
 
 You can always talk to Appling while its helpers work, it no longer gets
@@ -41,10 +69,6 @@ stuck, and it always offers the newest Claude models.
   would ever finish, so new messages waited in the queue for hours. Notices
   no longer start a reply, a reply left open is closed when the next one
   begins, and Stop always ends the reply within 15 seconds.
-- **The Claude Code engine is split into small modules** (model routes,
-  turn handling, helpers, permissions, playbooks) with no change in how it
-  works. A reply now still ends if saving it fails, or if the Claude program
-  stops while Appling is closing a helper report, instead of staying "busy".
 - **Five new website templates**, each with a live demo: **AI Product**
   (an assistant answering live with sources), **Software Product** (bento
   grid, light/dark switch), **Landing Page** (one offer, one button),

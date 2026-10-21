@@ -61,6 +61,19 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
     setTeam((t) => Array.from(new Set([...t, ...extra])));
   };
   const [picking, setPicking] = useState(false);
+  const pickTitle = mode === "new" ? "Where should the project live?" : "Choose the project folder";
+  const pickFrom = mode === "new" ? parent : folder || parent;
+  const choose = (p: string) => (mode === "new" ? setParent(p) : setFolder(p));
+
+  // The computer's own folder dialog; Appling's folder list where there is none.
+  const browse = async () => {
+    try {
+      const { path } = await api.pickFolder(pickFrom, pickTitle);
+      if (path) choose(path);
+    } catch {
+      setPicking(true);
+    }
+  };
   const [problem, setProblem] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
@@ -131,7 +144,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
                   <span className="field-label">Save inside</span>
                   <input className="input" value={parent} onChange={(e) => setParent(e.target.value)} />
                 </label>
-                <button className="btn" onClick={() => setPicking(true)}>Browse</button>
+                <button className="btn" onClick={() => void browse()}>Browse</button>
                 <label>
                   <span className="field-label">Project name</span>
                   <input className="input" value={name} placeholder="My new app" autoFocus onChange={(e) => setName(e.target.value)} />
@@ -143,7 +156,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
                   <span className="field-label">Folder</span>
                   <input className="input" value={folder} placeholder="Choose the project's folder" onChange={(e) => setFolder(e.target.value)} />
                 </label>
-                <button className="btn" onClick={() => setPicking(true)}>Browse</button>
+                <button className="btn" onClick={() => void browse()}>Browse</button>
               </div>
             )}
           </section>
@@ -337,13 +350,12 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
       )}
       {picking && (
         <FolderDialog
-          start={mode === "new" ? parent : folder || parent}
-          title={mode === "new" ? "Where should the project live?" : "Choose the project folder"}
+          start={pickFrom}
+          title={pickTitle}
           pickLabel={mode === "new" ? "Save inside this folder" : "Open this folder"}
           onClose={() => setPicking(false)}
           onPick={(p) => {
-            if (mode === "new") setParent(p);
-            else setFolder(p);
+            choose(p);
             setPicking(false);
           }}
         />

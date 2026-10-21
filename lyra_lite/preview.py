@@ -146,7 +146,10 @@ class _ExpoHost:
 
         if self.proc.poll() is None:
             try:
-                os.killpg(self.proc.pid, signal.SIGTERM)
+                if hasattr(os, "killpg"):
+                    os.killpg(self.proc.pid, signal.SIGTERM)
+                else:  # Windows has no process groups to signal
+                    self.proc.terminate()
                 self.proc.wait(timeout=10)
             except (OSError, subprocess.TimeoutExpired):
                 self.proc.kill()

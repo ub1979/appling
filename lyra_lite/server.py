@@ -43,7 +43,7 @@ ALLOWED_INSIDE_REPO = [REPO_ROOT / "my_projects"]
 
 
 def projects_root() -> Path:
-    return Path.home() / "Lyra Projects"
+    return Path.home() / "Appling Projects"
 
 
 def _registry_path() -> Path:
@@ -807,6 +807,28 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         ) if base.is_dir() else []
         return {"path": str(base), "parent": str(base.parent) if base != home else None,
                 "folders": dirs}
+
+    picking = threading.Lock()  # one system dialog at a time
+
+    @app.post("/api/folders/pick")
+    def pick_folder(request: Request, body: dict = Body(default={})):
+        """The computer's own folder dialog. 501 tells the screen to use its
+        folder list instead: no dialog here, or the page is open on another
+        device, where a dialog would pop up on a screen nobody is watching."""
+        from lyra_lite.folder_picker import PickerUnavailable, pick_folder as system_pick
+
+        host = request.client.host if request.client else ""
+        if host not in {"127.0.0.1", "::1", "localhost"}:
+            raise HTTPException(status_code=501, detail="Folder dialog only on this computer")
+        if not picking.acquire(blocking=False):
+            raise HTTPException(status_code=409, detail="A folder dialog is already open")
+        try:
+            chosen = system_pick(str(body.get("start") or ""), str(body.get("title") or "Choose a folder"))
+        except PickerUnavailable as exc:
+            raise HTTPException(status_code=501, detail=str(exc)) from exc
+        finally:
+            picking.release()
+        return {"path": chosen}
 
     # -- UI ----------------------------------------------------------------
 

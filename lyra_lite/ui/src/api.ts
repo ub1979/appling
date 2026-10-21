@@ -205,6 +205,8 @@ export const api = {
   newChat: (id: string) => call("POST", `/api/projects/${id}/new-chat`),
   folders: (path?: string) =>
     call<FolderListing>("GET", `/api/folders${path ? `?path=${encodeURIComponent(path)}` : ""}`),
+  pickFolder: (start: string, title: string) =>
+    call<{ path: string | null }>("POST", "/api/folders/pick", { start, title }),
 };
 
 export function streamUrl(id: string, offset: number): string {
