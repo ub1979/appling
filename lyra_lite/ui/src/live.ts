@@ -45,6 +45,8 @@ export interface LiveState {
   helperChanges: number;
   paused: boolean;
   lastProblem: string | null;
+  // When Appling started; replayed problems older than this are not shown.
+  since: number;
 }
 
 export interface LyraEvent {
@@ -53,7 +55,7 @@ export interface LyraEvent {
   [key: string]: unknown;
 }
 
-export const emptyLive = (): LiveState => ({
+export const emptyLive = (since = 0): LiveState => ({
   turn: null,
   queued: [],
   inbox: [],
@@ -63,6 +65,7 @@ export const emptyLive = (): LiveState => ({
   helperChanges: 0,
   paused: false,
   lastProblem: null,
+  since,
 });
 
 const TOOL_WORDS: Record<string, string> = {
@@ -136,6 +139,7 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
       return { ...state, inbox: [...state.inbox, item] };
     }
     case "problem":
+      if (evt.ts < state.since) return state;
       return { ...state, lastProblem: str(evt.text) || "Something went wrong." };
     case "watchdog":
       return {
@@ -157,7 +161,7 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
     case "turn_end": {
       const status = str(evt.status);
       const problem =
-        status === "error" || status === "crashed"
+        (status === "error" || status === "crashed") && evt.ts >= state.since
           ? str(evt.error) || "Appling hit a problem and stopped this reply."
           : null;
       let next = state;

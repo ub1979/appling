@@ -51,6 +51,7 @@ export interface ProjectDetail {
   queue: QueueItem[];
   turn: { id: string; text: string; kind: string; display?: string } | null;
   turn_start_offset: number;
+  started_at: number;
   inbox: InboxItem[];
   helpers: { id: string; goal: string; started: number | null }[];
   messages: ChatMessage[];

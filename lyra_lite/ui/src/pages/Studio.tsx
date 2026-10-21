@@ -40,7 +40,7 @@ interface ResetAction {
 function liveReducer(state: LiveState, action: LyraEvent | ResetAction): LiveState {
   if (action.type === "reset" && "detail" in action) {
     const { detail } = action as ResetAction;
-    return { ...emptyLive(), inbox: detail.inbox, queued: detail.queue, paused: detail.paused };
+    return { ...emptyLive(detail.started_at ?? 0), inbox: detail.inbox, queued: detail.queue, paused: detail.paused };
   }
   return applyEvent(state, action as LyraEvent);
 }
@@ -78,6 +78,7 @@ export function Studio({ id }: { id: string }) {
   const [map, setMap] = useState<ProjectMap | null>(null);
   const [live, dispatch] = useReducer(liveReducer, undefined, emptyLive);
   const [problem, setProblem] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<string | null>(null);
   const [showTeam, setShowTeam] = useState(false);
   // Bumped on every owner message so the chat jumps to the bottom to show it.
   const [sent, setSent] = useState(0);
@@ -123,6 +124,9 @@ export function Studio({ id }: { id: string }) {
   useEffect(() => {
     if (live.turnsEnded > 0 || live.helperChanges > 0) void load();
   }, [live.turnsEnded, live.helperChanges, load]);
+
+  // A hidden problem comes back if a later turn fails the same way.
+  useEffect(() => void setDismissed(null), [live.turnsEnded]);
 
   useEffect(() => {
     let alive = true;
@@ -293,7 +297,16 @@ export function Studio({ id }: { id: string }) {
             </button>
           </div>
         )}
-        {(problem || live.lastProblem) && <div className="banner bad">{problem ?? live.lastProblem}</div>}
+        {(() => {
+          const shown = problem ?? live.lastProblem;
+          if (!shown || shown === dismissed) return null;
+          return (
+            <div className="banner bad">
+              <span>{shown}</span>
+              <button className="btn small" aria-label="Hide this message" onClick={() => setDismissed(shown)}>×</button>
+            </div>
+          );
+        })()}
         {!busy && helpers.length === 0 && allDone && (
           <div className="banner good">
             🎉 {detail.name} is ready — every step is done.

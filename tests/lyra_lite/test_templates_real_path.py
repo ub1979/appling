@@ -48,6 +48,15 @@ def test_template_library_user_templates_and_live_demos(env):
             assert not (REPO / "lyra_lite" / "templates" / mine["id"]).exists()  # never in Lyra's source
             assert mine["id"] in {t["id"] for t in daemon.get("/api/templates?kind=website").json()["templates"]}
             assert mine["id"] not in {t["id"] for t in daemon.get("/api/templates?kind=video").json()["templates"]}
+            # A private template with its own demo shows its own thumbnail.
+            (saved.parent / "demo").mkdir()
+            (saved.parent / "demo" / "index.html").write_text("<p>glass</p>")
+            (saved.parent / "demo" / "thumb.jpg").write_bytes(b"\xff\xd8\xff\xe0thumb")
+            listed = {t["id"]: t for t in daemon.get("/api/templates?kind=website").json()["templates"]}
+            assert listed[mine["id"]]["thumb_url"] == f"/preview/templates/{mine['id']}/thumb.jpg"
+            with httpx.Client(base_url=daemon.base, timeout=5) as browser:
+                browser.get("/")
+                assert browser.get(listed[mine["id"]]["thumb_url"]).content.endswith(b"thumb")
 
             url = demos["cinematic-parallax"]
             assert httpx.get(daemon.base + url, timeout=5).status_code == 401  # cookie-gated

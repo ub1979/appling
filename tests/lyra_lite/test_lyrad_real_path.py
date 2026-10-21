@@ -260,6 +260,26 @@ def test_new_projects_are_refused_inside_lyra(env):
             daemon.stop()
 
 
+def test_a_rebound_domain_cannot_read_the_token(env):
+    """DNS rebinding: a page on evil.example re-pointed at 127.0.0.1 sends
+    Host: evil.example. It must not get the page that carries the token."""
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env["hermes_home"], llm.base_url)
+        daemon = Daemon(env).start()
+        try:
+            port = daemon.base.rsplit(":", 1)[1]
+            for host in (f"evil.example:{port}", "attacker.localhost.evil.example", ""):
+                page = httpx.get(daemon.base + "/", headers={"host": host}, timeout=5)
+                assert page.status_code == 403 and TOKEN not in page.text, host
+                api = httpx.get(f"{daemon.base}/api/projects", headers={**HEADERS, "host": host}, timeout=5)
+                assert api.status_code == 403, host
+            for host in (f"127.0.0.1:{port}", f"localhost:{port}", f"[::1]:{port}", f"192.168.1.20:{port}"):
+                assert httpx.get(f"{daemon.base}/api/projects", headers={**HEADERS, "host": host},
+                                 timeout=5).status_code == 200, host
+        finally:
+            daemon.stop()
+
+
 def test_background_helper_reports_back_as_a_new_turn(env):
     def run(path: Path):
         target = path / "hello.txt"

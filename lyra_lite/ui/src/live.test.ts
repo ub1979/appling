@@ -59,6 +59,19 @@ describe("applyEvent", () => {
     ]);
     expect(s.lastProblem).toBe("provider down");
   });
+
+  it("does not bring back a problem from before Appling restarted", () => {
+    const old = [
+      { ts: 10, type: "turn_start", turn: "t", text: "go", kind: "user" },
+      { ts: 11, type: "turn_end", turn: "t", status: "error", error: "provider down" },
+      { ts: 12, type: "problem", text: "could not save" },
+    ] as LyraEvent[];
+    const replayed = old.reduce(applyEvent, emptyLive(50));
+    expect(replayed.lastProblem).toBeNull();
+    expect(replayed.turnsEnded).toBe(1);
+    const fresh = applyEvent(replayed, { ts: 60, type: "turn_end", turn: "u", status: "crashed" });
+    expect(fresh.lastProblem).toMatch(/hit a problem/);
+  });
 });
 
 import { asksForApproval } from "./pages/Studio";

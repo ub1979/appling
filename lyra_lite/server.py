@@ -52,6 +52,28 @@ def _registry_path() -> Path:
     return get_hermes_home() / "lyra-lite" / "projects.json"
 
 
+def trusted_host(header: str) -> bool:
+    """True when the Host header names an IP address or localhost.
+
+    DNS rebinding needs a domain name the attacker controls, so allowing every
+    IP literal keeps LAN use (--host 0.0.0.0, a phone on the same Wi-Fi) working.
+    """
+    import ipaddress
+    from urllib.parse import urlsplit
+
+    try:
+        name = urlsplit(f"//{header.strip()}").hostname or ""
+    except ValueError:
+        return False
+    if name == "localhost" or name.endswith(".localhost"):
+        return True
+    try:
+        ipaddress.ip_address(name)
+    except ValueError:
+        return False
+    return True
+
+
 def rules_text() -> str:
     try:
         return RULES_PATH.read_text(encoding="utf-8")
@@ -373,6 +395,12 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
 
     @app.middleware("http")
     async def _auth(request: Request, call_next):
+        # The page at "/" carries the token, so a site that re-points its own
+        # domain at this port (DNS rebinding) could read it. Such a request
+        # names that domain in Host; Appling is only ever opened by IP or
+        # localhost, so anything else is turned away.
+        if not trusted_host(request.headers.get("host", "")):
+            return JSONResponse({"detail": "Open Appling at localhost or its IP address"}, status_code=403)
         if request.url.path.startswith("/api/"):
             given = request.headers.get("x-lyra-token") or request.query_params.get("token")
             if not given or not secrets.compare_digest(given, token):
@@ -656,14 +684,16 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
 
     @app.get("/api/templates")
     def templates_list(kind: str | None = None):
-        from lyra_lite.templates import list_templates
+        from lyra_lite.templates import demo_dir, list_templates
 
         items = list_templates(kind or None)
         for t in items:
             preview = t.get("preview") or {}
             if t.pop("local_demo", False):
                 t["demo_url"] = f"/preview/templates/{t['id']}/"
-                has_thumb = (BUILTIN_TEMPLATES / t["id"] / "demo" / "thumb.jpg").is_file()
+                # Same lookup that serves the demo, so private templates get theirs too.
+                demo = demo_dir(t["id"])
+                has_thumb = demo is not None and (demo / "thumb.jpg").is_file()
                 t["thumb_url"] = t["demo_url"] + "thumb.jpg" if has_thumb else None
             else:
                 t["demo_url"] = preview.get("video")

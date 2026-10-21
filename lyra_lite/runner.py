@@ -115,6 +115,8 @@ class ProjectRunner:
         self._memory_lock = threading.Lock()  # one index refresh at a time
         self._hooks = _Hooks(self)
         self._reload_pending = False
+        # Problems from before this start belong to an earlier run of Appling.
+        self.started_at = round(time.time(), 3)
         self._recover()
         self._thread = threading.Thread(
             target=self._loop, name=f"lyra-runner-{store.root.name}", daemon=True
@@ -245,6 +247,7 @@ class ProjectRunner:
             "inbox": self.store.inbox(status="open"),
             "helpers": self.helpers(),
             "events_size": self.store.events_size(),
+            "started_at": self.started_at,
         }
 
     def helpers(self) -> list[dict]:
