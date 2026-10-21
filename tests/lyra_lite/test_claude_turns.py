@@ -101,3 +101,45 @@ def test_stop_ends_the_owners_turn_even_if_the_claude_program_stays_silent():
 
     reply, interrupted, current = asyncio.run(run())
     assert (reply, interrupted, current) == ("PARTIAL", True, None)
+
+
+def test_a_turn_still_ends_when_finishing_it_fails():
+    class _BrokenStore:
+        def state(self):
+            raise OSError("disk full")
+
+    async def run():
+        engine = _engine()
+        engine.store = _BrokenStore()
+        turn = _Turn(engine._hooks, "hi", asyncio.get_running_loop().create_future())
+        engine._pending.append(turn)
+        engine._route(sdk.SystemMessage(subtype="init", data={}))
+        engine._route(sdk.UserMessage(content="hi"))
+        engine._route(sdk.AssistantMessage(content=[sdk.TextBlock(text="DONE")], model="m"))
+        engine._route(sdk.ResultMessage(subtype="success", duration_ms=1, duration_api_ms=1,
+                                        is_error=False, num_turns=1, session_id="s", result="DONE"))
+        reply, _usage, error, _interrupted = await asyncio.wait_for(turn.future, 2)
+        return reply, error, engine._current
+
+    reply, error, current = asyncio.run(run())
+    assert reply == "DONE" and error and current is None
+
+
+def test_every_waiting_turn_ends_when_the_claude_program_stops_even_if_a_hook_fails():
+    class _Client:
+        async def receive_messages(self):
+            raise RuntimeError("pipe closed")
+            yield  # an async generator
+
+    async def run():
+        engine = _engine()
+        report = _Turn(engine._hooks)
+        report.external = {"id": "r"}
+        engine._hooks.end_external_turn = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("hook"))
+        mine = _Turn(engine._hooks, "hi", asyncio.get_running_loop().create_future())
+        engine._current, engine._pending = report, [mine]
+        await engine._read(_Client())
+        return await asyncio.wait_for(mine.future, 2)
+
+    _reply, _usage, error, _interrupted = asyncio.run(run())
+    assert "stopped" in error

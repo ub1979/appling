@@ -41,6 +41,10 @@ stuck, and it always offers the newest Claude models.
   would ever finish, so new messages waited in the queue for hours. Notices
   no longer start a reply, a reply left open is closed when the next one
   begins, and Stop always ends the reply within 15 seconds.
+- **The Claude Code engine is split into small modules** (model routes,
+  turn handling, helpers, permissions, playbooks) with no change in how it
+  works. A reply now still ends if saving it fails, or if the Claude program
+  stops while Appling is closing a helper report, instead of staying "busy".
 - **Five new website templates**, each with a live demo: **AI Product**
   (an assistant answering live with sources), **Software Product** (bento
   grid, light/dark switch), **Landing Page** (one offer, one button),

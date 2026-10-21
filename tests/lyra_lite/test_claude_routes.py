@@ -2,7 +2,7 @@
 
 import pytest
 
-from lyra_lite.engines import claude as claude_engine
+from lyra_lite.engines.claude import routes as claude_routes
 from lyra_lite.engines.claude import ClaudeEngine, claude_effort, claude_route
 from lyra_lite.engines.hermes import appling_reasoning
 from lyra_lite.settings import DEFAULT_EFFORT, EFFORTS
@@ -19,7 +19,7 @@ def test_route_defaults():
 
 
 def test_plan_route_uses_own_sign_in_and_blanks_api_keys(monkeypatch):
-    monkeypatch.setattr(claude_engine, "find_claude_cli", lambda: "/usr/local/bin/claude")
+    monkeypatch.setattr(claude_routes, "find_claude_cli", lambda: "/usr/local/bin/claude")
     monkeypatch.setenv("ANTHROPIC_API_KEY", "sk-should-not-be-used")
     env = _engine(route="subscription")._env()
     assert env["ANTHROPIC_API_KEY"] == "" and env["ANTHROPIC_BASE_URL"] == ""
@@ -27,7 +27,7 @@ def test_plan_route_uses_own_sign_in_and_blanks_api_keys(monkeypatch):
 
 
 def test_plan_route_without_claude_program_explains(monkeypatch):
-    monkeypatch.setattr(claude_engine, "find_claude_cli", lambda: None)
+    monkeypatch.setattr(claude_routes, "find_claude_cli", lambda: None)
     with pytest.raises(RuntimeError, match="isn't installed"):
         _engine(route="subscription")._env()
 
