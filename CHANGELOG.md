@@ -9,6 +9,14 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.09 beta — 2026-10-23
+
+- **Ollama appears on fresh installations.** Appling Settings discovers models
+  from Ollama running on this computer on first load and Refresh, even before
+  the provider has been configured. Selecting a model uses the existing
+  keyless local connection; other pickers and the build/QA workflow keep
+  their existing behavior.
+
 ### Appling v0.08 beta — 2026-10-23
 
 - **Each project keeps its engine.** The engine is locked when the project is
@@ -224,6 +232,16 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.10-a] - 2026-10-23 — Fresh-install Ollama discovery
+
+Appling v0.09 beta; the Lyra/Studio compatibility version advances to 0.19.10-a.
+
+- **Ollama appears on fresh installations.** Appling Settings discovers models
+  from Ollama running on this computer on first load and Refresh, even before
+  the provider has been configured. Selecting a model uses the existing
+  keyless local connection; other pickers and the build/QA workflow keep
+  their existing behavior.
 
 ## [0.19.9-a] - 2026-10-23 — Project engine locks and safe retries
 

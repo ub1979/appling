@@ -116,6 +116,7 @@ def build_models_payload(
     *,
     explicit_only: bool = False,
     include_unconfigured: bool = False,
+    discover_local_ollama: bool = False,
     picker_hints: bool = False,
     canonical_order: bool = False,
     pricing: bool = False,
@@ -137,6 +138,9 @@ def build_models_payload(
     - ``include_unconfigured``: append ``CANONICAL_PROVIDERS`` rows that
       ``list_authenticated_providers`` didn't emit (TUI uses this to show
       the full provider universe in the picker).
+    - ``discover_local_ollama``: probe for a running local Ollama even before
+      it is configured, without adding unconfigured cloud providers. Settings
+      screens can opt in; other pickers keep their existing discovery policy.
     - ``picker_hints``: add ``authenticated``/``auth_type``/``key_env``/
       ``warning`` per row (TUI ``ModelPickerDialog`` shape).
     - ``canonical_order``: reorder canonical-slug rows to
@@ -206,6 +210,7 @@ def build_models_payload(
     # creating a technical custom-provider entry.
     local_is_relevant = bool(
         include_unconfigured
+        or discover_local_ollama
         or str(ctx.current_provider or "").lower() == "ollama-local"
         or "ollama-local" in (ctx.user_providers or {})
     )
@@ -308,6 +313,7 @@ def build_model_options_payload(
     *,
     explicit_only: bool = False,
     include_unconfigured: bool = False,
+    discover_local_ollama: bool = False,
     refresh: bool = False,
 ) -> dict:
     """Build the shared API-server/dashboard/TUI model-options payload.
@@ -325,6 +331,7 @@ def build_model_options_payload(
         ctx,
         explicit_only=bool(explicit_only),
         include_unconfigured=bool(include_unconfigured),
+        discover_local_ollama=bool(discover_local_ollama),
         picker_hints=True,
         canonical_order=True,
         pricing=True,

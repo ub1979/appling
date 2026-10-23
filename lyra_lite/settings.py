@@ -66,11 +66,13 @@ def hermes_model() -> dict:
 
 
 def model_options(refresh: bool = False) -> dict:
-    """Linked providers and their models, as the Studio's picker lists them."""
+    """Linked providers plus models served by Ollama on this computer."""
     from hermes_cli.inventory import build_model_options_payload, load_picker_context
 
-    payload = build_model_options_payload(load_picker_context(), explicit_only=False,
-                                          include_unconfigured=False, refresh=refresh)
+    payload = build_model_options_payload(
+        load_picker_context(), explicit_only=False, include_unconfigured=False,
+        discover_local_ollama=True, refresh=refresh,
+    )
     providers = []
     for p in payload.get("providers") or []:
         models = [str(m) for m in (p.get("models") or [])]

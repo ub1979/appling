@@ -21,12 +21,21 @@ from __future__ import annotations
 
 from unittest.mock import patch
 
+import pytest
 
 from hermes_cli.inventory import (
     ConfigContext,
     build_models_payload,
     load_picker_context,
 )
+
+
+@pytest.fixture(autouse=True)
+def _isolate_local_ollama(monkeypatch):
+    # Inventory ordering must not depend on Ollama running on the test host.
+    # Real local discovery is exercised in lyra_lite/test_ollama_discovery.py.
+    monkeypatch.setattr("hermes_cli.local_ollama.local_ollama_status",
+                        lambda **kw: {"running": False, "models": []})
 
 
 # ─── load_picker_context ───────────────────────────────────────────────
