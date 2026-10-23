@@ -129,9 +129,9 @@ def test_new_skills_reach_claude_code_as_native_skills(env):
         _write_config(env["hermes_home"], hermes_llm.base_url)
         daemon = Daemon(env).start()
         try:
+            assert daemon.post("/api/settings", {"engine": "claude", "claude": {
+                "base_url": claude.base_url, "auth_token": "x", "model": "claude-fake"}}).status_code == 200
             pid, path = _new_project(daemon, env)
-            daemon.post(f"/api/projects/{pid}/settings", {"engine": "claude", "claude": {
-                "base_url": claude.base_url, "auth_token": "x", "model": "claude-fake"}})
             daemon.post(f"/api/projects/{pid}/messages", {"text": "hi"})
             _wait_event(path, lambda e: e["type"] == "turn_end", 120)
             first = json.dumps(claude.main_requests()[0])

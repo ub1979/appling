@@ -77,6 +77,13 @@ class ProjectStore:
                 _atomic_write_text(ignore, "*\n")
             if not self.state_path.exists():
                 _atomic_write_json(self.state_path, self._new_state())
+            # Freeze legacy projects at their effective choice before any
+            # subsequent global default change, including projects never run.
+            state = self.state()
+            if not state.get("engine_locked"):
+                from lyra_lite.settings import effective_engine
+
+                self.update_state(engine=effective_engine(state), engine_locked=True)
         return self
 
     @staticmethod
@@ -87,7 +94,7 @@ class ProjectStore:
             "queue": [],
             "turn": None,
             "turn_start_offset": 0,
-            "engine": None,  # None: follow Lyra's default engine
+            "engine": None,  # resolved and locked by init()
             "rules_hash": "",
         }
 

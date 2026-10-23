@@ -115,6 +115,9 @@ class HermesEngine:
         self.session_key = session_key
         self.system_prompt = system_prompt
         self.skills = list(skills or [])
+        from lyra_lite.delegation import DelegationGuard
+
+        self._delegations = DelegationGuard(session_key)
         self._agent = None
         self._hooks: TurnHooks | None = None
         self._lock = threading.Lock()
@@ -124,6 +127,12 @@ class HermesEngine:
     def _build_agent(self):
         import tui_gateway.server as gw
         from run_agent import AIAgent
+
+        guard = self._delegations
+
+        class ProjectAgent(AIAgent):
+            def _dispatch_delegate_task(self, function_args: dict) -> str:
+                return guard.dispatch(function_args, super()._dispatch_delegate_task)
 
         cfg = gw._load_cfg()
         model, requested_provider = gw._resolve_startup_runtime()
@@ -156,7 +165,7 @@ class HermesEngine:
         toolsets = gw._load_enabled_toolsets()
         if toolsets is not None:
             toolsets = [t for t in toolsets if t not in SHARED_MEMORY_TOOLSETS] + [TOOLSET]
-        agent = AIAgent(
+        agent = ProjectAgent(
             model=model,
             max_iterations=gw._cfg_max_turns(cfg, 90),
             provider=runtime.get("provider"),
@@ -351,8 +360,9 @@ class HermesEngine:
 
             before = _counters(agent)
 
+            self._delegations.restore(history)
             result = agent.run_conversation(
-                text,
+                text + self._delegations.reminder(),
                 conversation_history=list(history),
                 stream_callback=_stream,
                 task_id=key,

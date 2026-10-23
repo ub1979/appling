@@ -467,7 +467,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         if "engine" in body or "claude" in body:
             from lyra_lite.engines import ENGINES
 
-            raw = body.get("engine", runner.store.state().get("engine") if runner.store.state().get("engine_override") else "default")
+            raw = body.get("engine", runner.store.state().get("engine"))
             engine = None if raw in (None, "", "default") else str(raw)
             if engine is not None and engine not in ENGINES:
                 raise HTTPException(status_code=400, detail="Unknown engine")
@@ -543,7 +543,10 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             changes["about_me"] = str(body.get("about_me") or "").strip()[:st.ABOUT_ME_LIMIT]
         if changes:
             st.save_section(changes)
-            _apply_everywhere()
+            # The engine default belongs to future projects. In particular,
+            # changing it must not close an existing engine with live helpers.
+            if changes.keys() - {"engine"}:
+                _apply_everywhere()
         return _settings_view()
 
     @app.get("/api/settings/claude-cli")

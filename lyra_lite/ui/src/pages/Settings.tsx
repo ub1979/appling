@@ -73,7 +73,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
       <div className="setup-head">
         <p className="kicker">AI settings</p>
         <h1>Engine and model</h1>
-        <p>Choose how Appling thinks. Changes apply from Appling's next message; anything already running finishes as it started.</p>
+        <p>Choose the engine for new projects. Each project keeps its engine. Model and effort changes apply from the next message.</p>
       </div>
 
       {(note || problem) && (
@@ -87,15 +87,15 @@ export function Settings({ projectId }: { projectId: string | null }) {
       ) : (
         <div className="settings-grid">
           <section className="card card-pad">
-            <h2 style={{ fontSize: 20 }}>Engine</h2>
-            <p className="muted small" style={{ margin: "4px 0 0" }}>Used by every project that doesn't pick its own.</p>
+            <h2 style={{ fontSize: 20 }}>Engine for new projects</h2>
+            <p className="muted small" style={{ margin: "4px 0 0" }}>Choose before creating or opening a new project. Existing projects keep their engine.</p>
             <div className="profile-grid two">
               {ENGINE_CARDS.map((e) => (
                 <button
                   key={e.id}
                   type="button"
                   className={`profile-card ${settings.engine === e.id ? "on" : ""}`}
-                  onClick={() => void run(async () => setSettings(await api.settingsSave({ engine: e.id })), `${e.name} is now Appling's engine.`)}
+                  onClick={() => void run(async () => setSettings(await api.settingsSave({ engine: e.id })), `New projects will use ${e.name}.`)}
                 >
                   <span className="radio" />
                   <b>{e.name}</b>
@@ -148,32 +148,8 @@ export function Settings({ projectId }: { projectId: string | null }) {
           {project && (
             <section className="card card-pad">
               <h2 style={{ fontSize: 20 }}>This project: {project.name}</h2>
-              <p className="muted small" style={{ margin: "4px 0 0" }}>Usually a project follows Appling's engine. You can pin one for this project only.</p>
-              <div className="stack" style={{ marginTop: 14 }}>
-                {[
-                  { id: "default", label: `Follow Appling's engine (now ${settings.engine === "claude" ? "Claude Code" : "Hermes"})` },
-                  { id: "hermes", label: "Always use Hermes for this project" },
-                  { id: "claude", label: "Always use Claude Code for this project" },
-                ].map((o) => {
-                  const current = project.engine_override ? project.engine : "default";
-                  return (
-                    <button
-                      key={o.id}
-                      type="button"
-                      className={`style-option ${current === o.id ? "on" : ""}`}
-                      onClick={() =>
-                        void run(async () => {
-                          await api.settings(project.id, { engine: o.id });
-                          setProject(await api.project(project.id));
-                        }, "Saved for this project.")
-                      }
-                    >
-                      <span className="radio" />
-                      <span><b>{o.label}</b></span>
-                    </button>
-                  );
-                })}
-              </div>
+              <p style={{ margin: "14px 0 4px" }}><b>{project.engine === "claude" ? "Claude Code" : "Hermes"}</b> · Locked to this project</p>
+              <p className="muted small">Its conversations and running work stay with this engine. To use another engine, choose it above and create a new project.</p>
             </section>
           )}
         </div>

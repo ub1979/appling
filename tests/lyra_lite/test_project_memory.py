@@ -78,3 +78,25 @@ def test_focus_note_comes_from_ledger_and_brain(tmp_path):
         assert expected in note, expected
     assert "Gym tracker" not in note  # only the focus sections, not the whole brain
     assert focus_note(tmp_path / "empty") == ""
+
+
+def test_focus_note_does_not_reopen_closed_work(tmp_path):
+    (tmp_path / ".sdlc").mkdir()
+    (tmp_path / ".sdlc" / "progress.md").write_text(
+        "## Phase ledger\n| Phase | Status |\n|---|---|\n"
+        "| Development history | superseded — see the Development row below |\n"
+        "| Post-send corrections | **DESCOPED BY OWNER** |\n"
+        "| Private access decision | RESOLVED — decided by the owner's real run |\n"
+        "| Development | running |\n"
+        "| Owner acceptance | pending owner confirmation |\n"
+        "| Service connection | blocked |\n")
+
+    note = focus_note(tmp_path)
+    unfinished = [line for line in note.splitlines() if line.startswith("Not done:")]
+    assert unfinished == [
+        "Not done: Development — running",
+        "Not done: Owner acceptance — pending owner confirmation",
+        "Not done: Service connection — blocked",
+    ]
+    for phase in ("Development history", "Post-send corrections", "Private access decision"):
+        assert phase in note

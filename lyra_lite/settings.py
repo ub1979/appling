@@ -5,8 +5,8 @@
   owner has linked (Codex, Ollama, Anthropic, Copilot, …).
 - The default engine and the Claude Code engine's model/address live under
   ``lyra_lite:`` in ``config.yaml``.
-- A project follows these defaults unless the owner picked an engine for that
-  project specifically.
+- Each project saves its engine when first opened. The global engine is only
+  the default for new projects; model and effort settings remain independent.
 """
 
 from __future__ import annotations
@@ -133,8 +133,8 @@ def set_hermes_model(provider: str, model: str, confirm: bool = False) -> dict[s
 
 
 def effective_engine(state: dict) -> str:
-    """The engine a project runs on: its own choice, else Appling's default."""
-    if state.get("engine_override") and state.get("engine") in ENGINES:
+    """Use the project's locked engine, with legacy resolution during migration."""
+    if (state.get("engine_locked") or state.get("engine_override")) and state.get("engine") in ENGINES:
         return str(state["engine"])
     return default_engine()
 

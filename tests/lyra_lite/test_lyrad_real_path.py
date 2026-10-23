@@ -695,7 +695,12 @@ def test_focus_note_rides_along_only_when_the_state_changes(env):
                 daemon.post(f"/api/projects/{pid}/messages", {"text": text})
                 _wait_event(path, lambda e, n=n: e["type"] == "turn_end" and sum(
                     1 for x in _events(path) if x["type"] == "turn_end") >= n)
-            ledger.write_text("## Phase ledger\n| Phase | Status |\n|---|---|\n| Development | verified |\n| QA | running |\n")
+            ledger.write_text(
+                "## Phase ledger\n| Phase | Status |\n|---|---|\n"
+                "| Development | verified |\n| QA | running |\n"
+                "| Access decision | RESOLVED — owner confirmed |\n"
+                "| Old development | superseded — see Development |\n"
+                "| Post-send corrections | DESCOPED BY OWNER |\n")
             daemon.post(f"/api/projects/{pid}/messages", {"text": "third"})
             _wait_event(path, lambda e: e["type"] == "turn_end" and e.get("reply") == "Three.")
 
@@ -706,6 +711,10 @@ def test_focus_note_rides_along_only_when_the_state_changes(env):
             assert "[Project focus" in sent[0] and "CSV export left" in sent[0]
             assert sent[1] == "second"  # unchanged state: no repeat
             assert "[Project focus" in sent[2] and "QA" in sent[2]
+            assert "Not done: QA — running" in sent[2]
+            for closed in ("Access decision", "Old development", "Post-send corrections"):
+                assert closed in sent[2]
+                assert f"Not done: {closed}" not in sent[2]
             shown = [m["content"] for m in daemon.get(f"/api/projects/{pid}").json()["messages"]]
             assert "first" in shown and not any("[Project focus" in m for m in shown)
         finally:

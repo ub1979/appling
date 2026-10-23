@@ -41,6 +41,7 @@ export interface ProjectDetail {
   keep_going: boolean;
   engine: string;
   engine_override: boolean;
+  engine_locked: boolean;
   claude: { model?: string; base_url?: string };
   team: string[];
   style: string;

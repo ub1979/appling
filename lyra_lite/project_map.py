@@ -17,15 +17,18 @@ _INCOMPLETE = re.compile(
     r"\b(incomplete|partial|pending|running|in progress|not (yet )?verified|unverified|open)\b"
 )
 _DONE = re.compile(r"\b(verified|approved|complete|completed|done|integrated|passed)\b")
+# Closed dispositions finish a row too. Require a leading status label so
+# negations ("not resolved") and incidental mentions do not close open work.
+_CLOSED = re.compile(r"^(resolved|superseded|descoped)\b")
 
 
 def row_state(status: str) -> str:
-    """done | running | owner | blocked | pending — same rules as the Studio map."""
-    text = status.lower()
+    """done (including closed work) | running | owner | blocked | pending."""
+    text = status.strip().lower()
     incomplete = bool(_INCOMPLETE.search(text))
     if re.search(r"\bblocked\b", text):
         return "owner" if "owner" in text else "blocked"
-    if _DONE.search(text) and not incomplete:
+    if (_DONE.search(text) or _CLOSED.match(text)) and not incomplete:
         return "done"
     if incomplete and "owner" in text:
         return "owner"

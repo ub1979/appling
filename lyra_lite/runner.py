@@ -242,6 +242,7 @@ class ProjectRunner:
             "turn_start_offset": int(state.get("turn_start_offset") or 0),
             "chat_id": state.get("chat_id"),
             "engine": effective_engine(state),
+            "engine_locked": bool(state.get("engine_locked")),
             "engine_override": bool(state.get("engine_override")),
             "claude": {k: v for k, v in (state.get("claude") or {}).items() if k != "auth_token"},
             "inbox": self.store.inbox(status="open"),
@@ -271,19 +272,28 @@ class ProjectRunner:
         self.store.append_event("setting", name="keep_going", value=bool(on))
 
     def set_engine(self, name: str | None, claude: dict | None = None) -> None:
-        """Pick this project's own engine, or None to follow Appling's default."""
+        """Keep the project's engine fixed; allow its existing model settings."""
         with self._cond:
+            current = effective_engine(self.store.state())
+            if name != current:
+                raise RuntimeError(
+                    f"This project is locked to {'Claude Code' if current == 'claude' else 'Hermes'}. "
+                    "Choose another default engine before creating a new project."
+                )
+            if claude is None:
+                return
             if self._busy or self.helpers():
-                raise RuntimeError("Appling is busy; switch engines when it's idle")
-            changes: dict[str, Any] = {"engine": name, "engine_override": name is not None}
-            if claude is not None:
-                # A blank token field means "keep the saved one".
-                merged = {**(self.store.state().get("claude") or {}), **claude}
-                changes["claude"] = {k: v for k, v in merged.items() if v != "" or k != "auth_token"}
-            changes.update(focus_hash=None, focus_turns=0)  # a new engine hasn't seen the note
+                raise RuntimeError("Appling is busy; change model settings when it's idle")
+            # A blank token field means "keep the saved one".
+            merged = {**(self.store.state().get("claude") or {}), **claude}
+            changes: dict[str, Any] = {
+                "claude": {k: v for k, v in merged.items() if v != "" or k != "auth_token"},
+                "engine_override": True,
+                "focus_hash": None, "focus_turns": 0,
+            }
             self.store.update_state(**changes)
             self._drop_engine()
-        self.store.append_event("setting", name="engine", value=name or "default")
+        self.store.append_event("setting", name="claude")
 
     def request_reload(self) -> None:
         """Appling-wide settings changed: rebuild the engine before the next turn
@@ -536,7 +546,12 @@ class ProjectRunner:
         if result.reply:
             entries.append({"role": "assistant", "content": result.reply, "ts": now})
         self.store.append_transcript(entries)
-        if result.messages and not result.error:
+        # Hermes can fail after a tool has already started a background job.
+        # Its returned conversation includes that dispatch and must survive
+        # the error so the next turn can continue it. Claude owns its native
+        # conversation separately and keeps its existing persistence behavior.
+        keep_hermes_progress = getattr(self._engine, "name", None) == "hermes"
+        if result.messages and (not result.error or keep_hermes_progress):
             try:
                 self.store.save_messages(result.messages)
             except Exception as exc:

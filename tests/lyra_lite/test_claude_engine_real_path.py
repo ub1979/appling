@@ -13,20 +13,19 @@ pytest.importorskip("claude_agent_sdk")
 
 from tests.fakes.fake_anthropic_server import FakeAnthropicServer, text_step, tool_step  # noqa: E402
 from tests.fakes.fake_openai_server import FakeOpenAIServer  # noqa: E402
-from tests.fakes.fake_openai_server import text_step as openai_text  # noqa: E402
 from tests.lyra_lite.test_lyrad_real_path import (  # noqa: E402
     Daemon, _events, _new_project, _wait_event, _write_config, env,  # noqa: F401
 )
 
 
-def _use_claude(daemon, pid, claude_url):
-    res = daemon.post(f"/api/projects/{pid}/settings", {
+def _new_claude_project(daemon, env, claude_url):
+    res = daemon.post("/api/settings", {
         "engine": "claude",
         "claude": {"base_url": claude_url, "auth_token": "fake", "model": "claude-fake"},
     })
     assert res.status_code == 200, res.text
-    assert res.json()["engine"] == "claude"
     assert "auth_token" not in res.json()["claude"]
+    return _new_project(daemon, env)
 
 
 def test_claude_engine_streams_edits_and_runs_safe_commands(env):
@@ -34,7 +33,7 @@ def test_claude_engine_streams_edits_and_runs_safe_commands(env):
         _write_config(env["hermes_home"], hermes_llm.base_url)
         daemon = Daemon(env).start()
         try:
-            pid, path = _new_project(daemon, env)
+            pid, path = _new_claude_project(daemon, env, claude.base_url)
             (path / ".sdlc").mkdir()
             (path / ".sdlc" / "progress.md").write_text("# Progress\n")
             claude.script = [
@@ -42,7 +41,6 @@ def test_claude_engine_streams_edits_and_runs_safe_commands(env):
                 tool_step("Bash", {"command": "ls hello.txt > listing.txt"}),
                 text_step("Wrote hello.txt and listed it."),
             ]
-            _use_claude(daemon, pid, claude.base_url)
             daemon.post(f"/api/projects/{pid}/messages", {"text": "make hello.txt"})
             end = _wait_event(path, lambda e: e["type"] == "turn_end", 120)
 
@@ -67,12 +65,11 @@ def test_claude_engine_asks_before_risky_commands(env):
         _write_config(env["hermes_home"], hermes_llm.base_url)
         daemon = Daemon(env).start()
         try:
-            pid, path = _new_project(daemon, env)
+            pid, path = _new_claude_project(daemon, env, claude.base_url)
             claude.script = [
                 tool_step("Bash", {"command": "python3 -c 'open(\"risky.txt\",\"w\").write(\"ok\")'"}),
                 text_step("Done."),
             ]
-            _use_claude(daemon, pid, claude.base_url)
             daemon.post(f"/api/projects/{pid}/messages", {"text": "do the risky thing"})
             item = _wait_event(path, lambda e: e["type"] == "inbox", 120)["item"]
             assert item["kind"] == "approval" and "risky.txt" in item["command"]
@@ -90,7 +87,7 @@ def test_claude_helpers_run_in_background_and_the_owner_can_always_talk(env):
         _write_config(env["hermes_home"], hermes_llm.base_url)
         daemon = Daemon(env).start()
         try:
-            pid, path = _new_project(daemon, env)
+            pid, path = _new_claude_project(daemon, env, claude.base_url)
             target = path / "agent.txt"
             claude.script = [
                 tool_step("Agent", {"description": "Write agent.txt",
@@ -104,7 +101,6 @@ def test_claude_helpers_run_in_background_and_the_owner_can_always_talk(env):
                 {**tool_step("Write", {"file_path": str(target), "content": "from agent"}), "delay": 12},
                 text_step("Wrote it."),
             ]}
-            _use_claude(daemon, pid, claude.base_url)
 
             # The turn that starts a helper ends without waiting for it.
             daemon.post(f"/api/projects/{pid}/messages", {"text": "use an agent"})
@@ -142,7 +138,7 @@ def test_stop_ends_background_helpers_and_ignores_their_reports(env):
         _write_config(env["hermes_home"], hermes_llm.base_url)
         daemon = Daemon(env).start()
         try:
-            pid, path = _new_project(daemon, env)
+            pid, path = _new_claude_project(daemon, env, claude.base_url)
             target = path / "never.txt"
             claude.script = [
                 tool_step("Agent", {"description": "Slow job", "prompt": f"HELPER-S write {target}",
@@ -155,7 +151,6 @@ def test_stop_ends_background_helpers_and_ignores_their_reports(env):
                 {**tool_step("Write", {"file_path": str(target), "content": "late"}), "delay": 10},
                 text_step("Wrote it."),
             ]}
-            _use_claude(daemon, pid, claude.base_url)
             daemon.post(f"/api/projects/{pid}/messages", {"text": "start a slow helper"})
             _wait_event(path, lambda e: e["type"] == "turn_end", 120)
             assert daemon.get(f"/api/projects/{pid}").json()["helpers"]
@@ -172,28 +167,6 @@ def test_stop_ends_background_helpers_and_ignores_their_reports(env):
             daemon.stop()
 
 
-def test_switching_engines_mid_chat_carries_the_conversation(env):
-    with FakeOpenAIServer([openai_text("Hermes says the plan is ready.")]) as hermes_llm, \
-            FakeAnthropicServer([text_step("Claude continues the plan.")]) as claude:
-        _write_config(env["hermes_home"], hermes_llm.base_url)
-        daemon = Daemon(env).start()
-        try:
-            pid, path = _new_project(daemon, env)
-            daemon.post(f"/api/projects/{pid}/messages", {"text": "make a plan"})
-            _wait_event(path, lambda e: e["type"] == "turn_end")
-            _use_claude(daemon, pid, claude.base_url)
-            daemon.post(f"/api/projects/{pid}/messages", {"text": "continue"})
-            end = _wait_event(path, lambda e: e["type"] == "turn_end" and e["reply"].startswith("Claude"), 120)
-            assert end["status"] == "done"
-            first = str(claude.main_requests()[0]["messages"])
-            assert "Hermes says the plan is ready." in first
-            shown = [m["content"] for m in daemon.get(f"/api/projects/{pid}").json()["messages"]]
-            assert shown == ["make a plan", "Hermes says the plan is ready.", "continue",
-                             "Claude continues the plan."]
-        finally:
-            daemon.stop()
-
-
 def test_claude_engine_without_a_key_explains_what_to_do(env):
     with FakeOpenAIServer([]) as hermes_llm:
         _write_config(env["hermes_home"], hermes_llm.base_url)
@@ -201,48 +174,13 @@ def test_claude_engine_without_a_key_explains_what_to_do(env):
         daemon.env.pop("ANTHROPIC_API_KEY", None)
         daemon.start()
         try:
+            assert daemon.post("/api/settings", {"engine": "claude", "claude": {"route": "api"}}).json()["claude"]["route"] == "api"
             pid, path = _new_project(daemon, env)
-            assert daemon.post("/api/settings", {"claude": {"route": "api"}}).json()["claude"]["route"] == "api"
-            assert daemon.post(f"/api/projects/{pid}/settings", {"engine": "claude"}).status_code == 200
             daemon.post(f"/api/projects/{pid}/messages", {"text": "hello"})
             end = _wait_event(path, lambda e: e["type"] == "turn_end", 60)
             assert end["status"] == "error"
             assert "ANTHROPIC_API_KEY" in end["error"] and "Your Claude plan" in end["error"]
             time.sleep(0.5)
-        finally:
-            daemon.stop()
-
-
-def test_lyra_wide_engine_setting_moves_projects_unless_they_chose_their_own(env):
-    hermes_replies = [openai_text("Hermes here."), openai_text("Hermes again.")]
-    with FakeOpenAIServer(hermes_replies) as hermes_llm, FakeAnthropicServer([text_step("Claude here.")]) as claude:
-        _write_config(env["hermes_home"], hermes_llm.base_url)
-        daemon = Daemon(env).start()
-        try:
-            pid, path = _new_project(daemon, env)
-            assert daemon.get("/api/settings").json()["engine"] == "hermes"
-            daemon.post(f"/api/projects/{pid}/messages", {"text": "one"})
-            _wait_event(path, lambda e: e["type"] == "turn_end" and e["reply"] == "Hermes here.")
-
-            saved = daemon.post("/api/settings", {"engine": "claude", "claude": {
-                "base_url": claude.base_url, "auth_token": "fake", "model": "claude-fake"}}).json()
-            assert saved["engine"] == "claude" and saved["claude"]["has_token"] is True
-            assert "auth_token" not in saved["claude"]
-            assert daemon.get(f"/api/projects/{pid}").json()["engine"] == "claude"
-            daemon.post(f"/api/projects/{pid}/messages", {"text": "two"})
-            _wait_event(path, lambda e: e["type"] == "turn_end" and e["reply"] == "Claude here.")
-
-            # This project picks Hermes for itself; Lyra's default stays Claude.
-            assert daemon.post(f"/api/projects/{pid}/settings", {"engine": "hermes"}).status_code == 200
-            daemon.post(f"/api/projects/{pid}/messages", {"text": "three"})
-            _wait_event(path, lambda e: e["type"] == "turn_end" and e["reply"] == "Hermes again.")
-            assert daemon.get("/api/settings").json()["engine"] == "claude"
-            back = daemon.post(f"/api/projects/{pid}/settings", {"engine": "default"}).json()
-            assert back["engine"] == "claude" and back["engine_override"] is False
-
-            config = yaml.safe_load((env["hermes_home"] / "config.yaml").read_text())
-            assert config["lyra_lite"]["engine"] == "claude"
-            assert config["model"]["base_url"] == hermes_llm.base_url  # Hermes model untouched
         finally:
             daemon.stop()
 
@@ -265,10 +203,9 @@ def test_claude_engine_loads_lyra_playbooks_as_native_skills(env):
         _write_config(env["hermes_home"], hermes_llm.base_url)
         daemon = Daemon(env).start()
         try:
-            pid, path = _new_project(daemon, env)
+            pid, path = _new_claude_project(daemon, env, claude.base_url)
             claude.script = [tool_step("Skill", {"skill": "ultimate-builder:req-engineer"}),
                              text_step("Who will use the app?")]
-            _use_claude(daemon, pid, claude.base_url)
             daemon.post(f"/api/projects/{pid}/messages", {"text": "I want a gym tracker"})
             end = _wait_event(path, lambda e: e["type"] == "turn_end", 120)
             assert end["status"] == "done"
@@ -287,11 +224,10 @@ def test_claude_engine_recalls_project_memory(env):
         _write_config(env["hermes_home"], hermes_llm.base_url)
         daemon = Daemon(env).start()
         try:
-            pid, path = _new_project(daemon, env)
+            pid, path = _new_claude_project(daemon, env, claude.base_url)
             claude.script = [text_step("Noted."),
                              tool_step("mcp__lyra__project_recall", {"query": "CSV separator"}),
                              text_step("You chose semicolons.")]
-            _use_claude(daemon, pid, claude.base_url)
             daemon.post(f"/api/projects/{pid}/messages", {"text": "The CSV export must use semicolons."})
             _wait_event(path, lambda e: e["type"] == "turn_end", 120)
             daemon.post(f"/api/projects/{pid}/messages", {"text": "What separator did I pick?"})

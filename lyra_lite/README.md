@@ -40,8 +40,8 @@ The classic Studio in this folder is `./start-studio.sh` / `./stop-studio.sh`.
   agents and handed to each agent instead of the whole project.
 - **The project map** is read straight from `.sdlc/progress.md` (the phase
   ledger the builder skills keep), so it can't disagree with the files.
-- **Engines plug in** through `lyra_lite/engines/base.py`. Pick one per project
-  with the ⚙ button:
+- **Engines plug in** through `lyra_lite/engines/base.py`. Choose the default
+  for new projects with the ⚙ button before creating or opening a project:
   - `HermesEngine` uses the same provider set-up as the Studio, so every linked
     subscription works.
   - `ClaudeEngine` runs the Claude Agent SDK (Claude Code). It needs
@@ -51,7 +51,10 @@ The classic Studio in this folder is `./start-studio.sh` / `./stop-studio.sh`.
     - Hermes' danger check guards its shell commands.
     - It runs agents in the foreground.
     - Its cron, scheduling and worktree tools are switched off.
-  - Switching engines keeps the chat.
+  - Each project locks its engine when first opened, including across new
+    chats and restarts. Existing projects keep their effective engine on
+    upgrade. Global engine changes only affect new projects; model and
+    effort settings keep their existing behavior.
 - **Compare runs** with `python -m lyra_lite.report <project> [<project>…]`.
   See `HOW-TO-TEST.md`.
 - **Every turn is saved** to the project's Git with the same checkpoint the

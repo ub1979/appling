@@ -9,6 +9,20 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.08 beta — 2026-10-23
+
+- **Each project keeps its engine.** The engine is locked when the project is
+  created or first opened after this update. Global engine changes apply only
+  to new projects; existing conversations and helpers stay with their engine.
+- **Hermes retries remember running helpers.** A coordinator error preserves
+  its working conversation and dispatch details. The next turn receives the
+  current running-job list; repeating an identical running task returns its
+  existing job instead of starting another worker. Unrelated work and later
+  retests after completion continue normally.
+- **Closed work stays closed in the project map.** Resolved, superseded and
+  descoped rows are no longer shown as unfinished unless they explicitly
+  remain incomplete or blocked. QA stages and approval rules are unchanged.
+
 ### Appling v0.07 beta — 2026-10-21
 
 Browse opens your computer's own folder dialog, Appling runs on Windows with
@@ -210,6 +224,22 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.9-a] - 2026-10-23 — Project engine locks and safe retries
+
+Appling v0.08 beta; the Lyra/Studio compatibility version advances to 0.19.9-a.
+
+- **Each project keeps its engine.** The engine is locked when the project is
+  created or first opened after this update. Global engine changes apply only
+  to new projects; existing conversations and helpers stay with their engine.
+- **Hermes retries remember running helpers.** A coordinator error preserves
+  its working conversation and dispatch details. The next turn receives the
+  current running-job list; repeating an identical running task returns its
+  existing job instead of starting another worker. Unrelated work and later
+  retests after completion continue normally.
+- **Closed work stays closed in the project map.** Resolved, superseded and
+  descoped rows are no longer shown as unfinished unless they explicitly
+  remain incomplete or blocked. QA stages and approval rules are unchanged.
 
 ## [0.19.8-a] - 2026-09-30 — Background helper reliability
 

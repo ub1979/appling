@@ -1,5 +1,7 @@
 from pathlib import Path
 
+import pytest
+
 from lyra_lite.project_map import read_map, row_state
 
 LEDGER = """# SDLC Progress
@@ -45,6 +47,35 @@ def test_unfinished_qualifier_wins_over_done_words():
     assert row_state("verified locally, incomplete product") == "running"
     assert row_state("integrated, product capability partial") == "running"
     assert row_state("complete") == "done"
+
+
+@pytest.mark.parametrize("status", [
+    "resolved",
+    "RESOLVED — outcome B, locked private. Decided by the owner's real run.",
+    "superseded",
+    "superseded — see the Development row below",
+    "descoped",
+    "DESCOPED BY OWNER 2026-10-13",
+    "  Resolved  ",
+])
+def test_closed_work_is_done(status):
+    assert row_state(status) == "done"
+
+
+@pytest.mark.parametrize("status, expected", [
+    ("not resolved", "pending"),
+    ("not yet superseded", "pending"),
+    ("not descoped", "pending"),
+    ("unresolved", "pending"),
+    ("partially resolved", "pending"),
+    ("awaiting confirmation that work is descoped", "pending"),
+    ("resolved locally; owner acceptance pending", "owner"),
+    ("superseded; migration in progress", "running"),
+    ("descoped in part; remaining work blocked", "blocked"),
+    ("resolved locally; blocked on owner approval", "owner"),
+])
+def test_closure_words_do_not_hide_unfinished_work(status, expected):
+    assert row_state(status) == expected
 
 
 def test_missing_ledger_is_an_empty_map(tmp_path: Path):
