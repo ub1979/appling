@@ -15,7 +15,17 @@ LEDGER = Path(".sdlc") / "progress.md"
 _MAX_BYTES = 512 * 1024
 
 _INCOMPLETE = re.compile(
-    r"\b(incomplete|partial|pending|running|reopened|in progress|not (yet )?(verified|pass|passed)|unverified|open)\b"
+    r"\b(incomplete|partial|pending|running|reopened|in progress|not (yet )?(verified|pass|passed)"
+    r"|unverified|open|fail(?:ed|ing|ure|ures)?)\b"
+)
+# Ignore only explicitly absent problems, not the rest of the status. For
+# example, "0 open HIGH; 2 open MEDIUM" still contains unfinished work.
+_ABSENT_WORK = re.compile(
+    r"(?<![\w.+-])(?:0|zero|no|nothing)\s+"
+    r"(?:(?:open|pending|tests?|checks?)\s+)?"
+    r"(?:open|pending|running|incomplete|partial|unverified|blocked|fail(?:ed|ing|ure|ures)?)\b"
+    r"|\bnot\s+(?:open|pending|running|blocked|failed|failing)\b"
+    r"|\b(?:open|pending|failures?|failed(?:\s+(?:tests|checks))?)\s*[:=]\s*0(?![\w.])"
 )
 _DONE = re.compile(r"\b(verified|approved|complete|completed|done|integrated|pass|passed)\b")
 # Closed dispositions finish a row too. Require a leading status label so
@@ -23,9 +33,13 @@ _DONE = re.compile(r"\b(verified|approved|complete|completed|done|integrated|pas
 _CLOSED = re.compile(r"^(resolved|superseded|descoped|delivered|handed off)\b")
 
 
+def _status_text(status: str) -> str:
+    return _ABSENT_WORK.sub("", status.strip().lower()).strip()
+
+
 def row_state(status: str) -> str:
     """done (including closed work) | running | owner | blocked | pending."""
-    text = status.strip().lower()
+    text = _status_text(status)
     incomplete = bool(_INCOMPLETE.search(text))
     if re.search(r"\bblocked\b", text):
         return "owner" if "owner" in text else "blocked"
@@ -55,7 +69,7 @@ def _is_delivery(row: dict) -> bool:
     if row["state"] != "done":
         return False
     _, name = _revision(row["name"])
-    status = row["status"].lower()
+    status = _status_text(row["status"])
     # Removing/replacing the delivery task is not evidence of delivery.
     if re.match(r"^(resolved|superseded|descoped)\b", status):
         return False

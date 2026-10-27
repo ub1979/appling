@@ -54,6 +54,44 @@ def test_unfinished_qualifier_wins_over_done_words():
 
 
 @pytest.mark.parametrize("status", [
+    "PASS — 0 open HIGH/CRITICAL",
+    "APPROVED, no open defects",
+    "verified, nothing pending",
+    "PASS — zero failures",
+    "PASS — 0 open failures",
+    "PASS — failures: 0",
+    "PASS — no tests failing",
+    "completed — no failed tests",
+    "PASS — tests not failing",
+    "resolved — no pending work",
+    "superseded — no open work",
+    "descoped — nothing pending",
+])
+def test_explicit_absence_of_remaining_work_does_not_reopen_passed_rows(status):
+    assert row_state(status) == "done"
+
+
+@pytest.mark.parametrize("status, expected", [
+    ("done, FAIL", "running"),
+    ("completed — but tests failing", "running"),
+    ("PASS locally; integration tests failed", "running"),
+    ("FAIL", "running"),
+    ("PASS — 2 open HIGH", "running"),
+    ("PASS — 10 open defects", "running"),
+    ("PASS — failures: 10", "running"),
+    ("PASS — 0 open HIGH; 2 open MEDIUM", "running"),
+    ("PASS — no open defects; implementation partial", "running"),
+    ("PASS — no failures; export pending", "running"),
+    ("verified, nothing pending in QA; owner acceptance pending", "owner"),
+    ("completed — no failed tests; blocked on owner approval", "owner"),
+    ("done, FAIL; owner acceptance pending", "owner"),
+    ("PASS locally; blocked on integration", "blocked"),
+])
+def test_actual_failures_and_remaining_work_still_override_pass(status, expected):
+    assert row_state(status) == expected
+
+
+@pytest.mark.parametrize("status", [
     "resolved",
     "RESOLVED — outcome B, locked private. Decided by the owner's real run.",
     "superseded",
@@ -190,6 +228,16 @@ def test_ordinary_or_incomplete_handoff_does_not_close_other_work(tmp_path, summ
     result = _map(tmp_path, "| Phase | Status |\n|---|---|\n| Development | running |\n" + summary)
     assert result["phases"][0]["state"] == "running"
     assert not result["delivery_complete"]
+
+
+def test_delivery_with_nothing_pending_closes_history_but_failed_delivery_does_not(tmp_path):
+    prefix = "| Phase | Status |\n|---|---|\n| Development | running |\n"
+    result = _map(tmp_path, prefix + "| Delivery | delivered — nothing pending |\n")
+    assert result["delivery_complete"]
+    assert [row["name"] for row in result["history"]] == ["Development"]
+    result = _map(tmp_path, prefix + "| Delivery | completed — but tests failing |\n")
+    assert not result["delivery_complete"]
+    assert [row["state"] for row in result["phases"]] == ["running", "running"]
 
 
 def test_delivery_does_not_close_other_tables_or_revision_scopes(tmp_path):

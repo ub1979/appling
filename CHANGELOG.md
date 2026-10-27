@@ -9,6 +9,19 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.11 beta — 2026-10-27
+
+- **Passed QA stays finished.** Statuses such as `PASS — 0 open HIGH/CRITICAL`,
+  `APPROVED, no open defects` and `verified, nothing pending` no longer reopen
+  work in the project map, coordinator focus or idle keep-going checks.
+- **Failures remain unfinished.** Explicit FAIL/failed/failing results override
+  completion words such as done or completed. Real remaining work and pending
+  owner approvals retain their existing handling.
+- **Checker regression test waits for setup.** The test now completes the
+  project's setup turn before customizing its checkers and counting the two
+  status turns, removing the timing race on both engines.
+- Skills, helper budgets and Security/Code Review/QA gates remain unchanged.
+
 ### Appling v0.10 beta — 2026-10-27
 
 - **Project QA checkers keep their customizations.** Status requests and helper
@@ -251,6 +264,21 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.12-a] - 2026-10-27 — Accurate QA completion status
+
+Appling v0.11 beta; the Lyra/Studio compatibility version advances to 0.19.12-a.
+
+- **Passed QA stays finished.** Statuses such as `PASS — 0 open HIGH/CRITICAL`,
+  `APPROVED, no open defects` and `verified, nothing pending` no longer reopen
+  work in the project map, coordinator focus or idle keep-going checks.
+- **Failures remain unfinished.** Explicit FAIL/failed/failing results override
+  completion words such as done or completed. Real remaining work and pending
+  owner approvals retain their existing handling.
+- **Checker regression test waits for setup.** The test now completes the
+  project's setup turn before customizing its checkers and counting the two
+  status turns, removing the timing race on both engines.
+- Skills, helper budgets and Security/Code Review/QA gates remain unchanged.
 
 ## [0.19.11-a] - 2026-10-27 — Reliable approvals, progress and QA checkers
 

@@ -24,6 +24,70 @@ def _focus(request):
     return text.rsplit("[Project focus", 1)[-1]
 
 
+@pytest.mark.parametrize("engine", ["hermes", pytest.param("claude", marks=pytest.mark.live_system_guard_bypass)])
+def test_status_qualifiers_drive_real_focus_and_continuation(env, engine):
+    if engine == "claude":
+        pytest.importorskip("claude_agent_sdk")
+    with FakeOpenAIServer([]) as hermes, FakeAnthropicServer([], marker="Appling") as claude:
+        llm = hermes if engine == "hermes" else claude
+        _write_config(env["hermes_home"], hermes.base_url, lyra_lite={
+            "engine": engine,
+            "claude": {"base_url": claude.base_url, "auth_token": "fake", "model": "claude-fake"},
+            "watchdog": {"enabled": False},
+        })
+        app = Lyra()
+        app.start()
+        try:
+            runner = app.add_project(str(env["home"] / "Status qualifiers"), create=True)
+            root = runner.root
+            (root / ".sdlc").mkdir()
+            ledger = root / ".sdlc/progress.md"
+            # Exercise the named-column formats emitted by the audited Hermes
+            # and Claude projects, without a delivery row masking QA's state.
+            if engine == "hermes":
+                table = ("| Date | Phase | Status | Notes |\n|---|---|---|---|\n"
+                         "| 2026-10-27 | QA | {status} | Current result |\n")
+            else:
+                table = ("| # | Phase | Agent | Status | Evidence / notes |\n|---|---|---|---|---|\n"
+                         "| 1 | QA | QA | {status} | Current result |\n")
+            cases = [
+                ("PASS — 0 open HIGH/CRITICAL", "done"),
+                ("APPROVED, no open defects", "done"),
+                ("verified, nothing pending", "done"),
+                ("done, FAIL", "running"),
+                ("completed — but tests failing", "running"),
+                ("PASS — 0 open HIGH; 2 open MEDIUM", "running"),
+                ("PASS; owner acceptance pending", "owner"),
+            ]
+            for index, (status, expected) in enumerate(cases):
+                ledger.write_text(table.format(status=status))
+                runner.store.update_state(last_turn_end=1.0, last_reply="Checks recorded.")
+                before = len(llm.main_requests())
+                reply = f"STATUS-CASE-{index}"
+                llm.script = [text_step(reply)]
+                if expected == "running":
+                    assert runner.watchdog_tick({"idle_minutes": 0}) == "idle with unfinished work"
+                else:
+                    for _ in range(3):
+                        assert runner.watchdog_tick({"idle_minutes": 0}) == "no unfinished step in the ledger"
+                    assert len(llm.main_requests()) == before
+                    runner.submit("Report the current status.")
+                end = _wait_event(root, lambda e: e["type"] == "turn_end" and e.get("reply") == reply, 120)
+                assert end["status"] == "done", end
+                assert read_map(root)["phases"][0]["state"] == expected
+                prompt = _focus(llm.main_requests()[before])
+                if expected == "done":
+                    assert "Done: QA" in prompt and "Not done:" not in prompt
+                else:
+                    assert f"Not done: QA — {status}" in prompt
+                assert ledger.read_text() == table.format(status=status)
+            events = _events(root)
+            assert len([e for e in events if e["type"] == "watchdog"]) == 3
+            assert not [e for e in events if e["type"] == "helper"]
+        finally:
+            app.shutdown()
+
+
 # The live-system guard scans the whole CLI argv, including the embedded skill
 # prose, and mistakes it for a process-killer command. This intentionally runs
 # the bundled CLI with a temporary HOME and a local scripted provider only.

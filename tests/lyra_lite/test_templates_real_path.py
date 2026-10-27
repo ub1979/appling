@@ -23,8 +23,8 @@ REPO = Path(__file__).resolve().parents[2]
 
 @pytest.mark.parametrize("engine", ["hermes", pytest.param("claude", marks=pytest.mark.live_system_guard_bypass)])
 def test_status_turns_preserve_project_checkers(env, engine):
-    with FakeOpenAIServer([openai_text("Status unchanged.")] * 2) as hermes, \
-            FakeAnthropicServer([text_step("Status unchanged.")] * 2, marker="Appling") as claude:
+    with FakeOpenAIServer([openai_text("Setup complete."), *[openai_text("Status unchanged.")] * 2]) as hermes, \
+            FakeAnthropicServer([text_step("Setup complete."), *[text_step("Status unchanged.")] * 2], marker="Appling") as claude:
         _write_config(env["hermes_home"], hermes.base_url)
         daemon = Daemon(env).start()
         try:
@@ -37,11 +37,17 @@ def test_status_turns_preserve_project_checkers(env, engine):
                                                    "kind": "website", "team": []})
             assert response.status_code == 200, response.text
             pid = response.json()["id"]
+            # Creating a website queues its own setup turn. Finish that turn
+            # before customizing the checkers or counting owner status turns.
+            setup = _wait_event(path, lambda e: e["type"] == "turn_end", 120)
+            assert setup["status"] == "done" and setup["reply"] == "Setup complete.", setup
+            llm = hermes if engine == "hermes" else claude
+            setup_calls = len(llm.main_requests())
             kit = path / ".lyra" / "kit"
             kit.mkdir(parents=True, exist_ok=True)
             for name in ("site-check.mjs", "deck-check.mjs"):
                 (kit / name).write_bytes(b"project-owned authenticated checker\n")
-            seen = set()
+            seen = {setup["turn"]}
             for _ in range(2):
                 assert daemon.post(f"/api/projects/{pid}/messages", {"text": "Report status only."}).status_code == 200
                 end = _wait_event(path, lambda e: e["type"] == "turn_end" and e["turn"] not in seen, 120)
@@ -50,8 +56,7 @@ def test_status_turns_preserve_project_checkers(env, engine):
                 assert end["reply"] == "Status unchanged."
                 for name in ("site-check.mjs", "deck-check.mjs"):
                     assert (kit / name).read_bytes() == b"project-owned authenticated checker\n"
-            requests = hermes.main_requests() if engine == "hermes" else claude.main_requests()
-            assert len(requests) == 2
+            assert len(llm.main_requests()) - setup_calls == 2
         finally:
             daemon.stop()
 
