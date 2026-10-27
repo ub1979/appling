@@ -9,6 +9,7 @@ import subprocess
 from pathlib import Path
 
 import httpx
+import pytest
 
 from tests.fakes.fake_anthropic_server import FakeAnthropicServer, text_step
 from tests.fakes.fake_openai_server import FakeOpenAIServer
@@ -18,6 +19,41 @@ from tests.lyra_lite.test_lyrad_real_path import (  # noqa: F401
 )
 
 REPO = Path(__file__).resolve().parents[2]
+
+
+@pytest.mark.parametrize("engine", ["hermes", pytest.param("claude", marks=pytest.mark.live_system_guard_bypass)])
+def test_status_turns_preserve_project_checkers(env, engine):
+    with FakeOpenAIServer([openai_text("Status unchanged.")] * 2) as hermes, \
+            FakeAnthropicServer([text_step("Status unchanged.")] * 2, marker="Appling") as claude:
+        _write_config(env["hermes_home"], hermes.base_url)
+        daemon = Daemon(env).start()
+        try:
+            if engine == "claude":
+                response = daemon.post("/api/settings", {"engine": "claude", "claude": {
+                    "base_url": claude.base_url, "auth_token": "x", "model": "claude-fake"}})
+                assert response.status_code == 200
+            path = env["home"] / "Appling Projects" / "Custom checker"
+            response = daemon.post("/api/projects", {"path": str(path), "create": True,
+                                                   "kind": "website", "team": []})
+            assert response.status_code == 200, response.text
+            pid = response.json()["id"]
+            kit = path / ".lyra" / "kit"
+            kit.mkdir(parents=True, exist_ok=True)
+            for name in ("site-check.mjs", "deck-check.mjs"):
+                (kit / name).write_bytes(b"project-owned authenticated checker\n")
+            seen = set()
+            for _ in range(2):
+                assert daemon.post(f"/api/projects/{pid}/messages", {"text": "Report status only."}).status_code == 200
+                end = _wait_event(path, lambda e: e["type"] == "turn_end" and e["turn"] not in seen, 120)
+                seen.add(end["turn"])
+                assert end["status"] == "done", end
+                assert end["reply"] == "Status unchanged."
+                for name in ("site-check.mjs", "deck-check.mjs"):
+                    assert (kit / name).read_bytes() == b"project-owned authenticated checker\n"
+            requests = hermes.main_requests() if engine == "hermes" else claude.main_requests()
+            assert len(requests) == 2
+        finally:
+            daemon.stop()
 
 
 def test_template_library_user_templates_and_live_demos(env):

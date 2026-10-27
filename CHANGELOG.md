@@ -9,6 +9,25 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.10 beta — 2026-10-27
+
+- **Project QA checkers keep their customizations.** Status requests and helper
+  reports no longer overwrite project-specific site/deck checks. Untouched
+  managed copies still receive bundled updates; unknown legacy copies are
+  preserved and missing checkers are installed.
+- **Coordinator compression keeps the right amount of history.** Applying the
+  coordinator's token cap now resizes the retained tail using the compressor's
+  configured ratio, while preserving lower caps and model-switch behavior.
+- **Approval prompts follow their own requests.** Background approvals survive
+  unrelated chat turns, expire on timeout or Stop, and resolve the selected
+  request even when several helpers ask in a different order.
+- **Progress follows the ledger's actual columns and current records.** Later
+  phase results supersede older rows. Explicit delivery closes earlier stale
+  rows only in the same table and revision; new, reopened and unrelated work
+  still continues. Old current/next notes cannot restart delivered work.
+- Skills, engine selection, Security/Code Review/QA gates and helper budgets
+  remain unchanged.
+
 ### Appling v0.09 beta — 2026-10-23
 
 - **Ollama appears on fresh installations.** Appling Settings discovers models
@@ -232,6 +251,27 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.11-a] - 2026-10-27 — Reliable approvals, progress and QA checkers
+
+Appling v0.10 beta; the Lyra/Studio compatibility version advances to 0.19.11-a.
+
+- **Project QA checkers keep their customizations.** Status requests and helper
+  reports no longer overwrite project-specific site/deck checks. Untouched
+  managed copies still receive bundled updates; unknown legacy copies are
+  preserved and missing checkers are installed.
+- **Coordinator compression keeps the right amount of history.** Applying the
+  coordinator's token cap now resizes the retained tail using the compressor's
+  configured ratio, while preserving lower caps and model-switch behavior.
+- **Approval prompts follow their own requests.** Background approvals survive
+  unrelated chat turns, expire on timeout or Stop, and resolve the selected
+  request even when several helpers ask in a different order.
+- **Progress follows the ledger's actual columns and current records.** Later
+  phase results supersede older rows. Explicit delivery closes earlier stale
+  rows only in the same table and revision; new, reopened and unrelated work
+  still continues. Old current/next notes cannot restart delivered work.
+- Skills, engine selection, Security/Code Review/QA gates and helper budgets
+  remain unchanged.
 
 ## [0.19.10-a] - 2026-10-23 — Fresh-install Ollama discovery
 

@@ -4,6 +4,7 @@ with the Claude Agent SDK), real sockets; only the model is scripted."""
 from __future__ import annotations
 
 import json
+import threading
 import time
 
 import pytest
@@ -79,6 +80,63 @@ def test_claude_engine_asks_before_risky_commands(env):
             assert end["status"] == "done"
             assert (path / "risky.txt").read_text() == "ok"
         finally:
+            daemon.stop()
+
+
+@pytest.mark.parametrize("action", ["approve", "stop"])
+def test_background_approval_outlives_owner_turn_and_closes_with_its_wait(env, action):
+    release_helper, release_owner = threading.Event(), threading.Event()
+    with FakeOpenAIServer([]) as hermes_llm, FakeAnthropicServer([]) as claude:
+        _write_config(env["hermes_home"], hermes_llm.base_url)
+        next_step = claude.next_step
+
+        def gated_step(body):
+            step = next_step(body)
+            gate = step.get("gate")
+            if gate is not None:
+                assert gate.wait(60), "test did not release model response"
+            return step
+
+        claude.next_step = gated_step
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_claude_project(daemon, env, claude.base_url)
+            claude.script = [
+                tool_step("Agent", {"description": "Approval job", "prompt": "HELPER-PERM run the command",
+                                    "subagent_type": "general-purpose"}),
+                text_step("MAIN-STARTED"),
+                {**text_step("MAIN-STATUS"), "gate": release_owner},
+                text_step("MAIN-REPORT"),
+            ]
+            claude.side_scripts = {"HELPER-PERM": [
+                {**tool_step("Bash", {"command": "python3 -c 'open(\"approved.txt\",\"w\").write(\"yes\")'"}),
+                 "gate": release_helper},
+                text_step("HELPER-FINISHED"),
+            ]}
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "start the helper"})
+            _wait_event(path, lambda e: e["type"] == "turn_end" and e["reply"] == "MAIN-STARTED", 120)
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "what is happening?"})
+            _wait_event(path, lambda e: e["type"] == "turn_start" and e["text"] == "what is happening?", 60)
+            release_helper.set()
+            item = _wait_event(path, lambda e: e["type"] == "inbox", 60)["item"]
+            release_owner.set()
+            _wait_event(path, lambda e: e["type"] == "turn_end" and e["reply"] == "MAIN-STATUS", 60)
+            assert [i["id"] for i in daemon.get(f"/api/projects/{pid}").json()["inbox"]] == [item["id"]]
+            assert not (path / "approved.txt").exists()
+            if action == "approve":
+                response = daemon.post(f"/api/projects/{pid}/inbox/{item['id']}", {"answer": "once"})
+                assert response.status_code == 200, response.text
+                _wait_event(path, lambda e: e["type"] == "turn_end" and e["reply"] == "MAIN-REPORT", 120)
+                assert (path / "approved.txt").read_text() == "yes"
+            else:
+                assert daemon.post(f"/api/projects/{pid}/stop", {}).status_code == 200
+                assert not (path / "approved.txt").exists()
+                response = daemon.post(f"/api/projects/{pid}/inbox/{item['id']}", {"answer": "once"})
+                assert response.status_code == 409
+            assert daemon.get(f"/api/projects/{pid}").json()["inbox"] == []
+        finally:
+            release_helper.set()
+            release_owner.set()
             daemon.stop()
 
 

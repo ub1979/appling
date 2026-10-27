@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from lyra_lite.project_map import read_map, row_state
+from tests.lyra_lite.progress_cases import CLAUDE_DELIVERED, HERMES_DELIVERED, NEW_FEATURE
 
 LEDGER = """# SDLC Progress
 
@@ -46,6 +47,9 @@ def test_rows_are_read_in_order_with_plain_states(tmp_path: Path):
 def test_unfinished_qualifier_wins_over_done_words():
     assert row_state("verified locally, incomplete product") == "running"
     assert row_state("integrated, product capability partial") == "running"
+    assert row_state("not yet PASS") == "running"
+    assert row_state("not passed") == "running"
+    assert row_state("PASS; owner acceptance pending") == "owner"
     assert row_state("complete") == "done"
 
 
@@ -57,6 +61,8 @@ def test_unfinished_qualifier_wins_over_done_words():
     "descoped",
     "DESCOPED BY OWNER 2026-10-13",
     "  Resolved  ",
+    "delivered 2026-10-23",
+    "handed off 2026-10-23",
 ])
 def test_closed_work_is_done(status):
     assert row_state(status) == "done"
@@ -73,6 +79,9 @@ def test_closed_work_is_done(status):
     ("superseded; migration in progress", "running"),
     ("descoped in part; remaining work blocked", "blocked"),
     ("resolved locally; blocked on owner approval", "owner"),
+    ("not delivered", "pending"),
+    ("not yet handed off", "pending"),
+    ("delivered locally; owner acceptance pending", "owner"),
 ])
 def test_closure_words_do_not_hide_unfinished_work(status, expected):
     assert row_state(status) == expected
@@ -89,3 +98,138 @@ def test_titled_ledger_heading_and_bare_phase_table_are_read(tmp_path: Path):
         (tmp_path / ".sdlc" / "progress.md").write_text(heading + body + "\n## Planned wave/task ledger\n| Wave | Rows |\n|---|---|\n| 1 | T-001 verified |\n")
         rows = [(p["name"], p["state"]) for p in read_map(tmp_path)["phases"]]
         assert rows == [("Task planning", "done"), ("QA", "blocked")], heading
+
+
+@pytest.mark.parametrize("table", [
+    "| Date | Phase | Status | Notes |\n|---|---|---|---|\n"
+    "| 2026-10-23 | Build | verified | built it |\n"
+    "| 2026-10-23 | QA | ✅ PASS | tested it |\n",
+    "| # | Phase | Agent | Status | Evidence / notes |\n|---|---|---|---|---|\n"
+    "| 1 | Build | Developer | verified | built it |\n"
+    "| 2 | QA | QA | round 2 PASS | tested it |\n",
+])
+def test_observed_engine_ledgers_use_named_columns(tmp_path, table):
+    (tmp_path / ".sdlc").mkdir()
+    (tmp_path / ".sdlc/progress.md").write_text("# Progress ledger\n\n" + table)
+    phases = read_map(tmp_path)["phases"]
+    assert [(p["name"], p["state"], p["note"]) for p in phases] == [
+        ("Build", "done", "built it"), ("QA", "done", "tested it"),
+    ]
+
+
+def test_only_phase_status_tables_count_and_evidence_cannot_complete_a_row(tmp_path):
+    (tmp_path / ".sdlc").mkdir()
+    (tmp_path / ".sdlc/progress.md").write_text("""## Phase ledger
+| Status | Evidence | Phase |
+|---|---|---|
+| running | Development complete; QA passed | Development |
+| resolved | old issue | Defect |
+| superseded | replaced | Old plan |
+| descoped | owner removed | Export |
+## Other table
+| Name | Status |
+|---|---|
+| unrelated | running |
+""")
+    rows = read_map(tmp_path)["phases"]
+    assert [(p["name"], p["state"]) for p in rows] == [
+        ("Development", "running"), ("Defect", "done"), ("Old plan", "done"), ("Export", "done"),
+    ]
+
+
+def _map(tmp_path, text):
+    (tmp_path / ".sdlc").mkdir(exist_ok=True)
+    (tmp_path / ".sdlc/progress.md").write_text(text)
+    return read_map(tmp_path)
+
+
+@pytest.mark.parametrize("text", [CLAUDE_DELIVERED, HERMES_DELIVERED])
+def test_delivered_scope_keeps_old_rows_as_history_not_unfinished_work(tmp_path, text):
+    result = _map(tmp_path, text)
+    assert result["delivery_complete"]
+    assert all(row["state"] == "done" for row in result["phases"])
+    assert any("PASS" in row["status"] for row in result["phases"])
+    assert any(row["status"] == "running" for row in result["history"])
+    assert result["markdown"] == text
+    assert (tmp_path / ".sdlc/progress.md").read_text() == text
+
+
+@pytest.mark.parametrize("text", [CLAUDE_DELIVERED, HERMES_DELIVERED])
+def test_new_scope_after_delivery_remains_active(tmp_path, text):
+    result = _map(tmp_path, text + NEW_FEATURE)
+    assert not result["delivery_complete"]
+    assert [(p["name"], p["state"]) for p in result["phases"] if p["state"] != "done"] == [
+        ("Export development", "running"), ("Export QA", "pending"),
+    ]
+
+
+def test_same_phase_latest_status_wins_but_other_work_is_preserved(tmp_path):
+    result = _map(tmp_path, """| Phase | Status |
+|---|---|
+| Development | running |
+| QA | running |
+| QA | PASS |
+| Security QA | running |
+""")
+    assert [(p["name"], p["state"]) for p in result["phases"]] == [
+        ("Development", "running"), ("QA", "done"), ("Security QA", "running"),
+    ]
+
+
+@pytest.mark.parametrize("summary", [
+    "| Documentation | delivered |",  # a task handoff is not project delivery
+    "| Delivery | not delivered |",
+    "| Delivery | partial; owner approval pending |",
+    "| Delivery | blocked |",
+    "| Handoff | handed off to QA |",  # work still needs verification
+    "| Delivery | superseded |",
+    "| Delivery | descoped |",
+    "| Delivery | resolved |",
+])
+def test_ordinary_or_incomplete_handoff_does_not_close_other_work(tmp_path, summary):
+    result = _map(tmp_path, "| Phase | Status |\n|---|---|\n| Development | running |\n" + summary)
+    assert result["phases"][0]["state"] == "running"
+    assert not result["delivery_complete"]
+
+
+def test_delivery_does_not_close_other_tables_or_revision_scopes(tmp_path):
+    result = _map(tmp_path, """## Unfinished service
+| Phase | Status |
+|---|---|
+| Service development | running |
+
+## App ledger
+| Phase | Status |
+|---|---|
+| Rev 3 build | running |
+| Rev 2 build | running |
+| Rev 2 delivery | delivered |
+| Rev 2 new repair | running |
+""")
+    assert [p["name"] for p in result["phases"] if p["state"] == "running"] == [
+        "Service development", "Rev 3 build", "Rev 2 new repair",
+    ]
+
+
+def test_explicitly_reopened_row_stays_active_even_before_old_delivery_marker(tmp_path):
+    result = _map(tmp_path, """| Phase | Status |
+|---|---|
+| Development | reopened — regression found after delivery |
+| Delivery | delivered |
+""")
+    assert result["phases"][0]["state"] == "running"
+    assert not result["delivery_complete"]
+
+
+def test_completed_metadata_alone_does_not_hide_running_work(tmp_path):
+    result = _map(tmp_path, "Current phase: Delivered\n| Phase | Status |\n|---|---|\n| Development | running |\n")
+    assert result["phases"][0]["state"] == "running"
+    assert not result["delivery_complete"]
+
+
+@pytest.mark.parametrize("status", ["running", "reopened", "FAIL", "blocked on owner approval"])
+def test_new_qa_status_after_pass_and_delivery_is_still_unfinished(tmp_path, status):
+    result = _map(tmp_path, "| Phase | Status |\n|---|---|\n| QA | PASS |\n"
+                  f"| Delivery | delivered |\n| QA | {status} |\n")
+    assert not result["delivery_complete"]
+    assert [(p["name"], p["status"]) for p in result["phases"] if p["state"] != "done"] == [("QA", status)]

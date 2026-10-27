@@ -20,7 +20,7 @@ BRAIN = Path(".sdlc") / "project-brain.md"
 _SECTION_WORDS = ("next", "open", "risk", "question", "current")
 
 
-def _brain_sections(root: Path) -> list[str]:
+def _brain_sections(root: Path, *, delivered: bool = False) -> list[str]:
     try:
         text = (root / BRAIN).read_text(encoding="utf-8", errors="replace")
     except OSError:
@@ -29,7 +29,10 @@ def _brain_sections(root: Path) -> list[str]:
     for line in text.splitlines():
         heading = re.match(r"^#{1,4}\s+(.*)$", line)
         if heading:
-            take = any(w in heading.group(1).lower() for w in _SECTION_WORDS)
+            title = heading.group(1).lower()
+            take = any(w in title for w in _SECTION_WORDS)
+            if delivered and any(w in title for w in ("next", "current")):
+                take = False  # old in-progress notes cannot reopen a delivered ledger
             taken = 0
             if take:
                 out.append(f"{heading.group(1).strip()}:")
@@ -44,6 +47,7 @@ def focus_note(root: Path, open_inbox: int = 0) -> str:
     root = Path(root)
     lines: list[str] = []
     ledger = read_map(root)
+    delivered = bool(ledger.get("delivery_complete"))
     if ledger.get("current_phase"):
         lines.append(f"Current step: {ledger['current_phase']}")
     unfinished = [p for p in ledger.get("phases", []) if p["state"] != "done"]
@@ -52,7 +56,13 @@ def focus_note(root: Path, open_inbox: int = 0) -> str:
         lines.append("Done: " + ", ".join(done[:10]))
     for p in unfinished[:6]:
         lines.append(f"Not done: {p['name']} — {p['status'][:120]}")
-    lines.extend(_brain_sections(root))
+    if ledger.get("history"):
+        lines.append("Earlier ledger rows superseded by later phase records or delivery are history, "
+                     "not unfinished work.")
+    if delivered:
+        lines.append("The ledger records delivery with no current unfinished rows. "
+                     "Do not restart development or QA from historical rows or old next-action notes.")
+    lines.extend(_brain_sections(root, delivered=delivered))
     if open_inbox:
         lines.append(f"Waiting on the owner: {open_inbox} open question(s)/approval(s) in the inbox.")
     if not lines:

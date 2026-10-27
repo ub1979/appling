@@ -9,6 +9,7 @@ copied into Appling's source.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -131,6 +132,42 @@ def _copy_if_changed(src: Path, dst: Path) -> None:
         pass
 
 
+def _sync_checkers(kit: Path) -> None:
+    """Refresh only copies we installed and the project has not edited.
+
+    Legacy copies have no recorded hash: adopt an exact bundled match, but
+    preserve unknown contents rather than undoing a project's QA repairs.
+    """
+    from lyra_lite.store import _atomic_write_json, _read_json
+
+    manifest = kit.parent / "kit-checksums.json"
+    previous = _read_json(manifest, {})
+    previous = previous if isinstance(previous, dict) else {}
+    installed = dict(previous)
+    for src in (SITE_CHECK, DECK_CHECK):
+        dst = kit / src.name
+        try:
+            if not src.is_file() or dst.is_symlink():
+                continue
+            content = src.read_bytes()
+            digest = hashlib.sha256(content).hexdigest()
+            current = dst.read_bytes() if dst.exists() else None
+            if current is not None and current != content:
+                if hashlib.sha256(current).hexdigest() != previous.get(src.name):
+                    continue
+            if current != content:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                dst.write_bytes(content)
+            installed[src.name] = digest
+        except OSError:
+            continue
+    if installed != previous:
+        try:
+            _atomic_write_json(manifest, installed)
+        except OSError:
+            pass  # Without tracking, future refreshes preserve unknown copies.
+
+
 def _write_tools(kit: Path) -> None:
     """Small commands that run with Appling's own Python (Pillow, the Codex image
     provider), whatever the project's own setup is."""
@@ -162,9 +199,7 @@ def ensure_website_kit(root: Path, tid: str | None) -> None:
     the reference design, inside the project (``.lyra/kit/``, git-ignored) so
     every helper on any engine can run and read them."""
     kit = Path(root) / KIT_DIR
-    for check in (SITE_CHECK, DECK_CHECK):
-        if check.is_file():
-            _copy_if_changed(check, kit / check.name)
+    _sync_checkers(kit)
     _write_tools(kit)
     demo = demo_dir(tid) if tid else None
     if demo is None:

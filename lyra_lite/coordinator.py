@@ -67,3 +67,9 @@ def make_coordinator(agent: Any) -> None:
         apply = getattr(compressor, "_apply_threshold_tokens_cap", None)
         if callable(apply):
             apply()
+            # The cap is applied after construction. Resize the retained tail
+            # too, just as ContextCompressor.update_model does; otherwise the
+            # old large-window budget nearly refills the capped context.
+            ratio = getattr(compressor, "summary_target_ratio", None)
+            if ratio is not None:
+                compressor.tail_token_budget = int(compressor.threshold_tokens * ratio)

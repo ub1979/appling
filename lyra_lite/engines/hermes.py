@@ -284,12 +284,13 @@ class HermesEngine:
 
         return {**save_env_value_secure(env_var, value), "skipped": False, "message": "ok"}
 
-    def _on_approval(self, data: dict) -> None:
-        """Gateway approval notify: open an inbox item; answers resolve it."""
+    def _on_approval(self, data: dict):
+        """Open a card for this wait and return its completion cleanup."""
         hooks = self._hooks
         if hooks is None:
             return
         key = self.session_key
+        request_id = data["request_id"]
 
         def _answer(choice: Any) -> None:
             from tools.approval import resolve_gateway_approval
@@ -297,15 +298,16 @@ class HermesEngine:
             choice = str(choice or "deny")
             if choice not in {"once", "session", "always", "deny"}:
                 choice = "deny"
-            resolve_gateway_approval(key, choice)
+            resolve_gateway_approval(key, choice, request_id=request_id)
 
-        hooks.ask(
+        item_id = hooks.ask(
             "approval",
             _answer,
             command=str(data.get("command") or ""),
             description=str(data.get("description") or ""),
             choices=["once", "session", "always", "deny"],
         )
+        return lambda: hooks.expire(item_id)
 
     # -- turn ------------------------------------------------------------
 

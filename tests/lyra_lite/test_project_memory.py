@@ -100,3 +100,27 @@ def test_focus_note_does_not_reopen_closed_work(tmp_path):
     ]
     for phase in ("Development history", "Post-send corrections", "Private access decision"):
         assert phase in note
+
+
+def test_delivery_focus_uses_current_ledger_instead_of_old_status_and_next_actions(tmp_path):
+    from tests.lyra_lite.progress_cases import CLAUDE_DELIVERED, NEW_FEATURE
+
+    (tmp_path / ".sdlc").mkdir()
+    ledger = tmp_path / ".sdlc/progress.md"
+    ledger.write_text(CLAUDE_DELIVERED)
+    (tmp_path / ".sdlc/project-brain.md").write_text(
+        "## Current state\nDevelopment still running.\n## Next actions\nRun QA again.\n"
+        "## Open risks\nLocal storage only.\n")
+    note = focus_note(tmp_path)
+    assert "Not done:" not in note
+    assert "Current step: Development" not in note
+    assert "Development still running" not in note
+    assert "Run QA again" not in note
+    assert "Delivered" in note and "Local storage only" in note
+    assert "1 open question" in focus_note(tmp_path, open_inbox=1)
+
+    ledger.write_text(CLAUDE_DELIVERED + NEW_FEATURE)
+    note = focus_note(tmp_path)
+    assert "Not done: Export development — running" in note
+    assert "Not done: Export QA — pending" in note
+    assert "Not done: Development — running" not in note

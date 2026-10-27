@@ -21,6 +21,7 @@ import tempfile
 import threading
 import time
 import unicodedata
+import uuid
 from typing import Optional
 from hermes_cli.config import cfg_get
 
@@ -2048,10 +2049,11 @@ _gateway_notify_cbs: dict[str, object] = {}  # session_key → callable(approval
 def register_gateway_notify(session_key: str, cb) -> None:
     """Register a per-session callback for sending approval requests to the user.
 
-    The callback signature is ``cb(approval_data: dict) -> None`` where
-    *approval_data* contains ``command``, ``description``, and
-    ``pattern_keys``.  The callback bridges sync→async (runs in the agent
-    thread, must schedule the actual send on the event loop).
+    *approval_data* contains ``command``, ``description``, ``pattern_keys``
+    and a unique ``request_id`` for resolving a particular request. The
+    callback bridges sync→async (runs in the agent thread, must schedule the
+    actual send on the event loop). It may return a cleanup callable, invoked
+    when this wait ends (including timeout/interrupt), to dismiss its prompt.
     """
     with _lock:
         _gateway_notify_cbs[session_key] = cb
@@ -2072,13 +2074,17 @@ def unregister_gateway_notify(session_key: str) -> None:
 
 def resolve_gateway_approval(session_key: str, choice: str,
                              resolve_all: bool = False,
-                             reason: Optional[str] = None) -> int:
+                             reason: Optional[str] = None, *,
+                             request_id: Optional[str] = None) -> int:
     """Called by the gateway's /approve or /deny handler to unblock
     waiting agent thread(s).
 
     When *resolve_all* is True every pending approval in the session is
     resolved at once (``/approve all``).  Otherwise only the oldest one
     is resolved (FIFO).
+
+    A *request_id* resolves only that request, never another request if the
+    selected one has already expired. Existing FIFO/all callers are unchanged.
 
     *reason* is an optional free-text explanation attached to an explicit
     deny (``/deny <reason>``).  It is relayed back to the agent in the
@@ -2090,7 +2096,11 @@ def resolve_gateway_approval(session_key: str, choice: str,
         queue = _gateway_queues.get(session_key)
         if not queue:
             return 0
-        if resolve_all:
+        if request_id is not None:
+            targets = [e for e in queue if e.data.get("request_id") == request_id]
+            for entry in targets:
+                queue.remove(entry)
+        elif resolve_all:
             targets = list(queue)
             queue.clear()
         else:
@@ -3113,6 +3123,7 @@ def _await_gateway_decision(session_key: str, notify_cb, approval_data: dict,
     primary_key = approval_data.get("pattern_key", "")
     all_keys = approval_data.get("pattern_keys", [primary_key])
 
+    approval_data = {**approval_data, "request_id": uuid.uuid4().hex}
     entry = _ApprovalEntry(approval_data)
     with _lock:
         _gateway_queues.setdefault(session_key, []).append(entry)
@@ -3139,7 +3150,7 @@ def _await_gateway_decision(session_key: str, notify_cb, approval_data: dict,
 
     # Notify the user (bridges sync agent thread → async gateway)
     try:
-        notify_cb(approval_data)
+        cleanup = notify_cb(approval_data)
     except Exception as exc:
         logger.warning("Gateway approval notify failed: %s", exc)
         _drop_entry()
@@ -3150,45 +3161,46 @@ def _await_gateway_decision(session_key: str, notify_cb, approval_data: dict,
     # every ~10s to the agent's inactivity tracker — otherwise the gateway
     # watchdog kills the agent while the user is still responding. Mirrors
     # _wait_for_process() cadence.
-    timeout = _get_approval_timeout()
-
     try:
-        from tools.environments.base import touch_activity_if_due
-    except Exception:  # pragma: no cover
-        touch_activity_if_due = None
+        timeout = _get_approval_timeout()
 
-    _now = time.monotonic()
-    _deadline = _now + max(timeout, 0)
-    _activity_state = {"last_touch": _now, "start": _now}
-    resolved = False
-    while True:
-        # Respect interrupt signals (e.g. /stop, /new, or an inactivity
-        # timeout from the gateway) so a pending approval doesn't keep the
-        # session wedged on threading.Event.wait() until the 5-minute approval
-        # timeout. The wait runs on the agent's execution thread, which is the
-        # exact thread AIAgent.interrupt() flags — so is_interrupted() here
-        # sees the signal. Resolve as "deny" so the agent loop receives a
-        # normal denial and unwinds cleanly (#8697).
-        if is_interrupted():
-            logger.info(
-                "Approval wait interrupted by user signal — "
-                "returning deny for session %s",
-                session_key,
-            )
-            entry.result = "deny"
-            entry.event.set()
-            resolved = True
-            break
-        _remaining = _deadline - time.monotonic()
-        if _remaining <= 0:
-            break
-        if entry.event.wait(timeout=min(1.0, _remaining)):
-            resolved = True
-            break
-        if touch_activity_if_due is not None:
-            touch_activity_if_due(_activity_state, "waiting for user approval")
+        try:
+            from tools.environments.base import touch_activity_if_due
+        except Exception:  # pragma: no cover
+            touch_activity_if_due = None
 
-    _drop_entry()
+        _now = time.monotonic()
+        _deadline = _now + max(timeout, 0)
+        _activity_state = {"last_touch": _now, "start": _now}
+        resolved = False
+        while True:
+            # Respect /stop on the execution thread and deny the command so
+            # the agent unwinds without waiting for the approval timeout.
+            if is_interrupted():
+                logger.info(
+                    "Approval wait interrupted by user signal — "
+                    "returning deny for session %s",
+                    session_key,
+                )
+                entry.result = "deny"
+                entry.event.set()
+                resolved = True
+                break
+            _remaining = _deadline - time.monotonic()
+            if _remaining <= 0:
+                break
+            if entry.event.wait(timeout=min(1.0, _remaining)):
+                resolved = True
+                break
+            if touch_activity_if_due is not None:
+                touch_activity_if_due(_activity_state, "waiting for user approval")
+    finally:
+        _drop_entry()
+        if callable(cleanup):
+            try:
+                cleanup()
+            except Exception:
+                logger.warning("Gateway approval cleanup failed", exc_info=True)
 
     choice = entry.result
     # Normalize outcome for the post hook. Unresolved (timeout) and None both

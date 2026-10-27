@@ -31,10 +31,12 @@ class TurnHooks(Protocol):
         on_answer: Callable[[Any], None],
         **fields: Any,
     ) -> str:
-        """Open an owner inbox item; *on_answer* runs when it is answered.
+        """Open an owner inbox item; *on_answer* runs once on answer or expiry.
 
         Returns the item id. Non-blocking: engines that need a blocking
-        answer wait on their own event inside *on_answer*.
+        answer wait on their own event inside *on_answer*. Expiry delivers
+        "deny" for approvals and None for questions/secrets. Approvals live
+        until the engine expires them or the runner stops, across turns.
         """
 
     def expire(self, item_id: str) -> None:

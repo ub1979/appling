@@ -1,5 +1,7 @@
 from types import SimpleNamespace
 
+import pytest
+
 from agent.tool_executor import _budget_for_agent
 from lyra_lite.coordinator import COMPRESSION_CAP_TOKENS, RESULT_CHARS, TURN_CHARS, make_coordinator
 from tools.budget_config import DEFAULT_BUDGET
@@ -42,3 +44,32 @@ def test_all_tools_mode_is_pinned_before_the_shell_is_withheld():
     make_coordinator(agent)
     assert agent.enabled_toolsets and "terminal" in agent.enabled_toolsets
     assert "terminal" not in agent.valid_tool_names
+
+
+@pytest.mark.parametrize("threshold", [0.75, 0.85])
+@pytest.mark.parametrize("cap", [None, 60_000])
+def test_real_compressor_tail_tracks_capped_threshold(threshold, cap):
+    from agent.context_compressor import ContextCompressor
+
+    compressor = ContextCompressor(
+        model="test-model", config_context_length=272_000,
+        threshold_percent=threshold, threshold_tokens_cap=cap, quiet_mode=True,
+    )
+    ordinary = ContextCompressor(
+        model="test-model", config_context_length=272_000,
+        threshold_percent=threshold, quiet_mode=True,
+    )
+    agent = SimpleNamespace(context_compressor=compressor, enabled_toolsets=[], tools=[])
+    make_coordinator(agent)
+    assert compressor.threshold_tokens == min(cap or COMPRESSION_CAP_TOKENS, COMPRESSION_CAP_TOKENS)
+    assert compressor.tail_token_budget == int(compressor.threshold_tokens * compressor.summary_target_ratio)
+    assert ordinary.threshold_tokens > compressor.threshold_tokens
+    assert ordinary.tail_token_budget == int(ordinary.threshold_tokens * ordinary.summary_target_ratio)
+
+    # Applying the coordinator limits again is harmless. A later model switch
+    # must keep both the cap and the derived budget calibrated.
+    make_coordinator(agent)
+    for context_length in (32_000, 272_000):
+        compressor.update_model("switched-test-model", context_length)
+        assert compressor.threshold_tokens <= min(cap or COMPRESSION_CAP_TOKENS, COMPRESSION_CAP_TOKENS)
+        assert compressor.tail_token_budget == int(compressor.threshold_tokens * compressor.summary_target_ratio)

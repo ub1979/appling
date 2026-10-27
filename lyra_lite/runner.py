@@ -77,7 +77,10 @@ class _Hooks:
         self.runner.store.append_event(type_, turn=self.turn_id, **data)
 
     def ask(self, kind: str, on_answer: Callable[[Any], None], **fields: Any) -> str:
-        return self.runner._open_inbox(kind, on_answer, turn=self.turn_id, **fields)
+        # Permission waits own their lifetime: a helper may ask during an
+        # unrelated owner turn, or between turns entirely.
+        turn = None if kind == "approval" else self.turn_id
+        return self.runner._open_inbox(kind, on_answer, turn=turn, **fields)
 
     def expire(self, item_id: str) -> None:
         self.runner._close_inbox(item_id, "expired")
@@ -176,12 +179,13 @@ class ProjectRunner:
     def answer(self, item_id: str, value: Any) -> bool:
         with self._cond:
             waiter = self._waiters.pop(item_id, None)
+            if waiter is not None:
+                shown = "(hidden)" if (self.store.inbox_item(item_id) or {}).get("kind") == "secret" else value
+                self.store.close_inbox(item_id, "answered", answer=value)
+                self.store.append_event("inbox_closed", id=item_id, status="answered", answer=shown)
         if waiter is None:
             self._close_inbox(item_id, "expired")
             return False
-        shown = "(hidden)" if (self.store.inbox_item(item_id) or {}).get("kind") == "secret" else value
-        self.store.close_inbox(item_id, "answered", answer=value)
-        self.store.append_event("inbox_closed", id=item_id, status="answered", answer=shown)
         try:
             waiter(value)
         except Exception:
@@ -196,6 +200,7 @@ class ProjectRunner:
             self.store.update_state(**changes)
             engine = self._engine
             busy = self._busy
+        self._expire_turn_inbox(None)
         stopped = 0
         if engine is not None:
             if busy:
@@ -359,20 +364,28 @@ class ProjectRunner:
     # -- inbox internals -------------------------------------------------
 
     def _open_inbox(self, kind: str, on_answer: Callable[[Any], None], **fields: Any) -> str:
-        item = self.store.add_inbox(kind, **fields)
         with self._cond:
+            item = self.store.add_inbox(kind, **fields)
             self._waiters[item["id"]] = on_answer
-        public = {k: v for k, v in item.items() if k != "answer"}
-        self.store.append_event("inbox", item=public)
+            public = {k: v for k, v in item.items() if k != "answer"}
+            self.store.append_event("inbox", item=public)
+            stopped = self._stop or self.store.state().get("paused")
+        if stopped:
+            self._close_inbox(item["id"], "expired")
         return item["id"]
 
     def _close_inbox(self, item_id: str, status: str) -> None:
         with self._cond:
-            self._waiters.pop(item_id, None)
-        item = self.store.inbox_item(item_id)
-        if item and item.get("status") == "open":
-            self.store.close_inbox(item_id, status)
-            self.store.append_event("inbox_closed", id=item_id, status=status)
+            waiter = self._waiters.pop(item_id, None)
+            item = self.store.inbox_item(item_id)
+            if item and item.get("status") == "open":
+                self.store.close_inbox(item_id, status)
+                self.store.append_event("inbox_closed", id=item_id, status=status)
+        if waiter is not None:
+            try:
+                waiter("deny" if item and item.get("kind") == "approval" else None)
+            except Exception:
+                logger.warning("lyra-lite: inbox expiry handler failed", exc_info=True)
 
     def _expire_turn_inbox(self, turn_id: str | None) -> None:
         for item in self.store.inbox(status="open"):
@@ -433,6 +446,7 @@ class ProjectRunner:
     # -- worker ----------------------------------------------------------
 
     def _drop_engine(self) -> None:
+        self._expire_turn_inbox(None)
         engine, self._engine = self._engine, None
         self._engine_chat = None
         if engine is not None:

@@ -13,6 +13,7 @@ from lyra_lite import watchdog
 from lyra_lite.engines.base import TurnResult
 from lyra_lite.runner import ProjectRunner
 from lyra_lite.store import ProjectStore
+from tests.lyra_lite.progress_cases import CLAUDE_DELIVERED, HERMES_DELIVERED
 
 BASE = watchdog.Facts(
     now=10_000.0, keep_going=True, paused=False, busy=False, queued=0, helpers=0,
@@ -129,5 +130,60 @@ def test_a_question_reply_or_stop_holds_the_watchdog(tmp_path):
         runner.set_keep_going(False)
         runner.store.update_state(paused=False)
         assert runner.watchdog_tick({"idle_minutes": 0}) == "off"
+    finally:
+        runner.shutdown()
+
+
+def test_reordered_progress_drives_focus_and_watchdog_without_reopening_closed_work(tmp_path):
+    from lyra_lite.focus import focus_note
+
+    root = _project(tmp_path)
+    ledger = root / ".sdlc/progress.md"
+    table = ("# Progress ledger\n| # | Phase | Agent | Status | Evidence / notes |\n"
+             "|---|---|---|---|---|\n"
+             "| 1 | Old work | Dev | resolved | fixed |\n"
+             "| 2 | Old QA | QA | superseded | replacement verified |\n"
+             "| 3 | Export | Dev | descoped | owner removed |\n"
+             "| 4 | QA | QA | PASS | checked |\n")
+    ledger.write_text(table)
+    runner = ProjectRunner(ProjectStore(root), lambda store, key: ScriptedEngine(store, False))
+    try:
+        runner.store.update_state(last_turn_end=1.0, last_reply="Delivered.")
+        assert "Not done:" not in focus_note(root)
+        assert runner.watchdog_tick({"idle_minutes": 0}) == "no unfinished step in the ledger"
+        ledger.write_text(table + "| 5 | New feature | Dev | running | in progress |\n")
+        assert "Not done: New feature — running" in focus_note(root)
+        assert runner.watchdog_tick({"idle_minutes": 0}) == "idle with unfinished work"
+        # The nudge must finish before disposing of the test project.
+        deadline = time.time() + 10
+        while time.time() < deadline:
+            if runner._engine is not None:
+                _wait_idle(runner, 1, runner._engine)
+                break
+            time.sleep(0.01)
+        assert runner._engine is not None
+    finally:
+        runner.shutdown()
+
+
+@pytest.mark.parametrize("delivered", [CLAUDE_DELIVERED, HERMES_DELIVERED], ids=["claude-ledger", "hermes-ledger"])
+def test_restored_project_does_not_restart_history_but_does_continue_reopened_qa(tmp_path, delivered):
+    root = _project(tmp_path)
+    ledger = root / ".sdlc/progress.md"
+    ledger.write_text(delivered)
+    # Reconstruct the runner from persisted project state, as after a restart.
+    ProjectStore(root).init().update_state(last_turn_end=1.0, last_reply="Delivered.")
+    engine = ScriptedEngine(ProjectStore(root), False)
+    runner = ProjectRunner(ProjectStore(root), lambda store, key: engine)
+    try:
+        assert runner.watchdog_tick({"idle_minutes": 0}) == "no unfinished step in the ledger"
+        assert engine.turns == []
+        ledger.write_text(delivered + "\n## Regression\n| Phase | Status |\n|---|---|\n"
+                          "| QA regression | reopened — new defect |\n")
+        assert runner.watchdog_tick({"idle_minutes": 0}) == "idle with unfinished work"
+        _wait_idle(runner, 1, engine)
+        assert "Not done: QA regression — reopened" in engine.turns[0]
+        assert "Not done: Development — running" not in engine.turns[0]
+        assert "Not done: Rev 2 build — running" not in engine.turns[0]
     finally:
         runner.shutdown()

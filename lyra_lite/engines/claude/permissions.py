@@ -61,8 +61,11 @@ class PermissionsMixin:
         try:
             choice = str(await asyncio.wait_for(answer, APPROVAL_TIMEOUT_S) or "deny")
         except asyncio.TimeoutError:
-            hooks.expire(item_id)
             choice = "deny"
+        finally:
+            # Also runs when Claude cancels the permission task on Stop or
+            # disconnect. Closing an already answered item is harmless.
+            hooks.expire(item_id)
         if choice == "deny":
             return PermissionResultDeny(
                 message="BLOCKED: the owner did not allow this. Do not retry it or work around it.")

@@ -214,6 +214,32 @@ def test_agents_risky_command_waits_in_inbox_and_runs_in_project_folder(env, bat
             daemon.stop()
 
 
+@pytest.mark.parametrize("action", ["timeout", "stop"])
+def test_hermes_background_permission_cleanup_without_execution(env, action):
+    parent = [tool_step("delegate_task", {"goal": "HELPER-EX run the script", "background": True}),
+              text_step("Agent started."), text_step("Agent finished.")]
+    helper = [tool_step("terminal", {"command": "python3 -c 'open(\"never.txt\",\"w\").write(\"no\")'"}),
+              text_step("Command was not approved.")]
+    with FakeOpenAIServer(parent, side_scripts={"HELPER-EX": helper}) as llm:
+        _write_config(env["hermes_home"], llm.base_url,
+                      approvals={"mode": "manual", "timeout": 2 if action == "timeout" else 60})
+        daemon = Daemon(env).start()
+        try:
+            pid, path = _new_project(daemon, env)
+            daemon.post(f"/api/projects/{pid}/messages", {"text": "start the helper"})
+            item = _wait_event(path, lambda e: e["type"] == "inbox", 90)["item"]
+            if action == "stop":
+                assert daemon.post(f"/api/projects/{pid}/stop", {}).status_code == 200
+            closed = _wait_event(path, lambda e: e["type"] == "inbox_closed" and e["id"] == item["id"], 30)
+            assert closed["status"] == "expired"
+            _wait_event(path, lambda e: e["type"] == "helper" and e.get("event") == "complete", 90)
+            assert daemon.get(f"/api/projects/{pid}").json()["inbox"] == []
+            assert not (path / "never.txt").exists()
+            assert daemon.post(f"/api/projects/{pid}/inbox/{item['id']}", {"answer": "once"}).status_code == 409
+        finally:
+            daemon.stop()
+
+
 def test_killed_mid_turn_keeps_history_and_recovers(env):
     script = [text_step("First answer."), text_step("never delivered")]
     with FakeOpenAIServer(script) as llm:
