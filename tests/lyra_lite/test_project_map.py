@@ -66,6 +66,11 @@ def test_unfinished_qualifier_wins_over_done_words():
     "resolved — no pending work",
     "superseded — no open work",
     "descoped — nothing pending",
+    "fixed, no longer failing",
+    "PASS (previously failing test fixed)",
+    "PASS — fail: 0",
+    "PASS — 0/5 failing",
+    "CONFIRMED at 039b438",
 ])
 def test_explicit_absence_of_remaining_work_does_not_reopen_passed_rows(status):
     assert row_state(status) == "done"
@@ -86,6 +91,12 @@ def test_explicit_absence_of_remaining_work_does_not_reopen_passed_rows(status):
     ("completed — no failed tests; blocked on owner approval", "owner"),
     ("done, FAIL; owner acceptance pending", "owner"),
     ("PASS locally; blocked on integration", "blocked"),
+    ("PASS — Safari test fails", "running"),
+    ("PASS — 2/5 failing", "running"),
+    ("partially fixed", "pending"),
+    ("partially complete", "pending"),
+    ("not confirmed", "running"),
+    ("not yet fixed", "running"),
 ])
 def test_actual_failures_and_remaining_work_still_override_pass(status, expected):
     assert row_state(status) == expected

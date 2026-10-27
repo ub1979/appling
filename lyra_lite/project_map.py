@@ -14,20 +14,22 @@ from pathlib import Path
 LEDGER = Path(".sdlc") / "progress.md"
 _MAX_BYTES = 512 * 1024
 
+_FAIL = r"fail(?:s|ed|ing|ure|ures)?"
 _INCOMPLETE = re.compile(
-    r"\b(incomplete|partial|pending|running|reopened|in progress|not (yet )?(verified|pass|passed)"
-    r"|unverified|open|fail(?:ed|ing|ure|ures)?)\b"
+    r"\b(incomplete|partial|pending|running|reopened|in progress"
+    r"|not (yet )?(verified|confirmed|fixed|pass|passed)"
+    rf"|unverified|open|{_FAIL})\b"
 )
-# Ignore only explicitly absent problems, not the rest of the status. For
-# example, "0 open HIGH; 2 open MEDIUM" still contains unfinished work.
+# Ignore only explicitly absent or past problems, not the rest of the status.
+# For example, "0 open HIGH; 2 open MEDIUM" still contains unfinished work.
 _ABSENT_WORK = re.compile(
-    r"(?<![\w.+-])(?:0|zero|no|nothing)\s+"
+    r"(?<![\w.+-])(?:0|zero|no|nothing)(?:\s*/\s*\d+)?\s+"
     r"(?:(?:open|pending|tests?|checks?)\s+)?"
-    r"(?:open|pending|running|incomplete|partial|unverified|blocked|fail(?:ed|ing|ure|ures)?)\b"
-    r"|\bnot\s+(?:open|pending|running|blocked|failed|failing)\b"
-    r"|\b(?:open|pending|failures?|failed(?:\s+(?:tests|checks))?)\s*[:=]\s*0(?![\w.])"
+    rf"(?:open|pending|running|incomplete|partial|unverified|blocked|{_FAIL})\b"
+    rf"|\b(?:not|no\s+longer|previously)\s+(?:open|pending|running|blocked|{_FAIL})\b"
+    rf"|\b(?:open|pending|{_FAIL})(?:\s+(?:tests|checks))?\s*[:=]\s*0(?![\w.])"
 )
-_DONE = re.compile(r"\b(verified|approved|complete|completed|done|integrated|pass|passed)\b")
+_DONE = re.compile(r"\b(verified|approved|confirmed|fixed|complete|completed|done|integrated|pass|passed)\b")
 # Closed dispositions finish a row too. Require a leading status label so
 # negations ("not resolved") and incidental mentions do not close open work.
 _CLOSED = re.compile(r"^(resolved|superseded|descoped|delivered|handed off)\b")
@@ -43,7 +45,9 @@ def row_state(status: str) -> str:
     incomplete = bool(_INCOMPLETE.search(text))
     if re.search(r"\bblocked\b", text):
         return "owner" if "owner" in text else "blocked"
-    if (_DONE.search(text) or _CLOSED.match(text)) and not incomplete:
+    # "partially fixed/complete" is not done, but it is not running either.
+    partly = bool(re.search(r"\bpartially\b", text))
+    if (_DONE.search(text) or _CLOSED.match(text)) and not incomplete and not partly:
         return "done"
     if incomplete and "owner" in text:
         return "owner"

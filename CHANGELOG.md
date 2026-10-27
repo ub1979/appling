@@ -9,6 +9,17 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.12 beta — 2026-10-27
+
+- **More QA wordings read correctly.** `fixed, no longer failing`,
+  `PASS (previously failing test fixed)`, `PASS — 0/5 failing` and
+  `CONFIRMED at <commit>` count as finished; `PASS — Safari test fails`,
+  `not confirmed` and `not yet fixed` stay unfinished, and "partially fixed"
+  or "partially complete" is no longer counted as done.
+- Checked against every progress ledger on the build Mac: only the intended
+  `CONFIRMED` rows change, and no project's keep-going decision changes.
+- Skills, helper budgets and Security/Code Review/QA gates remain unchanged.
+
 ### Appling v0.11 beta — 2026-10-27
 
 - **Passed QA stays finished.** Statuses such as `PASS — 0 open HIGH/CRITICAL`,
@@ -264,6 +275,19 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.13-a] - 2026-10-27 — Fewer misread QA statuses
+
+Appling v0.12 beta; the Lyra/Studio compatibility version advances to 0.19.13-a.
+
+- **More QA wordings read correctly.** `fixed, no longer failing`,
+  `PASS (previously failing test fixed)`, `PASS — 0/5 failing` and
+  `CONFIRMED at <commit>` count as finished; `PASS — Safari test fails`,
+  `not confirmed` and `not yet fixed` stay unfinished, and "partially fixed"
+  or "partially complete" is no longer counted as done.
+- Checked against every progress ledger on the build Mac: only the intended
+  `CONFIRMED` rows change, and no project's keep-going decision changes.
+- Skills, helper budgets and Security/Code Review/QA gates remain unchanged.
 
 ## [0.19.12-a] - 2026-10-27 — Accurate QA completion status
 
