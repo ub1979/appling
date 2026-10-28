@@ -284,7 +284,7 @@ export function Studio({ id }: { id: string }) {
             <MessageSquarePlus size={16} />
           </IconButton>
           <PrefButtons onAi={() => go(`/settings?project=${id}`)} />
-          <span className="engine-tag" title="Engine used by this project">{detail.engine === "claude" ? "Claude Code" : "Hermes"}</span>
+          <span className="engine-tag" title="Engine used by this project">Hermes</span>
         </div>
       </header>
 

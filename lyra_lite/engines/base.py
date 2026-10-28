@@ -1,8 +1,8 @@
 """The pipe between Appling and an agent engine.
 
 An engine runs one turn at a time and reports everything through
-:class:`TurnHooks`. It never talks to the UI, HTTP, or files directly, so any
-engine (Hermes, the Claude Agent SDK, a CLI agent) plugs in the same way.
+:class:`TurnHooks`. The Hermes adapter translates these hooks into
+runner events and approval requests, independently of the UI.
 """
 
 from __future__ import annotations

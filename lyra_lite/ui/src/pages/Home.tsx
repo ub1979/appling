@@ -102,7 +102,7 @@ export function Home() {
                 <span className="path"><bdi>{p.root}</bdi></span>
                 <div className="recent-row">
                   <AvatarStack ids={["app-it", ...p.team]} />
-                  <span className="tiny muted">{p.engine === "claude" ? "Claude Code" : "Hermes"}</span>
+                  <span className="tiny muted">Hermes</span>
                 </div>
               </button>
             ))}

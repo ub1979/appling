@@ -29,15 +29,8 @@ if errorlevel 1 (
 
 if not exist "%PY%" (
   echo Preparing Appling for the first run ^(a few minutes, only once^)...
-  uv sync --extra dev --extra lyra-claude
+  uv sync --extra dev
   if errorlevel 1 exit /b 1
-)
-
-rem A .venv carried over from another folder can lack the Claude engine's SDK.
-"%PY%" -c "import claude_agent_sdk" >nul 2>&1
-if errorlevel 1 (
-  echo Installing the Claude engine...
-  uv pip install --python "%PY%" -r pyproject.toml --extra lyra-claude
 )
 
 set "UI=%PROJECT_DIR%\lyra_lite\ui"

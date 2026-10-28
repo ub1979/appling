@@ -1,6 +1,5 @@
 """Real permission waits and runner inboxes, without calling a model."""
 
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import time
 
@@ -46,63 +45,6 @@ def _inbox(runner, count=1):
 def _finish_owner_turn(runner):
     runner._finish_turn({"id": "owner", "kind": "user", "text": "status?"},
                         TurnResult(reply="Still working.", messages=[]))
-
-
-def test_claude_permission_survives_unrelated_owner_turn(runner):
-    sdk = pytest.importorskip("claude_agent_sdk")
-    from lyra_lite.engines.claude import ClaudeEngine
-
-    async def run():
-        engine = ClaudeEngine(workspace=str(runner.root), session_key=runner.session_key())
-        engine._hooks = runner._hooks
-        runner._hooks.turn_id = "owner"
-        pending = asyncio.create_task(engine._can_use_tool("Bash", {"command": COMMAND}, None))
-        try:
-            item, = await asyncio.to_thread(_inbox, runner)
-            _finish_owner_turn(runner)
-            assert runner.store.inbox_item(item["id"])["status"] == "open"
-            assert runner.answer(item["id"], "once")
-            assert isinstance(await asyncio.wait_for(pending, 5), sdk.PermissionResultAllow)
-        finally:
-            pending.cancel()
-            await asyncio.gather(pending, return_exceptions=True)
-
-    asyncio.run(run())
-
-
-@pytest.mark.parametrize("action", ["stop", "shutdown", "cancel", "timeout"])
-def test_claude_wait_cleanup_denies_and_removes_card(runner, monkeypatch, action):
-    sdk = pytest.importorskip("claude_agent_sdk")
-    from lyra_lite.engines.claude import ClaudeEngine
-
-    async def run():
-        engine = ClaudeEngine(workspace=str(runner.root), session_key=runner.session_key())
-        engine._hooks = runner._hooks
-        if action == "timeout":
-            monkeypatch.setattr("lyra_lite.engines.claude.permissions.APPROVAL_TIMEOUT_S", 0.2)
-        pending = asyncio.create_task(engine._can_use_tool("Bash", {"command": COMMAND}, None))
-        try:
-            if action != "timeout":
-                await asyncio.to_thread(_inbox, runner)
-            if action == "stop":
-                runner.stop_turn()
-            elif action == "shutdown":
-                runner.shutdown()
-            elif action == "cancel":
-                pending.cancel()
-            if action == "cancel":
-                with pytest.raises(asyncio.CancelledError):
-                    await pending
-            else:
-                assert isinstance(await asyncio.wait_for(pending, 5), sdk.PermissionResultDeny)
-            assert runner.store.inbox(status="open") == []
-            item, = runner.store.inbox()
-            assert not runner.answer(item["id"], "once")
-        finally:
-            pending.cancel()
-            await asyncio.gather(pending, return_exceptions=True)
-
-    asyncio.run(run())
 
 
 @pytest.fixture

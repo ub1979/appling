@@ -117,18 +117,8 @@ def default_engine_factory(store: ProjectStore, session_key: str):
     prompt = f"{text}\n\nProject folder: {store.root}\n"
     if about_me():
         prompt += f"\nAbout the owner (written by them; applies to every project):\n{about_me()}\n"
-    from lyra_lite.settings import effective_claude, effective_engine
-
-    state = store.state()
-    name = effective_engine(state)
-    kwargs: dict[str, Any] = {"workspace": str(store.root), "session_key": session_key,
-                              "system_prompt": prompt}
-    if name == "hermes":
-        kwargs["skills"] = DEFAULT_SKILLS
-    else:
-        kwargs["store"] = store
-        kwargs["settings"] = effective_claude(state)
-    return make_engine(name, **kwargs)
+    return make_engine("hermes", workspace=str(store.root), session_key=session_key,
+                       system_prompt=prompt, skills=DEFAULT_SKILLS)
 
 
 def placement(path: Path, *, creating: bool) -> str | None:
@@ -214,6 +204,9 @@ class Lyra:
         os.replace(tmp, path)
 
     def start(self) -> None:
+        from lyra_lite.settings import migrate_engine_settings
+
+        migrate_engine_settings()
         for root in self._load_registry():
             if Path(root).is_dir():
                 try:
@@ -462,25 +455,10 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     @app.post("/api/projects/{pid}/settings")
     def settings(pid: str, body: dict = Body(...)):
         runner = lyra.get(pid)
+        if "claude" in body or body.get("engine", "hermes") != "hermes":
+            raise HTTPException(status_code=400, detail="Appling uses Hermes. Claude Code settings are no longer supported.")
         if "keep_going" in body:
             runner.set_keep_going(bool(body["keep_going"]))
-        if "engine" in body or "claude" in body:
-            from lyra_lite.engines import ENGINES
-
-            raw = body.get("engine", runner.store.state().get("engine"))
-            engine = None if raw in (None, "", "default") else str(raw)
-            if engine is not None and engine not in ENGINES:
-                raise HTTPException(status_code=400, detail="Unknown engine")
-            claude = body.get("claude")
-            if claude is not None and not isinstance(claude, dict):
-                raise HTTPException(status_code=400, detail="Bad Claude settings")
-            try:
-                runner.set_engine(engine, claude={
-                    k: str(v).strip() for k, v in (claude or {}).items()
-                    if k in {"model", "base_url", "auth_token", "route"}
-                } if claude is not None else None)
-            except RuntimeError as exc:
-                raise HTTPException(status_code=409, detail=str(exc))
         return {"ok": True, **runner.snapshot()}
 
     # -- Lyra-wide AI settings ----------------------------------------------
@@ -488,17 +466,10 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     def _settings_view() -> dict:
         from lyra_lite import settings as st
 
-        from lyra_lite.engines.claude import claude_route
-
-        claude = st.claude_defaults()
         return {
             "engine": st.default_engine(),
             "hermes": st.hermes_model(),
             "hermes_effort": st.hermes_effort(),
-            "claude": {"model": claude.get("model", ""), "base_url": claude.get("base_url", ""),
-                       "route": claude_route(claude), "has_token": bool(claude.get("auth_token")),
-                       "effort": claude.get("effort", "")},
-            "anthropic_key": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip()),
             "about_me": st.about_me(),
         }
 
@@ -527,33 +498,16 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             if body["engine"] not in st.ENGINES:
                 raise HTTPException(status_code=400, detail="Unknown engine")
             changes["engine"] = body["engine"]
-        if isinstance(body.get("claude"), dict):
-            current = st.claude_defaults()
-            effort = str(body["claude"].get("effort") or "").strip()
-            if effort and effort not in st.EFFORTS:
-                raise HTTPException(status_code=400, detail="Unknown effort level")
-            for key in ("model", "base_url", "auth_token", "route", "effort"):
-                if key in body["claude"]:
-                    value = str(body["claude"][key] or "").strip()
-                    if key == "auth_token" and not value:
-                        continue  # blank token field keeps the saved one
-                    current[key] = value
-            changes["claude"] = {k: v for k, v in current.items() if v}
+        if "claude" in body:
+            raise HTTPException(status_code=400, detail="Claude Code settings are no longer supported.")
         if "about_me" in body:
             changes["about_me"] = str(body.get("about_me") or "").strip()[:st.ABOUT_ME_LIMIT]
         if changes:
             st.save_section(changes)
-            # The engine default belongs to future projects. In particular,
-            # changing it must not close an existing engine with live helpers.
+            # Reaffirming Hermes must not close an engine with live helpers.
             if changes.keys() - {"engine"}:
                 _apply_everywhere()
         return _settings_view()
-
-    @app.get("/api/settings/claude-cli")
-    async def claude_cli():
-        from lyra_lite.engines.claude import claude_cli_status
-
-        return await asyncio.to_thread(claude_cli_status)
 
     @app.post("/api/settings/model")
     async def save_model(body: dict = Body(...)):
@@ -583,8 +537,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     def engines():
         from lyra_lite.engines import ENGINES
 
-        return {"engines": [{"id": k, "label": v} for k, v in ENGINES.items()],
-                "anthropic_key": bool(os.environ.get("ANTHROPIC_API_KEY", "").strip())}
+        return {"engines": [{"id": k, "label": v} for k, v in ENGINES.items()]}
 
     @app.post("/api/projects/{pid}/apply-rules")
     def apply_rules(pid: str):

@@ -42,7 +42,6 @@ export interface ProjectDetail {
   engine: string;
   engine_override: boolean;
   engine_locked: boolean;
-  claude: { model?: string; base_url?: string };
   team: string[];
   style: string;
   profile: BuildProfile | null;
@@ -62,8 +61,6 @@ export interface AiSettings {
   engine: string;
   hermes: { provider: string; model: string };
   hermes_effort: { effort: string; effective: string; overridden: boolean };
-  claude: { model: string; base_url: string; route: string; has_token: boolean; effort: string };
-  anthropic_key: boolean;
   about_me: string;
 }
 
@@ -195,12 +192,11 @@ export const api = {
   modelOptions: (refresh = false) => call<ModelOptions>("GET", `/api/settings/models${refresh ? "?refresh=true" : ""}`),
   modelSave: (provider: string, model: string, confirm: boolean) =>
     call<{ ok: boolean; confirm_required?: boolean; message?: string }>("POST", "/api/settings/model", { provider, model, confirm }),
-  claudeCli: () => call<{ found: boolean; logged_in: boolean; method?: string; plan?: string }>("GET", "/api/settings/claude-cli"),
   templates: (kind: ProjectKind) => call<{ templates: Template[] }>("GET", `/api/templates?kind=${kind}`),
   addTemplate: (body: { name: string; kind: ProjectKind; tagline: string; spec: string }) =>
     call<Template>("POST", "/api/templates", body),
   deleteTemplate: (id: string) => call("DELETE", `/api/templates/${id}`),
-  engines: () => call<{ engines: { id: string; label: string }[]; anthropic_key: boolean }>("GET", "/api/engines"),
+  engines: () => call<{ engines: { id: string; label: string }[] }>("GET", "/api/engines"),
   applyRules: (id: string) => call("POST", `/api/projects/${id}/apply-rules`),
   stop: (id: string) => call("POST", `/api/projects/${id}/stop`),
   newChat: (id: string) => call("POST", `/api/projects/${id}/new-chat`),

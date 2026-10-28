@@ -1,19 +1,10 @@
-"""Appling-wide AI settings: which engine, which model.
-
-- The Hermes model is Hermes' own main model in ``config.yaml`` — the same
-  setting the Studio's model page writes — chosen from the providers the
-  owner has linked (Codex, Ollama, Anthropic, Copilot, …).
-- The default engine and the Claude Code engine's model/address live under
-  ``lyra_lite:`` in ``config.yaml``.
-- Each project saves its engine when first opened. The global engine is only
-  the default for new projects; model and effort settings remain independent.
-"""
+"""Appling settings for Hermes models, effort and owner preferences."""
 
 from __future__ import annotations
 
 from typing import Any
 
-ENGINES = ("hermes", "claude")
+ENGINES = ("hermes",)
 
 
 def _section() -> dict:
@@ -31,19 +22,36 @@ def save_section(changes: dict) -> None:
 
 
 def default_engine() -> str:
-    engine = str(_section().get("engine") or "hermes")
-    return engine if engine in ENGINES else "hermes"
+    return "hermes"
 
 
-def claude_defaults() -> dict:
-    claude = _section().get("claude") or {}
-    return {k: str(v) for k, v in claude.items() if k in {"model", "base_url", "auth_token", "route", "effort"} and v} \
-        if isinstance(claude, dict) else {}
+def migrate_engine_settings() -> None:
+    """Retire the old adapter settings, keeping a private recovery copy.
+
+    Remember the previous default only to identify unopened legacy projects.
+    New projects always have an explicit Hermes engine.
+    """
+    from hermes_cli.config import get_config_path, read_raw_config, save_config
+    from lyra_lite.store import _backup_once
+
+    config = read_raw_config()
+    section = config.get("lyra_lite") or {}
+    if not isinstance(section, dict):
+        return
+    if section.get("engine") != "claude" and "claude" not in section:
+        return
+    path = get_config_path()
+    _backup_once(path.parent / "lyra-lite" / "migrations" / "claude-to-hermes" / "config.yaml", path.read_bytes())
+    section = dict(section)
+    if section.get("engine") == "claude":
+        section["legacy_engine_default"] = "claude"
+    section.pop("claude", None)
+    section["engine"] = "hermes"
+    config["lyra_lite"] = section
+    save_config(config)
 
 
-# How hard the model thinks. Same names on both engines. Nothing chosen means
-# DEFAULT_EFFORT — set explicitly, because model defaults differ (Opus 5.5 would
-# run at medium) and the owner wants high, never more, unless they pick it.
+# Nothing chosen means DEFAULT_EFFORT; providers have different defaults.
 EFFORTS = ("low", "medium", "high", "xhigh", "max")
 DEFAULT_EFFORT = "high"
 
@@ -135,15 +143,5 @@ def set_hermes_model(provider: str, model: str, confirm: bool = False) -> dict[s
 
 
 def effective_engine(state: dict) -> str:
-    """Use the project's locked engine, with legacy resolution during migration."""
-    if (state.get("engine_locked") or state.get("engine_override")) and state.get("engine") in ENGINES:
-        return str(state["engine"])
-    return default_engine()
-
-
-def effective_claude(state: dict) -> dict:
-    project = state.get("claude") or {}
-    merged = dict(claude_defaults())
-    if state.get("engine_override") and isinstance(project, dict):
-        merged.update({k: v for k, v in project.items() if v})
-    return merged
+    """All Appling projects use Hermes; ProjectStore handles legacy state."""
+    return "hermes"

@@ -1,6 +1,6 @@
 # Lyra Lite
 
-A small, file-first shell around Lyra's agent engines. Start it with
+A small, file-first shell around the Hermes engine. Start it with
 `./start.sh` (opens <http://127.0.0.1:9200/>) and stop it with `./stop.sh`.
 The classic Studio in this folder is `./start-studio.sh` / `./stop-studio.sh`.
 
@@ -40,21 +40,18 @@ The classic Studio in this folder is `./start-studio.sh` / `./stop-studio.sh`.
   agents and handed to each agent instead of the whole project.
 - **The project map** is read straight from `.sdlc/progress.md` (the phase
   ledger the builder skills keep), so it can't disagree with the files.
-- **Engines plug in** through `lyra_lite/engines/base.py`. Choose the default
-  for new projects with the ⚙ button before creating or opening a project:
-  - `HermesEngine` uses the same provider set-up as the Studio, so every linked
-    subscription works.
-  - `ClaudeEngine` runs the Claude Agent SDK (Claude Code). It needs
-    `pip install '.[lyra-claude]'`, plus an `ANTHROPIC_API_KEY` or an
-    Anthropic-compatible address such as Ollama.
-    - It has its own config folder, so it never uses a claude.ai login.
-    - Hermes' danger check guards its shell commands.
-    - It runs agents in the foreground.
-    - Its cron, scheduling and worktree tools are switched off.
-  - Each project locks its engine when first opened, including across new
-    chats and restarts. Existing projects keep their effective engine on
-    upgrade. Global engine changes only affect new projects; model and
-    effort settings keep their existing behavior.
+- **Hermes runs every project** using the same provider setup as the Studio.
+  Choose a linked model and effort with the ⚙ button.
+- **Former Claude Code projects migrate automatically** on opening. Project
+  files, progress ledgers, chat IDs and conversation history are preserved.
+  Original state is backed up in `.lyra/migrations/claude-to-hermes/state.json`;
+  retired global settings are backed up under
+  `~/.hermes/lyra-lite/migrations/claude-to-hermes/config.yaml` (profile-aware).
+  These private backups may contain credentials; do not share them.
+  Old approvals expire on restart. Migrated projects remain paused until the
+  next owner message, which resumes Hermes with any held reports. Stop the
+  previous Appling process before updating; live agents cannot transfer between
+  processes. Hermes model providers, skills and review gates are unchanged.
 - **Compare runs** with `python -m lyra_lite.report <project> [<project>…]`.
   See `HOW-TO-TEST.md`.
 - **Every turn is saved** to the project's Git with the same checkpoint the
@@ -65,5 +62,3 @@ Tests:
 - `scripts/run_tests.sh tests/lyra_lite` runs the real daemon, the real
   engine and a fake model server.
 - `cd lyra_lite/ui && npm test` runs the UI tests.
-
-Plan: `/Users/u/.claude/plans/glowing-purring-clock.md` (phases 1–4).

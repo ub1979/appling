@@ -85,16 +85,6 @@ class _Hooks:
     def expire(self, item_id: str) -> None:
         self.runner._close_inbox(item_id, "expired")
 
-    def begin_external_turn(self, kind: str, text: str, display: str | None = None):
-        """An engine started a turn on its own (Claude Code reading a helper's
-        report). Returns the turn, None while another turn is running (the
-        engine folds it into that one), or False while the owner has Appling
-        stopped (the engine drops it)."""
-        return self.runner._begin_external_turn(kind, text, display)
-
-    def end_external_turn(self, turn: dict, *, reply: str, usage: dict | None = None,
-                          error: str | None = None) -> None:
-        self.runner._end_external_turn(turn, reply=reply, usage=usage or {}, error=error)
 
 
 WEBSITE_FOCUS = (
@@ -249,7 +239,6 @@ class ProjectRunner:
             "engine": effective_engine(state),
             "engine_locked": bool(state.get("engine_locked")),
             "engine_override": bool(state.get("engine_override")),
-            "claude": {k: v for k, v in (state.get("claude") or {}).items() if k != "auth_token"},
             "inbox": self.store.inbox(status="open"),
             "helpers": self.helpers(),
             "events_size": self.store.events_size(),
@@ -275,30 +264,6 @@ class ProjectRunner:
     def set_keep_going(self, on: bool) -> None:
         self.store.update_state(keep_going=bool(on))
         self.store.append_event("setting", name="keep_going", value=bool(on))
-
-    def set_engine(self, name: str | None, claude: dict | None = None) -> None:
-        """Keep the project's engine fixed; allow its existing model settings."""
-        with self._cond:
-            current = effective_engine(self.store.state())
-            if name != current:
-                raise RuntimeError(
-                    f"This project is locked to {'Claude Code' if current == 'claude' else 'Hermes'}. "
-                    "Choose another default engine before creating a new project."
-                )
-            if claude is None:
-                return
-            if self._busy or self.helpers():
-                raise RuntimeError("Appling is busy; change model settings when it's idle")
-            # A blank token field means "keep the saved one".
-            merged = {**(self.store.state().get("claude") or {}), **claude}
-            changes: dict[str, Any] = {
-                "claude": {k: v for k, v in merged.items() if v != "" or k != "auth_token"},
-                "engine_override": True,
-                "focus_hash": None, "focus_turns": 0,
-            }
-            self.store.update_state(**changes)
-            self._drop_engine()
-        self.store.append_event("setting", name="claude")
 
     def request_reload(self) -> None:
         """Appling-wide settings changed: rebuild the engine before the next turn
@@ -518,38 +483,6 @@ class ProjectRunner:
             hooks.turn_id = None
         self._finish_turn(turn, result)
 
-    def _begin_external_turn(self, kind: str, text: str, display: str | None):
-        with self._cond:
-            state = self.store.state()
-            if state.get("paused"):
-                return False
-            if self._busy:
-                return None
-            turn = {"id": uuid.uuid4().hex[:10], "text": text, "kind": kind, "display": display,
-                    "started": round(time.time(), 3)}
-            self.store.update_state(running=True, turn=turn, turn_start_offset=self.store.events_size())
-            self._busy = True
-        self.store.append_event("turn_start", turn=turn["id"], kind=kind, text=text, display=display)
-        self._hooks.turn_id = turn["id"]
-        return turn
-
-    def _end_external_turn(self, turn: dict, *, reply: str, usage: dict, error: str | None) -> None:
-        history = self.store.messages()
-        messages = history + [{"role": "user", "content": turn["text"]}]
-        if reply:
-            messages.append({"role": "assistant", "content": reply})
-        result = TurnResult(reply=reply, messages=messages, completed=error is None, error=error, usage=usage)
-        self._hooks.turn_id = None
-        try:
-            self._finish_turn(turn, result)
-        except Exception:
-            logger.exception("lyra-lite: could not finish a report turn")
-            with self._cond:
-                if (self.store.state().get("turn") or {}).get("id") == turn["id"]:
-                    self._busy = False
-                    self.store.update_state(running=False, turn=None)
-                    self._cond.notify_all()
-
     def _finish_turn(self, turn: dict, result: TurnResult) -> None:
         turn_id = turn["id"]
         # The engine's working conversation is saved even when it shrank:
@@ -562,8 +495,7 @@ class ProjectRunner:
         self.store.append_transcript(entries)
         # Hermes can fail after a tool has already started a background job.
         # Its returned conversation includes that dispatch and must survive
-        # the error so the next turn can continue it. Claude owns its native
-        # conversation separately and keeps its existing persistence behavior.
+        # the error so the next turn can continue it.
         keep_hermes_progress = getattr(self._engine, "name", None) == "hermes"
         if result.messages and (not result.error or keep_hermes_progress):
             try:

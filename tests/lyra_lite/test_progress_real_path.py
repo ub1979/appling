@@ -1,4 +1,4 @@
-"""Stale ledgers through the real runner, Hermes runtime and Claude Code CLI.
+"""Stale ledgers through the real runner, Hermes runtime and historical ledger formats.
 
 Only model responses are scripted on local provider servers. Watchdog ticks
 are explicit so absence of a restart is asserted without a timed sleep.
@@ -11,28 +11,20 @@ import pytest
 
 from lyra_lite.project_map import read_map
 from lyra_lite.server import Lyra
-from tests.fakes.fake_anthropic_server import FakeAnthropicServer, _flat
 from tests.fakes.fake_openai_server import FakeOpenAIServer, text_step, tool_step
 from tests.lyra_lite.progress_cases import CLAUDE_DELIVERED, HERMES_DELIVERED, NEW_FEATURE
 from tests.lyra_lite.test_lyrad_real_path import _events, _wait_event, _write_config, env  # noqa: F401
 
 
 def _focus(request):
-    # Claude adds an environment message after the owner's prompt; inspect
-    # user content rather than assuming that prompt is the final API message.
-    text = "\n".join(_flat(m["content"]) for m in request["messages"] if m["role"] == "user")
+    text = "\n".join(str(m["content"]) for m in request["messages"] if m["role"] == "user")
     return text.rsplit("[Project focus", 1)[-1]
 
 
-@pytest.mark.parametrize("engine", ["hermes", pytest.param("claude", marks=pytest.mark.live_system_guard_bypass)])
-def test_status_qualifiers_drive_real_focus_and_continuation(env, engine):
-    if engine == "claude":
-        pytest.importorskip("claude_agent_sdk")
-    with FakeOpenAIServer([]) as hermes, FakeAnthropicServer([], marker="Appling") as claude:
-        llm = hermes if engine == "hermes" else claude
-        _write_config(env["hermes_home"], hermes.base_url, lyra_lite={
-            "engine": engine,
-            "claude": {"base_url": claude.base_url, "auth_token": "fake", "model": "claude-fake"},
+@pytest.mark.parametrize("ledger_style", ["hermes", "claude"])
+def test_status_qualifiers_drive_real_focus_and_continuation(env, ledger_style):
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env["hermes_home"], llm.base_url, lyra_lite={
             "watchdog": {"enabled": False},
         })
         app = Lyra()
@@ -44,7 +36,7 @@ def test_status_qualifiers_drive_real_focus_and_continuation(env, engine):
             ledger = root / ".sdlc/progress.md"
             # Exercise the named-column formats emitted by the audited Hermes
             # and Claude projects, without a delivery row masking QA's state.
-            if engine == "hermes":
+            if ledger_style == "hermes":
                 table = ("| Date | Phase | Status | Notes |\n|---|---|---|---|\n"
                          "| 2026-10-27 | QA | {status} | Current result |\n")
             else:
@@ -100,19 +92,11 @@ def test_status_qualifiers_drive_real_focus_and_continuation(env, engine):
             app.shutdown()
 
 
-# The live-system guard scans the whole CLI argv, including the embedded skill
-# prose, and mistakes it for a process-killer command. This intentionally runs
-# the bundled CLI with a temporary HOME and a local scripted provider only.
-@pytest.mark.parametrize("engine", ["hermes", pytest.param("claude", marks=pytest.mark.live_system_guard_bypass)])
-def test_delivery_stays_idle_but_new_work_continues_to_one_qa_job(env, engine):
-    if engine == "claude":
-        pytest.importorskip("claude_agent_sdk")
+@pytest.mark.parametrize("ledger_style", ["hermes", "claude"])
+def test_delivery_stays_idle_but_new_work_continues_to_one_qa_job(env, ledger_style):
     release_qa = threading.Event()
-    with FakeOpenAIServer([]) as hermes, FakeAnthropicServer([], marker="Appling") as claude:
-        llm = hermes if engine == "hermes" else claude
-        _write_config(env["hermes_home"], hermes.base_url, lyra_lite={
-            "engine": engine,
-            "claude": {"base_url": claude.base_url, "auth_token": "fake", "model": "claude-fake"},
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env["hermes_home"], llm.base_url, lyra_lite={
             # Use the normal result poller, but tick the watchdog ourselves.
             "watchdog": {"enabled": False},
         })
@@ -132,7 +116,7 @@ def test_delivery_stays_idle_but_new_work_continues_to_one_qa_job(env, engine):
             root = runner.root
             (root / ".sdlc").mkdir()
             ledger = root / ".sdlc/progress.md"
-            delivered = CLAUDE_DELIVERED if engine == "claude" else HERMES_DELIVERED
+            delivered = CLAUDE_DELIVERED if ledger_style == "claude" else HERMES_DELIVERED
             ledger.write_text(delivered)
             (root / ".sdlc/project-brain.md").write_text(
                 "## Current state\nDevelopment is running.\n## Next actions\nRun QA again.\n")
@@ -140,7 +124,7 @@ def test_delivery_stays_idle_but_new_work_continues_to_one_qa_job(env, engine):
 
             # Idle, unpaused and keep-going enabled: the ledger is the only
             # reason this finished project must not start another turn.
-            assert runner.snapshot()["engine"] == engine
+            assert runner.snapshot()["engine"] == "hermes"
             for _ in range(8):
                 assert runner.watchdog_tick({"idle_minutes": 0}) == "no unfinished step in the ledger"
             assert not llm.main_requests()
@@ -161,14 +145,10 @@ def test_delivery_stays_idle_but_new_work_continues_to_one_qa_job(env, engine):
             finished = delivered + NEW_FEATURE + "| Export QA | PASS | Checked |\n| Delivery | delivered | Accepted |\n"
 
             def write(path, content):
-                args = {"path" if engine == "hermes" else "file_path": str(path), "content": content}
-                return tool_step("write_file" if engine == "hermes" else "Write", args)
+                return tool_step("write_file", {"path": str(path), "content": content})
 
             goal = "PROGRESS-QA: verify the export feature and record the result."
-            dispatch = (tool_step("delegate_task", {"goal": goal, "background": True})
-                        if engine == "hermes" else tool_step("Agent", {
-                            "description": "Export QA", "prompt": goal, "subagent_type": "general-purpose",
-                        }))
+            dispatch = tool_step("delegate_task", {"goal": goal, "background": True})
             llm.script = [write(root / "export.txt", "export implemented"), dispatch,
                           text_step("NEW-QA-STARTED"), write(ledger, finished), text_step("NEW-FEATURE-DELIVERED")]
             llm.side_scripts = {"PROGRESS-QA": [

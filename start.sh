@@ -23,13 +23,7 @@ fi
 
 if [[ ! -x ".venv/bin/python" ]]; then
   echo "Preparing Appling for the first run (a few minutes, only once)..."
-  uv sync --extra dev --extra lyra-claude
-fi
-
-# A .venv carried over from another folder can lack the Claude engine's SDK.
-if ! ".venv/bin/python" -c "import claude_agent_sdk" >/dev/null 2>&1; then
-  echo "Installing the Claude engine..."
-  uv pip install --python .venv/bin/python -r pyproject.toml --extra lyra-claude
+  uv sync --extra dev
 fi
 
 UI=lyra_lite/ui

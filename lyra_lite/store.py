@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import tempfile
 import threading
 import time
 import uuid
@@ -49,6 +50,23 @@ def _read_json(path: Path, default: Any) -> Any:
         return default
 
 
+def _backup_once(path: Path, content: bytes) -> None:
+    """Publish a complete private backup before changing legacy state."""
+    path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    if path.exists():
+        return
+    fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=".backup-")
+    try:
+        with os.fdopen(fd, "wb") as stream:
+            stream.write(content)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
 class ProjectStore:
     """File-backed state for one project folder. Thread-safe within a process."""
 
@@ -77,14 +95,34 @@ class ProjectStore:
                 _atomic_write_text(ignore, "*\n")
             if not self.state_path.exists():
                 _atomic_write_json(self.state_path, self._new_state())
-            # Freeze legacy projects at their effective choice before any
-            # subsequent global default change, including projects never run.
-            state = self.state()
-            if not state.get("engine_locked"):
-                from lyra_lite.settings import effective_engine
-
-                self.update_state(engine=effective_engine(state), engine_locked=True)
+            self._migrate_engine()
         return self
+
+    def _migrate_engine(self) -> None:
+        from lyra_lite.settings import _section
+
+        state = self.state()
+        settings = _section()
+        inherited = not (state.get("engine_locked") or state.get("engine_override"))
+        legacy_default = settings.get("legacy_engine_default") or settings.get("engine")
+        was_claude = (state.get("engine") == "claude" or bool(state.get("claude_session"))
+                      or bool(state.get("claude_chat"))
+                      or (inherited and legacy_default == "claude"))
+        obsolete = any(k in state for k in ("claude", "claude_session", "claude_chat"))
+        if was_claude or obsolete:
+            _backup_once(self.dir / "migrations" / "claude-to-hermes" / "state.json",
+                         self.state_path.read_bytes())
+            for key in ("claude", "claude_session", "claude_chat", "engine_override"):
+                state.pop(key, None)
+        if was_claude:
+            # Leave the old turn for normal restart recovery. Queued work and
+            # watchdog continuation stay held until an explicit user message.
+            state.update(paused=True, rules_hash="", focus_hash=None, focus_turns=0,
+                         engine_migration={"from": "claude", "to": "hermes",
+                                           "at": round(time.time(), 3)})
+        if was_claude or obsolete or state.get("engine") != "hermes" or not state.get("engine_locked"):
+            state.update(engine="hermes", engine_locked=True)
+            _atomic_write_json(self.state_path, state)
 
     @staticmethod
     def _new_state() -> dict:
@@ -94,7 +132,8 @@ class ProjectStore:
             "queue": [],
             "turn": None,
             "turn_start_offset": 0,
-            "engine": None,  # resolved and locked by init()
+            "engine": "hermes",
+            "engine_locked": True,
             "rules_hash": "",
         }
 

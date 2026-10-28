@@ -29,21 +29,12 @@ To stop Lyra Lite, run `./stop.sh` in the same folder.
 
 4. Answer Lyra's questions as you normally would.
 
-## 3. Test B: the same app with Claude Code
+## 3. Add a feature to the finished app
 
-You need one of the following:
-- **An Anthropic API key.** Add `ANTHROPIC_API_KEY=...` to `~/.hermes/.env`,
-  then restart Lyra Lite. This is billed per use by Anthropic, not by your
-  subscription.
-- **Ollama.** In the engine settings, set the model address to
-  `http://localhost:11434` and the model to one you have pulled (for example
-  `qwen3-coder`). This costs nothing.
-
-Then:
-1. Create a project called `pocket-tasks-claude`, also **Personal / one-off**.
-2. Click **Hermes ⚙**, choose **Claude Code**, fill in the model (and the
-   address, if you use Ollama), and click **Save**.
-3. Paste the same brief, and answer the same way you did in Test A.
+Ask for due dates and an overdue filter. Check that the existing tasks remain
+saved, the new feature works, and QA checks the changed behavior. Once the
+progress ledger marks delivery complete, leave the app idle: it should not
+start QA again. A genuinely unfinished later feature should still continue.
 
 ## 4. Things worth trying while it builds
 
@@ -57,30 +48,17 @@ Then:
 | Lyra's rules were changed | A yellow bar offers **Use the new rules** |
 | Restart Lyra Lite (`./stop.sh`, then `./start.sh`) during a build | History stays. Agents that were cut off are reported, and Lyra can redo them |
 
-## 5. Compare the two engines
+## 5. Inspect the run
 
-When both builds are finished (or you stop them), run this in a Terminal, in
-the Lyra folder:
+Run this in Appling's folder:
 
 ```
-.venv/bin/python -m lyra_lite.report "~/Appling Projects/pocket-tasks-hermes" "~/Appling Projects/pocket-tasks-claude"
+.venv/bin/python -m lyra_lite.report "~/Appling Projects/pocket-tasks-hermes"
 ```
 
-It prints both projects side by side, with these rows:
-
-| Row | What it counts |
-|---|---|
-| `wall_hours` | Total time from start to finish |
-| `working_hours` | Time Lyra spent actually working |
-| `owner_messages` | How many times you had to write |
-| `watchdog_nudges` | How many times Lyra had to push itself to continue |
-| `agents_started` | How many agents it used |
-| `approvals_asked` | How many risky commands it asked about |
-| `errors` | Turns that ended in an error |
-| `cost_usd` | Cost, for the Claude engine |
-| `commits` | How many saved steps are in the project's history |
-
-Open each app as well, and judge which one is actually better.
+The report includes elapsed time, owner messages, watchdog nudges, agents,
+approvals, errors and commits. Compare these with the project progress ledger
+and the actual app behavior; more review passes alone do not establish a loop.
 
 ## 6. If something goes wrong
 

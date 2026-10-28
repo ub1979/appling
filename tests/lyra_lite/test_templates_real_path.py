@@ -11,7 +11,6 @@ from pathlib import Path
 import httpx
 import pytest
 
-from tests.fakes.fake_anthropic_server import FakeAnthropicServer, text_step
 from tests.fakes.fake_openai_server import FakeOpenAIServer
 from tests.fakes.fake_openai_server import text_step as openai_text
 from tests.lyra_lite.test_lyrad_real_path import (  # noqa: F401
@@ -21,17 +20,11 @@ from tests.lyra_lite.test_lyrad_real_path import (  # noqa: F401
 REPO = Path(__file__).resolve().parents[2]
 
 
-@pytest.mark.parametrize("engine", ["hermes", pytest.param("claude", marks=pytest.mark.live_system_guard_bypass)])
-def test_status_turns_preserve_project_checkers(env, engine):
-    with FakeOpenAIServer([openai_text("Setup complete."), *[openai_text("Status unchanged.")] * 2]) as hermes, \
-            FakeAnthropicServer([text_step("Setup complete."), *[text_step("Status unchanged.")] * 2], marker="Appling") as claude:
+def test_status_turns_preserve_project_checkers(env):
+    with FakeOpenAIServer([openai_text("Setup complete."), *[openai_text("Status unchanged.")] * 2]) as hermes:
         _write_config(env["hermes_home"], hermes.base_url)
         daemon = Daemon(env).start()
         try:
-            if engine == "claude":
-                response = daemon.post("/api/settings", {"engine": "claude", "claude": {
-                    "base_url": claude.base_url, "auth_token": "x", "model": "claude-fake"}})
-                assert response.status_code == 200
             path = env["home"] / "Appling Projects" / "Custom checker"
             response = daemon.post("/api/projects", {"path": str(path), "create": True,
                                                    "kind": "website", "team": []})
@@ -41,7 +34,7 @@ def test_status_turns_preserve_project_checkers(env, engine):
             # before customizing the checkers or counting owner status turns.
             setup = _wait_event(path, lambda e: e["type"] == "turn_end", 120)
             assert setup["status"] == "done" and setup["reply"] == "Setup complete.", setup
-            llm = hermes if engine == "hermes" else claude
+            llm = hermes
             setup_calls = len(llm.main_requests())
             kit = path / ".lyra" / "kit"
             kit.mkdir(parents=True, exist_ok=True)
@@ -161,23 +154,6 @@ def test_website_project_hands_template_to_requirements(env):
             last = llm.main_requests()[-1]["messages"]
             user_text = next(m["content"] for m in reversed(last) if m["role"] == "user")
             assert "Call it Aurelia Lodge" in str(user_text) and "site-check.mjs" in str(user_text)
-        finally:
-            daemon.stop()
-
-
-def test_new_skills_reach_claude_code_as_native_skills(env):
-    with FakeOpenAIServer([]) as hermes_llm, FakeAnthropicServer([text_step("ok")]) as claude:
-        _write_config(env["hermes_home"], hermes_llm.base_url)
-        daemon = Daemon(env).start()
-        try:
-            assert daemon.post("/api/settings", {"engine": "claude", "claude": {
-                "base_url": claude.base_url, "auth_token": "x", "model": "claude-fake"}}).status_code == 200
-            pid, path = _new_project(daemon, env)
-            daemon.post(f"/api/projects/{pid}/messages", {"text": "hi"})
-            _wait_event(path, lambda e: e["type"] == "turn_end", 120)
-            first = json.dumps(claude.main_requests()[0])
-            assert "ultimate-builder:web-cinematic" in first
-            assert "ultimate-builder:business-motion-film" in first
         finally:
             daemon.stop()
 

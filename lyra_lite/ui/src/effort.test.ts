@@ -8,7 +8,7 @@ describe("effort levels", () => {
     expect(ids.indexOf(DEFAULT_EFFORT)).toBeLessThanOrEqual(ids.indexOf("high"));
   });
 
-  it("Hermes offers every Claude Code level plus off", () => {
+  it("Hermes offers every supported effort level plus off", () => {
     const hermes = HERMES_EFFORT_LEVELS.map((l) => l.id);
     for (const level of EFFORT_LEVELS) expect(hermes).toContain(level.id);
     expect(hermes).toContain("off");

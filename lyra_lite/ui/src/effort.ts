@@ -1,4 +1,4 @@
-// How hard the model thinks before answering. Same names on both engines.
+// How hard the model thinks before answering.
 
 export interface EffortLevel {
   id: string;
@@ -16,7 +16,7 @@ export const EFFORT_LEVELS: EffortLevel[] = [
   { id: "max", label: "Max — deepest and slowest, uses the most" },
 ];
 
-// Hermes can also switch thinking off; Claude Code cannot.
+// Hermes can also switch thinking off.
 export const HERMES_EFFORT_LEVELS: EffortLevel[] = [
   { id: "off", label: "Off — no extra thinking" },
   ...EFFORT_LEVELS,

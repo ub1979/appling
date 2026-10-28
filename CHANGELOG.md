@@ -9,6 +9,19 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.14 beta — 2026-10-28
+
+- **Hermes runs every project.** Removed the Claude Code engine, its SDK dependency,
+  installation steps and engine settings. Hermes model providers remain available.
+- **Safe upgrades from older installations.** Retired Claude settings are backed up;
+  existing Claude project state moves to Hermes with history intact and continuation
+  paused until the next owner message. Old approvals expire during restart recovery.
+  Updating does not delete projects.
+- **Existing fixes retained.** Progress-status parsing, owner approval handling,
+  retry continuity and completed-work QA protections remain in place. Skills,
+  helper budgets and Security/Code Review/QA gates are unchanged.
+- Verified with 220 Appling backend tests, 10 UI tests and a production UI build.
+
 ### Appling v0.13 beta — 2026-10-28
 
 - **Negated completion stays unfinished.** Statuses such as `not fully fixed`
@@ -287,6 +300,21 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.15-a] - 2026-10-28 — Hermes-only Appling
+
+Appling v0.14 beta; the Lyra/Studio compatibility version advances to 0.19.15-a.
+
+- **Hermes runs every project.** Removed the Claude Code engine, its SDK dependency,
+  installation steps and engine settings. Hermes model providers remain available.
+- **Safe upgrades from older installations.** Retired Claude settings are backed up;
+  existing Claude project state moves to Hermes with history intact and continuation
+  paused until the next owner message. Old approvals expire during restart recovery.
+  Updating does not delete projects.
+- **Existing fixes retained.** Progress-status parsing, owner approval handling,
+  retry continuity and completed-work QA protections remain in place. Skills,
+  helper budgets and Security/Code Review/QA gates are unchanged.
+- Verified with 220 Appling backend tests, 10 UI tests and a production UI build.
 
 ## [0.19.14-a] - 2026-10-28 — Keep unfinished QA and owner acceptance visible
 
