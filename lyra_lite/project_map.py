@@ -17,18 +17,26 @@ _MAX_BYTES = 512 * 1024
 _FAIL = r"fail(?:s|ed|ing|ure|ures)?"
 _INCOMPLETE = re.compile(
     r"\b(incomplete|partial|pending|running|reopened|in progress"
-    r"|not (yet )?(verified|confirmed|fixed|pass|passed)"
+    r"|not\s+(?:(?:yet|fully|completely|entirely)\s+)*(verified|confirmed|fixed|pass|passed)"
     rf"|unverified|open|{_FAIL})\b"
 )
-# Ignore only explicitly absent or past problems, not the rest of the status.
+# Ignore only explicitly absent problems, not the rest of the status.
 # For example, "0 open HIGH; 2 open MEDIUM" still contains unfinished work.
 _ABSENT_WORK = re.compile(
     r"(?<![\w.+-])(?:0|zero|no|nothing)(?:\s*/\s*\d+)?\s+"
     r"(?:(?:open|pending|tests?|checks?)\s+)?"
-    rf"(?:open|pending|running|incomplete|partial|unverified|blocked|{_FAIL})\b"
-    rf"|\b(?:not|no\s+longer|previously)\s+(?:open|pending|running|blocked|{_FAIL})\b"
+    rf"(?:open|pending|awaiting|running|incomplete|partial|unverified|blocked|{_FAIL})\b"
+    rf"|\b(?:not|no\s+longer)\s+(?:open|pending|awaiting|running|blocked|{_FAIL})\b"
     rf"|\b(?:open|pending|{_FAIL})(?:\s+(?:tests|checks))?\s*[:=]\s*0(?![\w.])"
 )
+# A historical problem is not necessarily resolved. Require an explicit fix
+# in the same clause, and keep the problem if that clause still qualifies it.
+_RESOLVED_PAST = re.compile(
+    rf"\bpreviously\s+(?:open|pending|running|blocked|{_FAIL})\b"
+    r"(?=[^.;\n]*\b(?:fixed|resolved|closed)\b)"
+    r"(?![^.;\n]*\b(?:not|unresolved|broken|remain(?:s|ing)?)\b)"
+)
+_OWNER_WAIT = re.compile(r"\bawaiting\b[^.;\n]*\bowner\b|\bowner\b[^.;\n]*\bawaiting\b")
 _DONE = re.compile(r"\b(verified|approved|confirmed|fixed|complete|completed|done|integrated|pass|passed)\b")
 # Closed dispositions finish a row too. Require a leading status label so
 # negations ("not resolved") and incidental mentions do not close open work.
@@ -36,7 +44,8 @@ _CLOSED = re.compile(r"^(resolved|superseded|descoped|delivered|handed off)\b")
 
 
 def _status_text(status: str) -> str:
-    return _ABSENT_WORK.sub("", status.strip().lower()).strip()
+    text = _ABSENT_WORK.sub("", status.strip().lower())
+    return _RESOLVED_PAST.sub("", text).strip()
 
 
 def row_state(status: str) -> str:
@@ -45,6 +54,8 @@ def row_state(status: str) -> str:
     incomplete = bool(_INCOMPLETE.search(text))
     if re.search(r"\bblocked\b", text):
         return "owner" if "owner" in text else "blocked"
+    if _OWNER_WAIT.search(text):
+        return "owner"
     # "partially fixed/complete" is not done, but it is not running either.
     partly = bool(re.search(r"\bpartially\b", text))
     if (_DONE.search(text) or _CLOSED.match(text)) and not incomplete and not partly:

@@ -9,6 +9,18 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.13 beta — 2026-10-28
+
+- **Negated completion stays unfinished.** Statuses such as `not fully fixed`
+  and `not completely confirmed` cannot mark a phase done. Work awaiting owner
+  acceptance or approval stays in the owner state without an automatic nudge.
+- **Historical failures require evidence of resolution.** `Previously failing`
+  or `previously open` alone no longer clears a problem. Explicit fixes or
+  resolutions in the same clause retain their completed status; remaining
+  problems stay visible in the map, coordinator focus and continuation checks.
+- Skills, helper budgets, review gates and the existing handling of partially
+  complete work remain unchanged.
+
 ### Appling v0.12 beta — 2026-10-27
 
 - **More QA wordings read correctly.** `fixed, no longer failing`,
@@ -275,6 +287,20 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.14-a] - 2026-10-28 — Keep unfinished QA and owner acceptance visible
+
+Appling v0.13 beta; the Lyra/Studio compatibility version advances to 0.19.14-a.
+
+- **Negated completion stays unfinished.** Statuses such as `not fully fixed`
+  and `not completely confirmed` cannot mark a phase done. Work awaiting owner
+  acceptance or approval stays in the owner state without an automatic nudge.
+- **Historical failures require evidence of resolution.** `Previously failing`
+  or `previously open` alone no longer clears a problem. Explicit fixes or
+  resolutions in the same clause retain their completed status; remaining
+  problems stay visible in the map, coordinator focus and continuation checks.
+- Skills, helper budgets, review gates and the existing handling of partially
+  complete work remain unchanged.
 
 ## [0.19.13-a] - 2026-10-27 — Fewer misread QA statuses
 

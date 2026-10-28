@@ -71,6 +71,9 @@ def test_unfinished_qualifier_wins_over_done_words():
     "PASS — fail: 0",
     "PASS — 0/5 failing",
     "CONFIRMED at 039b438",
+    "PASS — previously open defect resolved",
+    "PASS — previously blocked build now fixed",
+    "fixed; no longer awaiting owner acceptance",
 ])
 def test_explicit_absence_of_remaining_work_does_not_reopen_passed_rows(status):
     assert row_state(status) == "done"
@@ -97,6 +100,16 @@ def test_explicit_absence_of_remaining_work_does_not_reopen_passed_rows(status):
     ("partially complete", "pending"),
     ("not confirmed", "running"),
     ("not yet fixed", "running"),
+    ("not fully fixed", "running"),
+    ("not completely confirmed", "running"),
+    ("not yet fully fixed", "running"),
+    ("fixed locally; awaiting owner acceptance", "owner"),
+    ("fix confirmed; awaiting owner approval", "owner"),
+    ("PASS locally; previously failing integration test still broken", "running"),
+    ("PASS — previously open defects remain unresolved", "running"),
+    ("PASS — previously failing test not fully fixed", "running"),
+    ("PASS — previously failing test fixed; another test fails", "running"),
+    ("PASS — previously failing test not resolved", "running"),
 ])
 def test_actual_failures_and_remaining_work_still_override_pass(status, expected):
     assert row_state(status) == expected
@@ -249,6 +262,20 @@ def test_delivery_with_nothing_pending_closes_history_but_failed_delivery_does_n
     result = _map(tmp_path, prefix + "| Delivery | completed — but tests failing |\n")
     assert not result["delivery_complete"]
     assert [row["state"] for row in result["phases"]] == ["running", "running"]
+
+
+@pytest.mark.parametrize("status", [
+    "not fully fixed",
+    "fixed locally; awaiting owner acceptance",
+    "PASS locally; previously failing integration test still broken",
+    "PASS — previously open defects remain unresolved",
+])
+def test_unfinished_delivery_cannot_close_prior_work(tmp_path, status):
+    result = _map(tmp_path, "| Phase | Status |\n|---|---|\n| Development | running |\n"
+                  f"| Delivery | {status} |\n")
+    assert not result["delivery_complete"]
+    assert result["history"] == []
+    assert result["phases"][0]["state"] == "running"
 
 
 def test_delivery_does_not_close_other_tables_or_revision_scopes(tmp_path):

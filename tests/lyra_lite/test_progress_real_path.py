@@ -58,6 +58,17 @@ def test_status_qualifiers_drive_real_focus_and_continuation(env, engine):
                 ("completed — but tests failing", "running"),
                 ("PASS — 0 open HIGH; 2 open MEDIUM", "running"),
                 ("PASS; owner acceptance pending", "owner"),
+                ("not fully fixed", "running"),
+                ("not completely confirmed", "running"),
+                ("fixed locally; awaiting owner acceptance", "owner"),
+                ("fix confirmed; awaiting owner approval", "owner"),
+                ("PASS locally; previously failing integration test still broken", "running"),
+                ("PASS — previously open defects remain unresolved", "running"),
+                ("fixed, no longer failing", "done"),
+                ("PASS (previously failing test fixed)", "done"),
+                ("PASS — previously open defect resolved", "done"),
+                ("CONFIRMED at 039b438", "done"),
+                ("partially complete", "pending"),
             ]
             for index, (status, expected) in enumerate(cases):
                 ledger.write_text(table.format(status=status))
@@ -82,7 +93,8 @@ def test_status_qualifiers_drive_real_focus_and_continuation(env, engine):
                     assert f"Not done: QA — {status}" in prompt
                 assert ledger.read_text() == table.format(status=status)
             events = _events(root)
-            assert len([e for e in events if e["type"] == "watchdog"]) == 3
+            assert len([e for e in events if e["type"] == "watchdog"]) == sum(
+                expected == "running" for _, expected in cases)
             assert not [e for e in events if e["type"] == "helper"]
         finally:
             app.shutdown()
