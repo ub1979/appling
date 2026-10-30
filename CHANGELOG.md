@@ -312,6 +312,12 @@ Same projects, linked models and builder playbooks; new plumbing.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
 
+## [0.19.19-a] - 2026-10-30 — Installer download links
+
+Appling v0.15 beta; the Studio compatibility version advances to 0.19.19-a.
+
+- Linked the three beta desktop installers and their test notes from the README.
+
 ## [0.19.18-a] - 2026-10-30 — Windows installer packaging fix
 
 Appling v0.15 beta; the Studio compatibility version advances to 0.19.18-a.

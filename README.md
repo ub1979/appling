@@ -6,6 +6,12 @@ Appling is a local-first product studio for apps, websites, slide decks, and sho
 
 Appling is in beta. Review generated work and test it for your own use before publishing it.
 
+## Desktop installers (beta)
+
+Download the [installer preview](https://github.com/ub1979/appling/releases/tag/appling-v0.15.0-beta.1) for [macOS Apple Silicon](https://github.com/ub1979/appling/releases/download/appling-v0.15.0-beta.1/Appling-0.15.0-beta.1-mac-arm64.dmg), [Windows x64](https://github.com/ub1979/appling/releases/download/appling-v0.15.0-beta.1/Appling-0.15.0-beta.1-win-x64.exe), or [Linux x86_64](https://github.com/ub1979/appling/releases/download/appling-v0.15.0-beta.1/Appling-0.15.0-beta.1-linux-x86_64.AppImage). The first launch downloads Python and its locked dependencies, so it needs internet. Node.js and npm are included.
+
+These beta installers are unsigned. macOS or Windows may interrupt the install with a security warning; the [release notes](https://github.com/ub1979/appling/releases/tag/appling-v0.15.0-beta.1) include checksums and test results. If you prefer not to override an operating-system warning, use the source setup below. Windows and Linux graphical installation still need tester feedback.
+
 ## Quick start
 
 The `start.sh` launcher is for macOS and Linux. It needs Bash, [uv](https://docs.astral.sh/uv/), Node.js 20.19+ or 22.12+, `lsof`, and `pgrep`. The Python project supports Python 3.11 through 3.13; `uv` selects a compatible version. The first start installs Python and UI dependencies and can take several minutes.
@@ -16,7 +22,7 @@ cd appling
 ./start.sh
 ```
 
-Open **<http://127.0.0.1:9200/>** in your browser. The launcher prints the address when Appling is ready; it does not automatically open a browser on a fresh start. Stop it later with `./stop.sh` from the same folder.
+Open **<http://127.0.0.1:9200/>** in your browser if it does not open automatically. The launcher prints the address when Appling is ready. Stop it later with `./stop.sh` from the same folder.
 
 Before your first build, connect a model:
 
