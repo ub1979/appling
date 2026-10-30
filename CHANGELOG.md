@@ -16,6 +16,9 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 - Updated Appling's technical, testing, and contribution guides and GitHub
   forms. Public issue reports no longer require diagnostic uploads.
 - Preserved historical internal paths needed by existing projects.
+- Added a dedicated Appling desktop launcher and native installer builds for
+  macOS, Windows, and Linux. First launch prepares Python, Node.js, and npm;
+  updates keep project folders separate from the application.
 
 ### Appling v0.14 beta — 2026-10-28
 
@@ -308,6 +311,14 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.17-a] - 2026-10-30 — Appling desktop installers
+
+Appling v0.15 beta; the Studio compatibility version advances to 0.19.17-a.
+
+- Added a dedicated Appling launcher, first-run dependency setup, native
+  packaging workflow, and packaged-runtime smoke checks.
+- The separate Hermes desktop client retains its own interface.
 
 ## [0.19.16-a] - 2026-10-30 — Appling documentation and onboarding
 

@@ -1,0 +1,46 @@
+{
+  "name": "appling-desktop",
+  "private": true,
+  "version": "0.15.0-beta.1",
+  "description": "Appling desktop launcher",
+  "main": "main.cjs",
+  "scripts": {
+    "stage": "node scripts/stage-runtime.cjs",
+    "smoke": "node scripts/smoke.cjs",
+    "pack": "node scripts/build.cjs dir",
+    "dist:mac": "node scripts/build.cjs mac",
+    "dist:win": "node scripts/build.cjs win",
+    "dist:linux": "node scripts/build.cjs linux"
+  },
+  "devDependencies": {
+    "electron": "40.10.2",
+    "electron-builder": "^26.8.1"
+  },
+  "build": {
+    "appId": "com.appling.desktop",
+    "productName": "Appling",
+    "executableName": "Appling",
+    "artifactName": "Appling-${version}-${os}-${arch}.${ext}",
+    "icon": "icons/icon",
+    "directories": { "output": "release" },
+    "files": ["main.cjs", "package.json"],
+    "extraResources": [
+      { "from": "build/runtime", "to": "runtime" },
+      { "from": "build/bin", "to": "bin" },
+      { "from": "build/node", "to": "node" },
+      { "from": "build/npm.tar.gz", "to": "npm.tar.gz" }
+    ],
+    "asar": true,
+    "mac": {
+      "category": "public.app-category.developer-tools",
+      "target": ["dmg"]
+    },
+    "dmg": { "title": "Install Appling" },
+    "win": { "target": ["nsis"] },
+    "nsis": { "oneClick": false, "allowToChangeInstallationDirectory": true },
+    "linux": {
+      "category": "Development",
+      "target": ["AppImage"]
+    }
+  }
+}
