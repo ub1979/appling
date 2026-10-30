@@ -1,9 +1,9 @@
-"""Lyra's own product version, its changelog, and the update signal.
+"""Appling's Studio compatibility version, changelog, and update signal.
 
 Distinct from ``hermes_cli.__version__``, which tracks the upstream Hermes CLI
-this is built on (0.19.0 at the time of writing). Users install *Lyra*, so the
-number they see, report in bugs, and compare against a release note has to be
-Lyra's own — conflating the two makes "which version are you on?" unanswerable.
+this is built on (0.19.0 at the time of writing). The Appling project studio
+also has its own product version in ``lyra_lite/__init__.py``. Keeping those
+numbers distinct makes bug reports and release notes unambiguous.
 
 ``CHANGELOG.md`` is the human record and this module is the machine one. They are
 kept in step by a test rather than by discipline: the top entry of the changelog
@@ -18,16 +18,16 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-LYRA_VERSION = "0.19.15-a"
+LYRA_VERSION = "0.19.16-a"
 """Semantic version. Bump with every release; the changelog's top entry must match."""
 
 LYRA_CHANNEL = "beta"
 """alpha → beta → rc → stable. Shown next to the number so nobody mistakes this for finished."""
 
-LYRA_RELEASE_NAME = "Hermes-only Appling"
+LYRA_RELEASE_NAME = "Appling documentation and onboarding"
 """Short human name for the release. The line under the number in the UI."""
 
-LYRA_RELEASED = "2026-10-28"
+LYRA_RELEASED = "2026-10-30"
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 CHANGELOG_PATH = PROJECT_ROOT / "CHANGELOG.md"
@@ -37,7 +37,7 @@ _update_cache: dict[str, Any] = {}
 
 
 def lyra_version_display() -> str:
-    """What the user sees: ``beta v0.19.15-a``.
+    """What the user sees: ``beta v0.19.16-a``.
 
     The patch digit is dropped when it is zero — a release called
     "alpha v0.17.0" reads like a build number, not a version.
@@ -52,7 +52,7 @@ def changelog_entry(version: str = LYRA_VERSION) -> Optional[dict[str, Any]]:
     """Return ``{version, released, notes}`` for *version*, or None if absent.
 
     Parses the Keep-a-Changelog shape this repo uses:
-    ``## [0.19.15-a] - 2026-10-28 — Hermes-only Appling``.
+    ``## [0.19.16-a] - 2026-10-30 — Appling documentation and onboarding``.
     """
     try:
         text = CHANGELOG_PATH.read_text(encoding="utf-8")
@@ -106,7 +106,7 @@ def update_status(force: bool = False) -> dict[str, Any]:
 
     Deliberately *not* the upstream-Hermes update check in web_server, which is
     disabled for this distribution. This answers a narrower question the user
-    actually has — "is there a newer Lyra than the one I am running?" — by
+    actually has — "is there a newer Appling checkout than mine?" — by
     counting commits between HEAD and the tracked remote branch.
 
     Never raises and never blocks for long: no git, no remote, no network, or a

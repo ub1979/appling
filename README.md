@@ -1,220 +1,53 @@
 # Appling
 
-> **Describe it. Pick a design. Get a working app, website, deck or video — on your own machine.**
+> Describe what you want to make. Work with an AI team to build it in a folder on your own machine.
 
-Appling is a personal AI product studio. You describe what you want; a team of
-AI agents asks the right questions, plans, builds, tests in a real browser and
-hands you something you can open. It runs locally on the AI subscriptions you
-already have (Claude, ChatGPT/Codex, Ollama and more).
+Appling is a local-first product studio for apps, websites, slide decks, and short videos. It helps you clarify an idea, choose a starting design, build, and review the result. The app and project files run on your computer; you choose the AI model it uses through [Hermes Agent](https://github.com/NousResearch/hermes-agent). A connected cloud model can send prompts to its provider and may incur a subscription or API cost. [Ollama](https://ollama.com/) can run a model locally.
 
-- **Start:** `./start.sh` → <http://127.0.0.1:9200/> · **Stop:** `./stop.sh`
-- **Make:** apps, websites (19 templates with live demos, two photo-real),
-  slide decks (6 templates) and short videos (10 templates)
-- **Checks:** websites are opened in Chrome on desktop and phone before QA
-  can pass; colours are measured, not guessed
-- **Your files:** everything lives in your project folder; 📎 attach videos,
-  frames or photos in the chat
+Appling is in beta. Review generated work and test it for your own use before publishing it.
 
-Appling (briefly APP IT) grew out of Lyra and runs on [Hermes Agent](https://github.com/NousResearch/hermes-agent)
-by Nous Research (MIT). Internal folders still use the name `lyra`
-(`lyra_lite/`, each project's `.lyra/`). The original Lyra README follows.
+## Quick start
 
----
-
-# Lyra
-
-> **Describe it. Approve the design. Get a working app.**
-
-Lyra is an AI agent that builds full-stack applications through conversation. It runs an autonomous SDLC pipeline — from requirements gathering to deployment — using 18 specialist agents that coordinate, learn, and improve with every project.
-
-Built on top of [Hermes Agent](https://github.com/NousResearch/hermes-agent) — uses the `hermes` CLI under the hood.
-
-<p align="center">
-  <a href="#quick-start"><img src="https://img.shields.io/badge/Get_Started-5_min_setup-2ea44f?style=for-the-badge" alt="Get Started"></a>
-  <a href="https://github.com/ub1979/lyra/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
-  <a href="https://github.com/ub1979/lyra/discussions"><img src="https://img.shields.io/badge/Discussions-Ask_Anything-blue?style=for-the-badge" alt="Discussions"></a>
-  <a href="CONTRIBUTING.md"><img src="https://img.shields.io/badge/PRs-Welcome-brightgreen?style=for-the-badge" alt="PRs Welcome"></a>
-</p>
-
----
-
-## What makes Lyra different
-
-Most AI coding tools autocomplete lines or generate files. Lyra runs the entire software development lifecycle:
-
-| What you do | What Lyra does |
-|---|---|
-| Describe your app in plain English | Interviews you for requirements, one question at a time |
-| Approve a requirements summary | Generates a visual UI/UX preview for your approval |
-| Say "looks good" | Architects, plans tasks, writes code, runs QA, deploys |
-| Use your app | Learns from the session and gets better next time |
-
-### The SDLC Pipeline
-
-Lyra doesn't just write code — it runs a full software development lifecycle with 18 specialist agents:
-
-```
-You ──► Requirements ──► Architecture ──► Task Planning ──► Development
-         Engineer         Architect        Planner          Developer
-                                                              │
-Deployed ◄── DevOps ◄── Security ◄── Code Review ◄── QA ◄────┘
-              Engineer    Auditor      Reviewer       Engineer
-```
-
-Each specialist has deep domain knowledge. The coordinator orchestrates the pipeline, verifies each phase's output, and advances automatically — stopping only at approval checkpoints where your input matters.
-
-### Self-Learning Loop
-
-Lyra creates reusable skills from complex tasks and improves them during use. It remembers what worked across sessions, builds a model of your preferences, and gets faster and more accurate over time.
-
-### Any LLM, Any Platform
-
-Use whatever model fits your budget and needs:
-
-| Provider | Models |
-|---|---|
-| **OpenRouter** | Claude, GPT, Gemini, Llama, + hundreds more |
-| **Google AI Studio** | Gemini 3 Flash/Pro |
-| **Ollama** | Any local model (Llama, Qwen, Mistral, etc.) |
-| **Fireworks AI** | Fast inference for open models |
-| **DeepInfra** | 100+ open models, pay-per-use |
-| **HuggingFace** | 20+ open models via unified endpoint |
-| **+ 12 more** | Kimi, GLM, MiniMax, Arcee, Upstage, NovitaAI... |
-
-Switch providers anytime — no code changes, no lock-in.
-
-Talk to Lyra from anywhere: **CLI** | **Web Dashboard** | **Desktop App** | **Telegram** | **Discord** | **Slack** | **WhatsApp** | **Signal** | **Teams** | **Google Chat** | **Email**
-
----
-
-## Quick Start
-
-### Prerequisites
-
-- Python 3.11+
-- Node.js 20+
-- [uv](https://docs.astral.sh/uv/) (Python package manager)
-
-### 1. Clone and configure
+The `start.sh` launcher is for macOS and Linux. It needs Bash, [uv](https://docs.astral.sh/uv/), Node.js 20.19+ or 22.12+, `lsof`, and `pgrep`. The Python project supports Python 3.11 through 3.13; `uv` selects a compatible version. The first start installs Python and UI dependencies and can take several minutes.
 
 ```bash
-git clone https://github.com/ub1979/lyra.git
-cd lyra
-cp .env.example .env
-# Edit .env — add at least one LLM provider API key (e.g. OPENROUTER_API_KEY)
-```
-
-### 2. Start Lyra
-
-```bash
+git clone https://github.com/ub1979/appling.git
+cd appling
 ./start.sh
 ```
 
-That's it. On first run it installs dependencies, enables the builder plugin, and opens the dashboard at **http://localhost:9119**.
+Open **<http://127.0.0.1:9200/>** in your browser. The launcher prints the address when Appling is ready; it does not automatically open a browser on a fresh start. Stop it later with `./stop.sh` from the same folder.
 
-Click **New Project**, describe your app, and Lyra handles the rest.
-
-### Using the CLI instead
+Before your first build, connect a model:
 
 ```bash
-uv sync                          # install dependencies (first time only)
-uv run hermes setup              # pick a provider and model
-uv run hermes                    # start the CLI
-> Build me a todo app with categories and due dates
+./.venv/bin/hermes setup
 ```
 
-### Stopping
+Follow the provider prompts, then use **Settings → Model** in Appling to choose a linked model. You can use a supported subscription login, an API provider, or a local Ollama model. Provider availability and charges depend on what you connect. Keep API keys in `~/.hermes/.env`; ordinary settings belong in `~/.hermes/config.yaml`.
 
-```bash
-./stop.sh
-```
+In Appling, select **Create a new project**, choose a folder and what you are making, pick a template or start from scratch, and describe the result you want. Appling asks questions and brings in building and review agents. It saves each project's work and conversation in that project folder. Use **Open a project** to continue existing work.
 
----
+For a first try, ask for a small website or web app with a clear outcome. For example: “Build a one-page site for a neighborhood bakery with opening hours, a menu, and a contact link.” Check the result in the browser and ask Appling to revise anything that is wrong.
 
-## Architecture
+## What is included
 
-```
-lyra/
-├── agent/              # Core agent loop, tool execution, display
-├── tools/              # Built-in tools (terminal, browser, files, skills, memory)
-├── plugins/
-│   ├── ultimate-builder/   # Guided app builder with dashboard UI
-│   ├── platforms/          # Telegram, Discord, Slack, WhatsApp, etc.
-│   ├── image_gen/          # AI image generation
-│   └── ...                 # 20+ plugins
-├── skills/             # Built-in skill library
-├── optional-skills/    # Community skills (blockchain, creative, data-science, etc.)
-├── web/                # React dashboard (Vite + TypeScript)
-├── apps/desktop/       # Electron desktop app
-└── ui-tui/             # Terminal UI (Ink)
-```
+- **Apps:** choose web, phone, or desktop as a target in project setup.
+- **Websites:** 19 built-in starting templates with preview designs. The website workflow includes build, browser, and QA checks.
+- **Slides and videos:** 6 slide templates and 10 short-video templates.
+- **Local project history:** project files, conversations, progress, and approvals are stored with the project; the internal `.lyra/` folder name is retained for compatibility.
+- **Model choice:** Appling uses Hermes to connect to supported models. Your model choice and provider determine where inference runs and what it costs.
 
-### Key Concepts
+Templates are starting designs, not finished customer projects. The output still needs your review before it is shared or deployed.
 
-- **Specialist Agents**: 18 domain-specific agents (requirements, architecture, development, QA, security, DevOps, etc.) each with deep playbooks
-- **SDLC Coordinator**: Orchestrates specialists in sequence, verifies phase outputs, stops at approval gates
-- **Guided Builder**: Dashboard plugin that turns the SDLC pipeline into a chat-driven experience with visual previews
-- **Skill System**: Agents create, store, and improve reusable skills from experience
-- **Terminal Backends**: Run commands locally, in Docker, via SSH, on Modal (serverless), Singularity, or Daytona
-- **Memory**: Agent-curated persistent memory with FTS5 search and cross-session recall
+## Development and support
 
----
+See [Contributing](CONTRIBUTING.md) for a development setup and pull request guide. For an Appling bug or setup problem, use the [Appling issue tracker](https://github.com/ub1979/appling/issues/new/choose). Include steps to reproduce and a redacted error message; do not publish API keys, private project files, or raw diagnostic archives.
 
-## Run Anywhere
+The [architecture overview](APPLING.md) and [technical guide](lyra_lite/README.md) explain the current workflow, with a [hands-on test walkthrough](lyra_lite/HOW-TO-TEST.md).
 
-| Backend | Use Case |
-|---|---|
-| **Local** | Your machine, zero setup |
-| **Docker** | Isolated container, reproducible |
-| **SSH** | Remote server — agent can't read your `.env` |
-| **Modal** | Serverless — hibernates when idle, near-zero cost |
-| **Singularity** | HPC clusters |
-| **Daytona** | Serverless dev environments |
+## History and credits
 
----
+Appling grew out of a project previously called Lyra. Some internal paths, Python packages, and older changelog entries retain that name so existing installations and projects continue to work. The user-facing product and this repository are **Appling**.
 
-## Dashboard
-
-The web dashboard provides a clean, progressive-disclosure interface:
-
-- **Guided Builder**: Chat-driven app creation with approval gates
-- **Sessions**: View and continue conversations
-- **Models**: Configure providers and switch models
-- **Analytics**: Token usage and cost tracking
-- **Plugins**: Enable/disable capabilities
-- **Cron**: Schedule autonomous tasks in natural language
-
----
-
-## Contributing
-
-We welcome contributions! Please read our [Contributing Guide](CONTRIBUTING.md) before submitting a PR.
-
-**Quick version:**
-
-1. Fork the repo
-2. Create a feature branch (`git checkout -b feat/my-feature`)
-3. Make your changes
-4. Run tests (`cd web && npm test`)
-5. Submit a PR — all PRs require review before merge
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full process, coding standards, and what makes a good PR.
-
----
-
-## Community
-
-- [GitHub Discussions](https://github.com/ub1979/lyra/discussions) — questions, ideas, show & tell
-- [Issues](https://github.com/ub1979/lyra/issues) — bug reports and feature requests
-
----
-
-## Acknowledgments
-
-Lyra builds on the open-source [Hermes Agent](https://github.com/NousResearch/hermes-agent) framework by Nous Research. Lyra adds the guided builder, progressive-disclosure dashboard, and enhanced SDLC workflow on top of that foundation.
-
----
-
-## License
-
-[MIT](LICENSE) — use it, modify it, ship it.
+Appling builds on [Hermes Agent](https://github.com/NousResearch/hermes-agent) by Nous Research. Hermes provides the agent runtime and model connections; Appling adds the project studio and guided building workflow. See the repository [license](LICENSE).

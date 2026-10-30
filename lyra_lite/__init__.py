@@ -7,5 +7,5 @@ projects keep working.
 
 # Appling's own version, separate from LYRA_VERSION (the Studio/Hermes line).
 PRODUCT_NAME = "Appling"
-__version__ = "0.14-beta"
-VERSION_LABEL = "v0.14 beta"
+__version__ = "0.15-beta"
+VERSION_LABEL = "v0.15 beta"

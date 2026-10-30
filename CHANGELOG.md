@@ -1,13 +1,21 @@
 # Changelog
 
-What changed in each release of Lyra, newest first. The top entry's version must
-match `LYRA_VERSION` in `lyra_version.py` — a test enforces it, so bumping one
-without the other fails the build rather than shipping a lie.
+What changed in each release of Appling and its compatibility runtime, newest
+first. The top entry's version must match `LYRA_VERSION` in `lyra_version.py` —
+a test enforces it, so bumping one without the other fails the build.
 
 Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the channel records the release's maturity.
 
 ## [Unreleased]
+
+### Appling v0.15 beta — 2026-10-30
+
+- Replaced the mixed Appling/Lyra onboarding with current install, model setup,
+  project creation, privacy, and cost guidance.
+- Updated Appling's technical, testing, and contribution guides and GitHub
+  forms. Public issue reports no longer require diagnostic uploads.
+- Preserved historical internal paths needed by existing projects.
 
 ### Appling v0.14 beta — 2026-10-28
 
@@ -300,6 +308,14 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.16-a] - 2026-10-30 — Appling documentation and onboarding
+
+Appling v0.15 beta; the Studio compatibility version advances to 0.19.16-a.
+
+- The README, contributor guide, technical walkthrough, and GitHub issue forms
+  now match the current Appling workflow and repository.
+- Internal project paths remain compatible.
 
 ## [0.19.15-a] - 2026-10-28 — Hermes-only Appling
 
