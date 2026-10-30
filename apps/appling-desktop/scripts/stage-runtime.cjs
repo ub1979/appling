@@ -63,8 +63,18 @@ if (fs.existsSync(libDir)) {
 }
 execFileSync(stagedNode, ['--version'], { stdio: 'ignore' });
 
-const globalNpm = execFileSync('npm', ['root', '-g'], { encoding: 'utf8' }).trim();
-const npmSource = [path.join(globalNpm, 'npm'), path.join(nodeRoot, 'lib/node_modules/npm'), path.join(nodeRoot, 'node_modules/npm')]
+const npmFromScript = process.env.npm_execpath
+  ? path.dirname(path.dirname(process.env.npm_execpath)) : null;
+let globalNpm = null;
+if (!npmFromScript || !fs.existsSync(path.join(npmFromScript, 'bin', 'npm-cli.js'))) {
+  const rootArgs = os.platform() === 'win32'
+    ? ['C:/Windows/System32/cmd.exe', ['/d', '/s', '/c', 'npm.cmd', 'root', '-g']]
+    : ['npm', ['root', '-g']];
+  globalNpm = execFileSync(rootArgs[0], rootArgs[1], { encoding: 'utf8' }).trim();
+}
+const npmSource = [npmFromScript, globalNpm && path.join(globalNpm, 'npm'),
+  path.join(nodeRoot, 'lib/node_modules/npm'), path.join(nodeRoot, 'node_modules/npm')]
+  .filter(Boolean)
   .find(candidate => fs.existsSync(path.join(candidate, 'bin', 'npm-cli.js')));
 if (!npmSource) throw new Error('Could not locate npm CLI to bundle');
 fs.cpSync(npmSource, npmTarget, { recursive: true });
