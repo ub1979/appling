@@ -402,6 +402,15 @@ export function Studio({ id }: { id: string }) {
             }}>{applyingRules ? "Applying…" : busy || helpers.length > 0 ? "Stop and apply rules" : "Use the new rules"}</button>
           </div>
         )}
+        {detail.review_recovery && !busy && helpers.length === 0 && live.inbox.length === 0 && (
+          <div className="banner warn">
+            <span>Your {detail.review_recovery.kind} review is still pending. Reopen it to see the approval and change-request buttons.</span>
+            <button className="btn small" onClick={() => void run(async () => {
+              await api.reopenReview(id, detail.review_recovery!.id);
+              await load();
+            })}>Reopen {detail.review_recovery.kind} review</button>
+          </div>
+        )}
         {(() => {
           const shown = problem ?? live.lastProblem;
           if (!shown || shown === dismissed) return null;

@@ -62,6 +62,7 @@ export interface ProjectDetail {
   last_completed_turn?: string;
   provider_statuses?: Record<string, ProviderStatus>;
   inbox: InboxItem[];
+  review_recovery?: InboxItem | null;
   helpers: { id: string; goal: string; started: number | null }[];
   messages: ChatMessage[];
 }
@@ -212,6 +213,7 @@ export const api = {
   map: (id: string) => call<ProjectMap>("GET", `/api/projects/${id}/map`),
   send: (id: string, text: string) => call("POST", `/api/projects/${id}/messages`, { text }),
   answer: (id: string, item: string, answer: ReviewAnswer) => call("POST", `/api/projects/${id}/inbox/${item}`, { answer }),
+  reopenReview: (id: string, item: string) => call("POST", `/api/projects/${id}/review/reopen`, { item_id: item }),
   team: (id: string, team: string[]) => call("POST", `/api/projects/${id}/team`, { team }),
   settings: (id: string, body: Record<string, unknown>) => call("POST", `/api/projects/${id}/settings`, body),
   settingsGet: () => call<AiSettings>("GET", "/api/settings"),

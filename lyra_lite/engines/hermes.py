@@ -317,8 +317,8 @@ class HermesEngine:
                 self.store.update_state(requirements_review=True, requirements_started=True)
                 return self._ask_blocking(
                     "prototype", question=str(question), choices=list(review.PROTOTYPE_CHOICES),
-                    revision=revision, timeout=CLARIFY_TIMEOUT_S,
-                    on_timeout="Prototype review is still pending. Ask the owner to reopen the prototype checkpoint.",
+                    revision=revision, timeout=None,
+                    on_timeout="Prototype review is still pending. Wait for the owner's decision.",
                 )
             if list(choices or []) == list(review.REQUIREMENTS_CHOICES):
                 revision = review.requirements_revision(root)
@@ -329,9 +329,10 @@ class HermesEngine:
                     prototype = review.prototype_revision(root)
                     if not prototype or prototype != state.get("prototype_approved"):
                         return "The owner must open and approve the current clickable prototype first."
+                self.store.update_state(requirements_review=True, requirements_started=True)
                 return self._ask_blocking(
                     "requirements", question=str(question), choices=list(review.REQUIREMENTS_CHOICES),
-                    revision=revision, prototype=prototype, timeout=CLARIFY_TIMEOUT_S,
+                    revision=revision, prototype=prototype, timeout=None,
                     on_timeout="Requirements approval is still pending. Wait for the owner.",
                 )
         return self._ask_blocking(
@@ -343,7 +344,7 @@ class HermesEngine:
             "or end your reply with the question so they can answer later.",
         )
 
-    def _ask_blocking(self, kind: str, *, timeout: float, on_timeout: str, **fields) -> str:
+    def _ask_blocking(self, kind: str, *, timeout: float | None, on_timeout: str, **fields) -> str:
         hooks = self._hooks
         if hooks is None:
             return on_timeout

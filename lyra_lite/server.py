@@ -520,6 +520,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             (state.get("requirements_review") and any(
                 item.get("kind") in {"question", "prototype", "requirements"} for item in runner.store.inbox()
             )))
+        snap["review_recovery"] = runner.recoverable_review()
         return {"id": pid, **snap, "messages": display_messages(runner.store.conversation())}
 
     @app.post("/api/projects/{pid}/update")
@@ -802,6 +803,14 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         if not ok:
             raise HTTPException(status_code=409, detail="That request has expired.")
         return {"ok": True}
+
+    @app.post("/api/projects/{pid}/review/reopen")
+    def reopen_review(pid: str, body: dict = Body(...)):
+        try:
+            item_id = lyra.get(pid).reopen_review(str(body.get("item_id") or ""))
+        except RuntimeError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
+        return {"id": item_id}
 
     @app.post("/api/projects/{pid}/stop")
     def stop(pid: str):

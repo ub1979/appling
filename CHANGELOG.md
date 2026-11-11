@@ -9,6 +9,16 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.1 beta — 2026-11-11
+
+Desktop package 0.17.1-beta.1.
+
+- Prototype and requirements approval buttons no longer disappear after the
+  ordinary question timeout. They wait for the owner's decision or an explicit Stop.
+- Expired reviews offer a Reopen review action that restores the real controls
+  without an AI call. Recovery works after restart and still validates the viewed
+  prototype and current requirements before approval.
+
 ### Appling v0.17 beta — 2026-11-11
 
 Desktop package 0.17.0-beta.1.
@@ -339,6 +349,15 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.22-a] - 2026-11-11 — Persistent review controls
+
+Appling v0.17.1 beta. Desktop package 0.17.1-beta.1.
+
+- Removed the ordinary clarification timeout from prototype and requirements
+  review checkpoints and added recovery controls for expired current reviews.
+- Reopening a review preserves pending approvals and continues the conversation
+  only after an explicit owner decision.
 
 ## [0.19.21-a] - 2026-11-11 — Prototype feedback and AI status
 

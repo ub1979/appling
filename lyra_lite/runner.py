@@ -269,6 +269,55 @@ class ProjectRunner:
         self.store.append_event("chat_started", chat_id=chat_id)
         return chat_id
 
+    def recoverable_review(self) -> dict | None:
+        """The most recent expired review, only while its exact draft is current."""
+        state = self.store.state()
+        if not state.get("requirements_review"):
+            return None
+        cards = [i for i in self.store.inbox()
+                 if i.get("kind") in {"prototype", "requirements"}
+                 and i.get("created", 0) >= state.get("chat_started_at", 0)]
+        if not cards:
+            return None
+        if any(i.get("status") == "open" for i in cards):
+            return None
+        item = max(cards, key=lambda i: i.get("created", 0))
+        kind, revision = item["kind"], item.get("revision")
+        if item.get("status") != "expired" or not revision:
+            return None
+        update = review.active_update(self.root, state) or {}
+        if kind == "prototype":
+            if (revision != review.prototype_revision(self.root)
+                    or revision in (state.get("prototype_approved"), state.get("prototype_needs_changes"),
+                                    update.get("baseline_prototype_revision"))):
+                return None
+        else:
+            if (revision != review.requirements_revision(self.root)
+                    or revision in (state.get("requirements_approved"), update.get("baseline_requirements_revision"))):
+                return None
+            if review.visual_project(self.root, state):
+                prototype = review.prototype_revision(self.root)
+                if not prototype or prototype != state.get("prototype_approved") or prototype != item.get("prototype"):
+                    return None
+        return item
+
+    def reopen_review(self, item_id: str) -> str:
+        """Restore review controls without asking a model to recreate them."""
+        with self._cond:
+            if self._stop or self._busy or self.helpers() or self.store.state().get("queue"):
+                raise RuntimeError("Finish or stop the current work before reopening the review.")
+            item = self.recoverable_review()
+            if item is None or item["id"] != item_id:
+                raise RuntimeError("This review is no longer current. Ask Appling to share the latest draft.")
+            self.store.update_state(paused=False)
+
+            def resume(value):
+                if value is not None:
+                    self.submit(f"Owner's {item['kind']} review decision:\n\n{value}")
+
+            fields = {k: item[k] for k in ("question", "choices", "revision", "prototype") if k in item}
+            return self._open_inbox(item["kind"], resume, turn=None, **fields)
+
     def start_update(self, branch: str | None) -> dict:
         from lyra_lite.templates import get_template
 
