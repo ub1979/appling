@@ -16,6 +16,7 @@ import secrets
 import subprocess
 import threading
 import time
+import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -31,7 +32,7 @@ UPLOADS = Path("assets") / "uploads"
 BUILTIN_TEMPLATES = Path(__file__).resolve().parent / "templates"
 MAX_UPLOAD = 2 * 1024 ** 3
 from lyra_lite.runner import REPO_ROOT, ProjectRunner, project_key
-from lyra_lite.store import ProjectStore
+from lyra_lite.store import ProjectStore, _atomic_write_json
 from lyra_lite.watchdog import NUDGE
 
 logger = logging.getLogger(__name__)
@@ -182,7 +183,7 @@ class Lyra:
     def __init__(self, engine_factory=default_engine_factory):
         self.engine_factory = engine_factory
         self.runners: dict[str, ProjectRunner] = {}
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._stop = threading.Event()
         self._poller: threading.Thread | None = None
 
@@ -200,9 +201,7 @@ class Lyra:
         path.parent.mkdir(parents=True, exist_ok=True)
         with self._lock:
             roots = sorted(str(r.root) for r in self.runners.values())
-        tmp = path.with_suffix(".tmp")
-        tmp.write_text(json.dumps({"projects": roots}, indent=2) + "\n", encoding="utf-8")
-        os.replace(tmp, path)
+            _atomic_write_json(path, {"projects": roots})
 
     def start(self) -> None:
         from lyra_lite.settings import migrate_engine_settings
@@ -293,6 +292,46 @@ class Lyra:
                               kind="setup",
                               display=brief.strip() or "Project opened")
         return runner
+
+    def archive_project(self, pid: str, hosts: AppHosts) -> Path:
+        with self._lock:
+            runner = self.get(pid)
+            archive = (projects_root() / "Archive").resolve()
+            if archive.is_relative_to(runner.root) or runner.root == archive:
+                raise HTTPException(status_code=409, detail="Choose an individual project to delete.")
+            if any(other is not runner and other.root.is_relative_to(runner.root)
+                   for other in self.runners.values()):
+                raise HTTPException(status_code=409, detail="Delete the projects inside this folder first.")
+            destination = archive / f"{runner.root.name}-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
+            try:
+                archive.mkdir(parents=True, exist_ok=True)
+                runner.close_for_archive()
+                hosts.close_project(runner.root)
+                self._move_project(runner.root, destination)
+            except (OSError, RuntimeError, subprocess.SubprocessError) as exc:
+                if runner._stop and not runner._thread.is_alive() and runner.root.is_dir():
+                    self.runners[pid] = ProjectRunner(ProjectStore(runner.root), self.engine_factory)
+                raise HTTPException(status_code=409, detail=f"Could not archive the project. {exc}") from exc
+            del self.runners[pid]
+            try:
+                self._save_registry()
+            except OSError as exc:
+                self._move_project(destination, runner.root)
+                self.runners[pid] = ProjectRunner(ProjectStore(runner.root), self.engine_factory)
+                raise HTTPException(status_code=409, detail="Could not save the project list. Try again.") from exc
+            return destination
+
+    @staticmethod
+    def _move_project(source: Path, destination: Path) -> None:
+        if (source / ".git").is_file():
+            result = subprocess.run(["git", "-C", str(source), "worktree", "move",
+                                     str(source), str(destination)],
+                                    capture_output=True, text=True, timeout=30, check=False)
+            if result.returncode:
+                raise RuntimeError(result.stderr.strip())
+        else:
+            # Rename keeps the move atomic, including the saved chat and Git history.
+            source.rename(destination)
 
     def get(self, pid: str) -> ProjectRunner:
         with self._lock:
@@ -415,18 +454,24 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     @app.post("/api/projects")
     def add_project(body: dict = Body(...)):
         team = body.get("team")
-        runner = lyra.add_project(
-            str(body.get("path") or ""), create=bool(body.get("create")),
-            team=[str(t) for t in team] if isinstance(team, list) else None,
-            style=str(body.get("style") or "") or None,
-            brief=str(body.get("brief") or ""),
-            models=body.get("models") if isinstance(body.get("models"), dict) else None,
-            profile=str(body.get("profile") or "") or None,
-            kind=str(body.get("kind") or "") or None,
-            template_id=str(body.get("template") or "") or None,
-            platforms=[str(p) for p in body["platforms"]] if isinstance(body.get("platforms"), list) else None,
-        )
+        with lyra._lock:
+            runner = lyra.add_project(
+                str(body.get("path") or ""), create=bool(body.get("create")),
+                team=[str(t) for t in team] if isinstance(team, list) else None,
+                style=str(body.get("style") or "") or None,
+                brief=str(body.get("brief") or ""),
+                models=body.get("models") if isinstance(body.get("models"), dict) else None,
+                profile=str(body.get("profile") or "") or None,
+                kind=str(body.get("kind") or "") or None,
+                template_id=str(body.get("template") or "") or None,
+                platforms=[str(p) for p in body["platforms"]] if isinstance(body.get("platforms"), list) else None,
+            )
         return {"id": project_key(runner.root), **runner.snapshot()}
+
+    @app.delete("/api/projects/{pid}")
+    def delete_project(pid: str):
+        destination = lyra.archive_project(pid, app.state.app_hosts)
+        return {"archived_to": str(destination)}
 
     @app.get("/api/catalog")
     def catalog():

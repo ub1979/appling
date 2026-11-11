@@ -363,6 +363,16 @@ class AppHosts:
             self._expo[str(project)] = host
             return host.url
 
+    def close_project(self, project: Path) -> None:
+        with self._lock:
+            for key in (str(project), f"prototype:{project}"):
+                host = self._hosts.pop(key, None)
+                if host is not None:
+                    host.stop()
+            expo = self._expo.pop(str(project), None)
+            if expo is not None:
+                expo.stop()
+
     def stop_all(self) -> None:
         with self._lock:
             for host in self._hosts.values():

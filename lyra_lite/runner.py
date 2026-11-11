@@ -139,6 +139,8 @@ class ProjectRunner:
         if display:
             item["display"] = display
         with self._cond:
+            if self._stop:
+                raise ValueError("This project has been closed.")
             state = self.store.state()
             queue = list(state.get("queue") or [])
             if state.get("paused") and kind == "user":
@@ -213,6 +215,8 @@ class ProjectRunner:
 
     def stop_turn(self, clear_queue: bool = True) -> None:
         with self._cond:
+            if self._stop:
+                return
             changes: dict[str, Any] = {"paused": True}
             if clear_queue:
                 changes["queue"] = []
@@ -234,6 +238,8 @@ class ProjectRunner:
 
     def new_chat(self) -> str:
         with self._cond:
+            if self._stop:
+                raise RuntimeError("This project has been closed.")
             if self._busy:
                 raise RuntimeError("Appling is busy; stop the current turn first")
             if self.helpers():
@@ -248,6 +254,8 @@ class ProjectRunner:
         from lyra_lite.templates import get_template
 
         with self._cond:
+            if self._stop:
+                raise RuntimeError("This project has been closed.")
             state = self.store.state()
             ledger = read_map(self.root)
             if review.active_update(self.root, state, ledger):
@@ -334,9 +342,26 @@ class ProjectRunner:
             self._cond.notify_all()
         self._drop_engine()
 
+    def close_for_archive(self) -> None:
+        with self._cond:
+            if self._busy or self.helpers():
+                raise RuntimeError("Stop Appling and its agents before deleting this project.")
+            self.store.update_state(paused=True)
+            self._stop = True
+            self._cond.notify_all()
+        self._thread.join(timeout=10)
+        if self._thread.is_alive():
+            raise RuntimeError("Appling is still finishing this project. Try again shortly.")
+        self._drop_engine()
+        with self._memory_lock:
+            pass  # Wait for any project index write before moving the folder.
+
     def set_keep_going(self, on: bool) -> None:
-        self.store.update_state(keep_going=bool(on))
-        self.store.append_event("setting", name="keep_going", value=bool(on))
+        with self._cond:
+            if self._stop:
+                return
+            self.store.update_state(keep_going=bool(on))
+            self.store.append_event("setting", name="keep_going", value=bool(on))
 
     def request_reload(self) -> None:
         """Appling-wide settings changed: rebuild the engine before the next turn
@@ -346,6 +371,8 @@ class ProjectRunner:
     def reload_engine(self) -> None:
         """Rebuild the engine (new rules) at the next turn; refuses while busy."""
         with self._cond:
+            if self._stop:
+                raise RuntimeError("This project has been closed.")
             if self._busy or self.helpers():
                 raise RuntimeError("Appling is busy; try again when it's idle")
             self._drop_engine()
@@ -356,6 +383,8 @@ class ProjectRunner:
         now = time.time() if now is None else now
         cfg = {**watchdog.DEFAULTS, **(settings or {})}
         with self._cond:
+            if self._stop:
+                return "project closed"
             state = self.store.state()
             wd = dict(state.get("watchdog") or {})
             if wd.get("day") != watchdog.today():
@@ -604,7 +633,8 @@ class ProjectRunner:
             from lyra_lite.memory import ProjectMemory
 
             with self._memory_lock:
-                ProjectMemory(self.root).refresh()
+                if not self._stop:
+                    ProjectMemory(self.root).refresh()
         except Exception:
             logger.warning("lyra-lite: project memory index failed", exc_info=True)
 

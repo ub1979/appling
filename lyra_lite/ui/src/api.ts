@@ -197,6 +197,7 @@ export const api = {
   projects: () => call<{ projects: ProjectSummary[]; default_root: string; version?: string }>("GET", "/api/projects"),
   catalog: () => call<Catalog>("GET", "/api/catalog"),
   addProject: (body: NewProject) => call<ProjectDetail>("POST", "/api/projects", body),
+  deleteProject: (id: string) => call<{ archived_to: string }>("DELETE", `/api/projects/${id}`),
   project: (id: string) => call<ProjectDetail>("GET", `/api/projects/${id}`),
   startUpdate: (id: string, branch: string | null) =>
     call<{ chat_id: string }>("POST", `/api/projects/${id}/update`, { branch }),

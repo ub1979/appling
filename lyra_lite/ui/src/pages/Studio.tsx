@@ -83,6 +83,7 @@ export function Studio({ id }: { id: string }) {
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [showTeam, setShowTeam] = useState(false);
   const [showUpdate, setShowUpdate] = useState(false);
+  const [deletingProject, setDeletingProject] = useState(false);
   // Bumped on every owner message so the chat jumps to the bottom to show it.
   const [sent, setSent] = useState(0);
   // The live preview beside the chat, and parts of it the owner picked.
@@ -315,6 +316,15 @@ export function Studio({ id }: { id: string }) {
           >
             <MessageSquarePlus size={16} />
           </IconButton>
+          <button className="btn small danger" disabled={busy || helpers.length > 0 || deletingProject}
+            onClick={() => {
+              if (!window.confirm(`Delete "${detail.name}" from your projects? Its folder, files and saved chats will move to Appling Projects/Archive.`)) return;
+              setDeletingProject(true);
+              void run(async () => {
+                try { await api.deleteProject(id); go("/"); }
+                finally { setDeletingProject(false); }
+              });
+            }}>{deletingProject ? "Moving to archive…" : "Delete project"}</button>
           <PrefButtons onAi={() => go(`/settings?project=${id}`)} />
           <span className="engine-tag" title="Engine used by this project">Hermes</span>
         </div>

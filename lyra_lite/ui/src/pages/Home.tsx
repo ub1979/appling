@@ -18,6 +18,24 @@ export function Home() {
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   const [problem, setProblem] = useState<string | null>(null);
   const [version, setVersion] = useState("");
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
+  const [deleteProblem, setDeleteProblem] = useState<string | null>(null);
+
+  const deleteProject = async (project: ProjectSummary) => {
+    if (!window.confirm(`Delete "${project.name}" from your projects? Its folder, files and saved chats will move to Appling Projects/Archive.`)) return;
+    setDeleting(project.id);
+    setDeleteProblem(null);
+    try {
+      const result = await api.deleteProject(project.id);
+      setProjects((all) => all?.filter((p) => p.id !== project.id) ?? null);
+      setNotice(`Project moved to ${result.archived_to}`);
+    } catch (e) {
+      setDeleteProblem(e instanceof Error ? e.message : String(e));
+    } finally {
+      setDeleting(null);
+    }
+  };
 
   useEffect(() => {
     const load = () =>
@@ -77,6 +95,8 @@ export function Home() {
         </div>
       </section>
 
+      {(notice || problem || deleteProblem) && <div className={`banner ${problem || deleteProblem ? "bad" : "good"}`} role="status">{deleteProblem ?? problem ?? notice}</div>}
+
       {projects && projects.length > 0 && (
         <>
           <div className="section-head">
@@ -88,7 +108,8 @@ export function Home() {
           </div>
           <div className="recent-grid">
             {projects.map((p) => (
-              <button key={p.id} className="recent-card" onClick={() => go(`/p/${p.id}`)}>
+              <div key={p.id} className="recent-project">
+              <button className="recent-card" disabled={deleting === p.id} onClick={() => go(`/p/${p.id}`)}>
                 <div className="recent-row">
                   <b>{p.name}</b>
                   {p.inbox > 0 ? (
@@ -105,6 +126,12 @@ export function Home() {
                   <span className="tiny muted">Hermes</span>
                 </div>
               </button>
+              <button className="btn small danger" disabled={p.running || deleting !== null}
+                title={p.running ? "Stop Appling and its agents before deleting this project" : "Move this project to Archive"}
+                onClick={() => void deleteProject(p)}>
+                {deleting === p.id ? "Moving to archive…" : "Delete project"}
+              </button>
+              </div>
             ))}
           </div>
         </>
