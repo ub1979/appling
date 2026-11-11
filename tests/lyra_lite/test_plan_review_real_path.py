@@ -1,10 +1,7 @@
 """The plan is visible, its exact revision is approved, and only then may development start."""
-from types import SimpleNamespace
-import json
 import pytest
 
 from lyra_lite import review
-from lyra_lite.delegation import dispatch_project_tasks
 from lyra_lite.store import ProjectStore
 from tests.fakes.fake_openai_server import FakeOpenAIServer, text_step, tool_step
 from tests.lyra_lite.test_lyrad_real_path import Daemon, _wait_event, _write_config, env  # noqa: F401
@@ -68,8 +65,6 @@ def test_plan_card_contains_the_actual_document_and_blocks_blind_or_stale_approv
         store = ProjectStore(root).init()
         store.update_state(requirements_approved=review.requirements_revision(root), requirements_revision_format=2,
                            prototype_approved=review.prototype_revision(root), requirements_review=False, plan_review_required=True)
-        blocked = json.loads(dispatch_project_tasks(store, SimpleNamespace(), {'goal': 'sw-developer: Begin Step 1'}))
-        assert 'Show the current implementation plan' in blocked['error']
         goal = 'sw-developer: Begin the approved Step 1'
         target = root / 'src/import.js'
         llm.script = [tool_step('delegate_task', {'goal': goal}), text_step('Development started.'), text_step('Step 1 report received.')]

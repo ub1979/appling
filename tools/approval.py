@@ -3273,10 +3273,6 @@ def check_all_command_guards(command: str, env_type: str,
                        deny_pattern, command[:200])
         return _user_deny_block_result(deny_pattern)
 
-    from agent.delegation_context import tool_permission_guard
-    scope_guard = tool_permission_guard()
-    scope_approved = scope_guard is not None and scope_guard.consume_consent("terminal", command)
-
     # --yolo or approvals.mode=off: bypass all approval prompts.
     # Gateway /yolo is session-scoped; CLI --yolo remains process-scoped.
     approval_mode = _get_approval_mode()
@@ -3427,11 +3423,6 @@ def check_all_command_guards(command: str, env_type: str,
     if is_dangerous:
         if not is_approved(session_key, pattern_key):
             warnings.append((pattern_key, description, False))
-
-    if scope_approved:
-        # Exact scope consent already covered the displayed destructive action.
-        # Keep independent scanner findings; never suppress a new security reason.
-        warnings = [warning for warning in warnings if warning[2]]
 
     # Nothing to warn about
     if not warnings:
@@ -3710,10 +3701,6 @@ def check_execute_code_guard(code: str, env_type: str,
     trusted-by-config (set a gateway/ask surface or ``approvals.cron_mode`` to
     require approval).
     """
-    from agent.delegation_context import tool_permission_guard
-    scope_guard = tool_permission_guard()
-    if scope_guard is not None and scope_guard.consume_consent("execute_code", code):
-        return {"approved": True, "message": None}
     pattern_key = "execute_code"
     description = (
         "execute_code script execution. The script can spawn subprocesses or "

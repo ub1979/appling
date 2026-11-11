@@ -2882,9 +2882,6 @@ def delegate_task(
             )
             # Override with correct parent tool names (before child construction mutated global)
             child._delegate_saved_tool_names = _parent_tool_names
-            permission_guard = getattr(parent_agent, "__dict__", {}).get("tool_permission_guard")
-            if permission_guard is not None:
-                child.tool_permission_guard = permission_guard.for_task(t["goal"])
             # Tee the child's progress events into its live transcript log.
             # wrap_progress_callback preserves the inner callback contract
             # (including the _flush attribute) and never lets writer failures

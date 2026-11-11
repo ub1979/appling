@@ -1257,20 +1257,6 @@ def handle_function_call(
                 )
                 return result
 
-        # Runtime permissions are independent of the single-fire plugin hook.
-        # Check the final payload after execution middleware and bridge unwrap.
-        from agent.delegation_context import tool_permission_guard
-        scope_guard = tool_permission_guard()
-        if scope_guard is not None:
-            try:
-                scope_block = scope_guard.final_check(function_name, function_args,
-                                                     task_id=task_id or "", tool_call_id=tool_call_id or "")
-            except Exception:
-                logger.exception("Final runtime scope check failed")
-                scope_block = "BLOCKED: the final runtime scope check failed. No tool was executed."
-            if scope_block:
-                return json.dumps({"error": scope_block}, ensure_ascii=False)
-
         # ACP/Zed edit approval runs before any file mutation.  The requester
         # is bound via ContextVar only for ACP sessions, so CLI/gateway paths
         # are unaffected when it is unset.

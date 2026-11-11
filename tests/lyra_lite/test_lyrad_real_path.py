@@ -196,25 +196,25 @@ def test_agents_risky_command_waits_in_inbox_and_runs_in_project_folder(env, bat
 
             ask = _wait_event(path, lambda e: e["type"] == "inbox", 90)
             item = ask["item"]
-            assert item["kind"] == "scope_permission" and "approved.txt" in item["command"]
+            assert item["kind"] == "approval" and "approved.txt" in item["command"]
             assert not (path / "approved.txt").exists()
 
             inbox = daemon.get(f"/api/projects/{pid}").json()["inbox"]
             assert [i["id"] for i in inbox] == [item["id"]]
 
-            res = daemon.post(f"/api/projects/{pid}/inbox/{item['id']}", {"answer": "Allow once"})
+            res = daemon.post(f"/api/projects/{pid}/inbox/{item['id']}", {"answer": "once"})
             assert res.status_code == 200, res.text
 
             report = _wait_event(path, lambda e: e["type"] == "turn_start" and e["kind"] == "helper_done", 90)
             _wait_event(path, lambda e: e["type"] == "turn_end" and e["turn"] == report["turn"], 60)
             assert (path / "approved.txt").read_text() == "yes"
             saved = json.loads((path / ".lyra" / "inbox" / f"{item['id']}.json").read_text())
-            assert saved["status"] == "answered" and saved["answer"] == "Allow once"
+            assert saved["status"] == "answered" and saved["answer"] == "once"
         finally:
             daemon.stop()
 
 
-@pytest.mark.parametrize("action", ["wait_then_stop", "stop"])
+@pytest.mark.parametrize("action", ["timeout", "stop"])
 def test_hermes_background_permission_cleanup_without_execution(env, action):
     parent = [tool_step("delegate_task", {"goal": "HELPER-EX run the script", "background": True}),
               text_step("Agent started."), text_step("Agent finished.")]
@@ -222,19 +222,14 @@ def test_hermes_background_permission_cleanup_without_execution(env, action):
               text_step("Command was not approved.")]
     with FakeOpenAIServer(parent, side_scripts={"HELPER-EX": helper}) as llm:
         _write_config(env["hermes_home"], llm.base_url,
-                      approvals={"mode": "manual", "timeout": 2 if action == "wait_then_stop" else 60})
+                      approvals={"mode": "manual", "timeout": 2 if action == "timeout" else 60})
         daemon = Daemon(env).start()
         try:
             pid, path = _new_project(daemon, env)
             daemon.post(f"/api/projects/{pid}/messages", {"text": "start the helper"})
             item = _wait_event(path, lambda e: e["type"] == "inbox", 90)["item"]
-            assert item['kind'] == 'scope_permission'
-            if action == "wait_then_stop":
-                # Scope requests remain visible until an owner decision or Stop;
-                # the ordinary command-approval timeout cannot silently remove them.
-                time.sleep(3)
-                assert daemon.get(f"/api/projects/{pid}").json()['inbox'][0]['id'] == item['id']
-            assert daemon.post(f"/api/projects/{pid}/stop", {}).status_code == 200
+            if action == "stop":
+                assert daemon.post(f"/api/projects/{pid}/stop", {}).status_code == 200
             closed = _wait_event(path, lambda e: e["type"] == "inbox_closed" and e["id"] == item["id"], 30)
             assert closed["status"] == "expired"
             _wait_event(path, lambda e: e["type"] == "helper" and e.get("event") == "complete", 90)
@@ -632,10 +627,6 @@ def test_lyra_has_no_shell_but_her_agents_do(env):
             pid, path = _new_project(daemon, env)
             llm.script, llm.side_scripts = scripts(path)
             daemon.post(f"/api/projects/{pid}/messages", {"text": "make the file"})
-            item = _wait_event(path, lambda e: e['type'] == 'inbox')['item']
-            assert item['kind'] == 'scope_permission'
-            assert not (path / 'made-by-agent.txt').exists()
-            assert daemon.post(f"/api/projects/{pid}/inbox/{item['id']}", {'answer': 'Allow once'}).is_success
             report = _wait_event(path, lambda e: e["type"] == "turn_start" and e["kind"] == "helper_done", 120)
             _wait_event(path, lambda e: e["type"] == "turn_end" and e["turn"] == report["turn"], 60)
 

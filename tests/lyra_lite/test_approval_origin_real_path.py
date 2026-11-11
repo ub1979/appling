@@ -19,14 +19,14 @@ def test_delegated_command_card_identifies_planner_and_denies_command(env):
             llm.side_scripts = {goal: [tool_step('terminal', {'command': command}), text_step('Command denied; no retry.')]}
             prefix = f'/api/projects/{pid}'
             assert daemon.post(prefix + '/messages', {'text': 'Run the isolated approval attribution test'}).is_success
-            item = _wait_event(root, lambda e: e['type'] == 'inbox' and e['item']['kind'] in {'approval', 'scope_permission'})['item']
+            item = _wait_event(root, lambda e: e['type'] == 'inbox' and e['item']['kind'] == 'approval')['item']
             worker = next(e for e in _events(root) if e['type'] == 'helper' and e.get('event') == 'start')
             assert item['requester']['subagent_id'] == worker['subagent_id']
             assert item['requester']['label'] == 'Task planning'
             assert item['requester']['goal'] == goal
             assert item['requester']['model'] == worker['model']
             assert marker.read_text() == 'must remain untouched'
-            assert daemon.post(prefix + '/inbox/' + item['id'], {'answer': 'Deny' if item['kind'] == 'scope_permission' else 'deny'}).is_success
+            assert daemon.post(prefix + '/inbox/' + item['id'], {'answer': 'deny'}).is_success
             _wait_event(root, lambda e: e['type'] == 'helper' and e.get('event') == 'reported')
             assert marker.read_text() == 'must remain untouched'
         finally:

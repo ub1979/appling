@@ -2249,17 +2249,6 @@ def resolve_pre_tool_block(
     times out is fail-closed to a block; ``block`` blocks with its message;
     anything else proceeds.
     """
-    from agent.delegation_context import tool_permission_guard
-
-    guard = tool_permission_guard()
-    if guard is not None:
-        try:
-            block = guard(tool_name, args or {}, task_id=task_id, tool_call_id=tool_call_id)
-        except Exception:
-            logger.exception("Runtime tool permission check failed")
-            return "BLOCKED: the runtime scope check failed. No tool was executed."
-        if block:
-            return block
     details = _get_pre_tool_call_directive_details(
         tool_name, args, task_id=task_id, session_id=session_id,
         tool_call_id=tool_call_id, turn_id=turn_id,

@@ -9,6 +9,15 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.9 beta — 2026-11-11
+
+Desktop package 0.17.9-beta.1.
+
+- Restore agent execution, delegation and command approvals to commit 924fe0520,
+  removing the broad extra permission layer and its repeated normal-work prompts.
+- Retain visible prototype/plan review controls, revision-bound owner decisions,
+  and recovery of expired plan reviews. Preserve project files and conversation history.
+
 ### Appling v0.17.8 beta — 2026-11-11
 
 Desktop package 0.17.8-beta.1.
@@ -433,6 +442,13 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.30-a] - 2026-11-11 — Restore agent workflow and visible reviews
+
+Appling v0.17.9 beta. Desktop package 0.17.9-beta.1.
+
+- Restore the original agent execution/delegation paths and normal command approvals.
+- Keep the preview/document visible before owner approval.
 
 ## [0.19.29-a] - 2026-11-11 — File-first runtime checks
 

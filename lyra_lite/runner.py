@@ -79,7 +79,7 @@ class _Hooks:
     def ask(self, kind: str, on_answer: Callable[[Any], None], **fields: Any) -> str:
         # Permission waits own their lifetime: a helper may ask during an
         # unrelated owner turn, or between turns entirely.
-        turn = None if kind in {"approval", "scope_permission"} else self.turn_id
+        turn = None if kind == "approval" else self.turn_id
         return self.runner._open_inbox(kind, on_answer, turn=turn, **fields)
 
     def expire(self, item_id: str) -> None:
@@ -190,8 +190,6 @@ class ProjectRunner:
                 item = self.store.inbox_item(item_id) or {}
                 kind = item.get("kind")
                 state = self.store.state()
-                if kind == "scope_permission" and (not isinstance(value, str) or value not in {"Allow once", "Deny"}):
-                    raise ValueError("Choose Allow once or Deny for this exact action.")
                 feedback = value.get("feedback") if isinstance(value, dict) else None
                 if feedback is not None and not isinstance(feedback, str):
                     raise ValueError("Feedback must be text.")

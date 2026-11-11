@@ -218,10 +218,6 @@ class HermesEngine:
             clarify_callback=self._on_clarify,
         )
         agent.interim_assistant_callback = self._on_interim
-        if self.store is not None:
-            from lyra_lite.scope import AgentScope
-
-            agent.tool_permission_guard = AgentScope(self.store, self._scope_permission)
         from lyra_lite.coordinator import make_coordinator
 
         make_coordinator(agent)
@@ -433,18 +429,6 @@ class HermesEngine:
             choices=["once", "session", "always", "deny"],
         )
         return lambda: hooks.expire(item_id)
-
-    def _scope_permission(self, *, label, goal, tool, action, reason, permission_id="") -> bool:
-        from agent.delegation_context import delegated_requester
-        from agent.redact import redact_sensitive_text
-        requester = delegated_requester() or {"subagent_id": "appling", "model": str(getattr(self._agent, "model", "") or "")}
-        return self._ask_blocking(
-            "scope_permission", timeout=CLARIFY_TIMEOUT_S, on_timeout="Deny",
-            question=f"{label} needs permission for an action outside its normal scope.",
-            description=redact_sensitive_text(reason, force=True), command=redact_sensitive_text(action, force=True), tool=tool,
-            permission_id=permission_id,
-            requester={**requester, "label": label, "goal": redact_sensitive_text(goal, force=True)}, choices=["Allow once", "Deny"],
-        ) == "Allow once"
 
     # -- turn ------------------------------------------------------------
 

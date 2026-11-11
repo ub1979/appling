@@ -1026,21 +1026,6 @@ export function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype, requi
       </div>
     );
   }
-  if (item.kind === "scope_permission") {
-    return (
-      <div className="need-card">
-        <b>{item.requester?.label ?? "Agent"} needs your permission</b>
-        <p>{item.description}</p>
-        {item.requester?.goal && <p className="small">Assigned work: {item.requester.goal}</p>}
-        <pre>{item.command}</pre>
-        <p className="small">Applies only to this exact action. Denying it keeps the agent within its assigned work.</p>
-        <div className="answer-row">
-          <button className="btn small" onClick={() => onAnswer("Allow once")}>Allow once</button>
-          <button className="btn danger small" onClick={() => onAnswer("Deny")}>Deny</button>
-        </div>
-      </div>
-    );
-  }
   if (item.kind === "approval") {
     return (
       <div className="need-card">

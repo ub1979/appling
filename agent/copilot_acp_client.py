@@ -733,9 +733,6 @@ class CopilotACPClient:
             response = _permission_denied(message_id)
         elif method == "fs/read_text_file":
             try:
-                from agent.delegation_context import tool_permission_guard
-                if tool_permission_guard() is not None:
-                    raise PermissionError("Use the listed Hermes read_file tool so Appling can check the assigned scope. Native filesystem access is disabled for scoped agents.")
                 path = _ensure_path_within_cwd(str(params.get("path") or ""), cwd)
                 block_error = get_read_block_error(str(path))
                 if block_error:
@@ -764,9 +761,6 @@ class CopilotACPClient:
                 response = _jsonrpc_error(message_id, -32602, str(exc))
         elif method == "fs/write_text_file":
             try:
-                from agent.delegation_context import tool_permission_guard
-                if tool_permission_guard() is not None:
-                    raise PermissionError("Use the listed Hermes write_file tool so Appling can check the assigned scope. Native filesystem access is disabled for scoped agents.")
                 path = _ensure_path_within_cwd(str(params.get("path") or ""), cwd)
                 denied = get_write_denied_error(str(path))
                 if denied:

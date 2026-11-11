@@ -69,12 +69,5 @@ describe("implementation plan review", () => {
     expect(html).toContain('disabled=""');
     expect(html).not.toContain("Actual saved implementation plan");
   });
-  it("scope permissions offer only one action or denial", () => {
-    const html = renderToStaticMarkup(createElement(NeedCard, {
-      item: { id: "scope", kind: "scope_permission", created: 1, command: "Exact proposed action", description: "Outside assigned work" },
-      requirementsInterview: true, seenPrototype: null, onOpenPrototype: () => {}, onAnswer: () => {},
-    }));
-    for (const label of ["Exact proposed action", "Allow once", "Deny"]) expect(html).toContain(label);
-    for (const label of ["Decide for me", "Use smart defaults", "Always allow"]) expect(html).not.toContain(label);
-  });
+
 });
