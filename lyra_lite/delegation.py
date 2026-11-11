@@ -119,6 +119,15 @@ def dispatch_project_tasks(store, agent, args: dict) -> str:
     root = store.root
     update = review.active_update(root, state)
     identities = [agent_for_goal(str(task.get("goal") or "")) for task in batch]
+    if "task-planner" in identities:
+        batch = [{**task, "context": (str(task.get("context") or "") +
+            "\nPlanning inspection: use source, documentation and CLI help to verify interfaces. "
+            "Do not start live provider/agent sessions, adversarial prompt probes, destructive tests, or "
+            "reads of unrelated host files as part of planning. These require a separately authorized "
+            "diagnostic task. A command approval prompt is not a substitute for that authorization. "
+            "Record unverified runtime behavior as a planned implementation/QA check or an explicit blocker.")}
+            if agent_id == "task-planner" else task for task, agent_id in zip(batch, identities)]
+        single = False  # Preserve the planning context for single-task dispatch too.
     requirements = review.requirements_revision(root)
     needs_prototype = review.visual_project(root, state)
     prototype = review.prototype_revision(root) if needs_prototype else None

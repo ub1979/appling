@@ -1013,7 +1013,11 @@ export function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype, requi
   if (item.kind === "approval") {
     return (
       <div className="need-card">
-        <b>Appling wants to run a command</b>
+        <b>{item.requester?.label ?? "Appling"} wants to run a command</b>
+        {item.requester && <>
+          <span className="small">Requested by {item.requester.label ?? "agent"}{item.requester.model ? ` · ${item.requester.model}` : ""}</span>
+          <span className="small">Assigned task: {item.requester.goal}</span>
+        </>}
         {item.description && <span className="small">Why it's flagged: {item.description}</span>}
         <pre>{item.command}</pre>
         <div className="answer-row" style={{ borderTop: 0, paddingTop: 0, marginTop: 0 }}>

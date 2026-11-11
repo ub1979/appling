@@ -384,6 +384,14 @@ class HermesEngine:
             return
         key = self.session_key
         request_id = data["request_id"]
+        requester = data.get("requester")
+        if isinstance(requester, dict):
+            from lyra_lite.agents import LABELS, agent_for_goal
+
+            requester = {k: str(requester.get(k) or "") for k in ("subagent_id", "goal", "model")}
+            requester["label"] = LABELS.get(agent_for_goal(requester["goal"]), "Agent")
+        else:
+            requester = None
 
         def _answer(choice: Any) -> None:
             from tools.approval import resolve_gateway_approval
@@ -398,6 +406,7 @@ class HermesEngine:
             _answer,
             command=str(data.get("command") or ""),
             description=str(data.get("description") or ""),
+            requester=requester,
             choices=["once", "session", "always", "deny"],
         )
         return lambda: hooks.expire(item_id)

@@ -9,6 +9,16 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.3 beta — 2026-11-11
+
+Desktop package 0.17.3-beta.1.
+
+- Command approval cards identify the requesting agent, model, and assigned task.
+  Parallel helpers retain their own identity through the real approval wait.
+- Planning handoffs explicitly limit compatibility inspection to source, docs,
+  and CLI help; live AI/adversarial/destructive probes require a separate
+  authorized diagnostic task. The existing command approval gate is unchanged.
+
 ### Appling v0.17.2 beta — 2026-11-11
 
 Desktop package 0.17.2-beta.1.
@@ -365,6 +375,15 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.24-a] - 2026-11-11 — Clear command approval origins
+
+Appling v0.17.3 beta. Desktop package 0.17.3-beta.1.
+
+- Carried helper identity through command approval requests into Appling's
+  approval cards and clarified planning-only inspection scope.
+- Verified real delegated approval attribution and that denying a command
+  leaves the temporary test file untouched.
 
 ## [0.19.23-a] - 2026-11-11 — Reliable approval handoffs
 

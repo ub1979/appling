@@ -44,3 +44,17 @@ describe("requirements question shortcuts", () => {
     expect(html).not.toContain("Skip this question");
   });
 });
+
+describe("command approval origin", () => {
+  it("shows the requesting agent, assigned task and model above the command", () => {
+    const html = renderToStaticMarkup(createElement(NeedCard, {
+      item: { id: "approval", kind: "approval", created: 1, command: "example command", description: "flagged command",
+        requester: { subagent_id: "planner", label: "Task planning", model: "test-model", goal: "Verify invocation syntax" } },
+      seenPrototype: null, onOpenPrototype: () => {}, onAnswer: () => {},
+    }));
+    expect(html).toContain("Task planning");
+    expect(html).toContain("test-model");
+    expect(html).toContain("Verify invocation syntax");
+    expect(html).toContain("Don&#x27;t allow");
+  });
+});

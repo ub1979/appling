@@ -1,6 +1,13 @@
 // Turns the project's event feed (.lyra/events.jsonl over SSE) into what the
 // screen shows. Pure, so it can be tested without a browser.
 
+export interface ApprovalRequester {
+  subagent_id: string;
+  goal: string;
+  model: string;
+  label?: string;
+}
+
 export interface InboxItem {
   id: string;
   kind: "approval" | "question" | "secret" | string;
@@ -11,6 +18,7 @@ export interface InboxItem {
   choices?: string[];
   env_var?: string;
   revision?: string;
+  requester?: ApprovalRequester | null;
 }
 
 export interface ProviderStatus {

@@ -143,3 +143,26 @@ def test_hermes_native_wait_termination_cleans_inbox(runner, hermes, action, app
         result = pool.submit(wait).result(5)
     assert result["choice"] not in {"once", "session", "always"}
     assert runner.store.inbox(status="open") == []
+
+
+def test_parallel_helpers_keep_their_own_requester_on_approval_cards(runner, hermes):
+    from agent.delegation_context import delegated_child_context, delegated_requester
+
+    def request(sid, goal, model):
+        with delegated_child_context(subagent_id=sid, goal=goal, model=model):
+            return _wait_hermes(hermes, sid)
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(request, "planner", "task-planner: Check invocation syntax", "model-a")
+        _inbox(runner)
+        second = pool.submit(request, "developer", "sw-developer: Verify the implementation", "model-b")
+        cards = {c["command"]: c for c in _inbox(runner, 2)}
+        assert cards["planner"]["requester"]["label"] == "Task planning"
+        assert cards["planner"]["requester"]["model"] == "model-a"
+        assert cards["developer"]["requester"]["subagent_id"] == "developer"
+        assert cards["developer"]["requester"]["model"] == "model-b"
+        assert runner.answer(cards["planner"]["id"], "deny")
+        assert runner.answer(cards["developer"]["id"], "deny")
+        assert first.result(5)["choice"] == "deny"
+        assert second.result(5)["choice"] == "deny"
+    assert delegated_requester() is None

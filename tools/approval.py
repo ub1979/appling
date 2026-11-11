@@ -3123,7 +3123,12 @@ def _await_gateway_decision(session_key: str, notify_cb, approval_data: dict,
     primary_key = approval_data.get("pattern_key", "")
     all_keys = approval_data.get("pattern_keys", [primary_key])
 
+    from agent.delegation_context import delegated_requester
+
     approval_data = {**approval_data, "request_id": uuid.uuid4().hex}
+    requester = delegated_requester()
+    if requester:
+        approval_data["requester"] = requester
     entry = _ApprovalEntry(approval_data)
     with _lock:
         _gateway_queues.setdefault(session_key, []).append(entry)

@@ -2183,7 +2183,7 @@ def _run_single_child(
             _worker_thread_holder["t"] = threading.current_thread()
             from agent.delegation_context import delegated_child_context
 
-            with delegated_child_context():
+            with delegated_child_context(subagent_id=child_task_id, goal=goal, model=str(getattr(child, "model", "") or "")):
                 return _run_child_to_completion(
                     child,
                     lambda **turn: child.run_conversation(

@@ -16,6 +16,7 @@ _DELEGATED_CHILD_CONTEXT: ContextVar[bool] = ContextVar(
     "hermes_delegated_child_context",
     default=False,
 )
+_DELEGATED_REQUESTER: ContextVar[dict | None] = ContextVar("hermes_delegated_requester", default=None)
 
 DELEGATED_CHILD_ENV_MARKER = "HERMES_DELEGATED_CHILD_CONTEXT"
 
@@ -31,13 +32,25 @@ KANBAN_ENV_KEYS: tuple[str, ...] = (
 
 
 @contextmanager
-def delegated_child_context() -> Iterator[None]:
+def delegated_child_context(*, subagent_id: str | None = None, goal: str = "", model: str = "") -> Iterator[None]:
     """Mark the current execution context as a delegate_task child."""
     token = _DELEGATED_CHILD_CONTEXT.set(True)
+    requester_token = None
+    if subagent_id:
+        requester_token = _DELEGATED_REQUESTER.set({
+            "subagent_id": str(subagent_id), "goal": str(goal)[:400], "model": str(model),
+        })
     try:
         yield
     finally:
+        if requester_token is not None:
+            _DELEGATED_REQUESTER.reset(requester_token)
         _DELEGATED_CHILD_CONTEXT.reset(token)
+
+
+def delegated_requester() -> dict | None:
+    requester = _DELEGATED_REQUESTER.get()
+    return dict(requester) if requester is not None else None
 
 
 def is_delegated_child_context() -> bool:
