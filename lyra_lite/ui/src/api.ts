@@ -20,9 +20,10 @@ export interface ProjectSummary {
 }
 
 export interface ChatMessage {
+  active?: boolean;
   role: "user" | "assistant";
   content: string;
-  kind: "chat" | "system" | "auto";
+  kind: "chat" | "system" | "auto" | "question" | "answer";
 }
 
 export interface QueueItem {
@@ -52,11 +53,13 @@ export interface ProjectDetail {
   update_available: boolean;
   next_revision: number;
   review_pending: boolean;
+  requirements_started: boolean;
   watchdog: { gave_up?: boolean; count?: number };
   queue: QueueItem[];
   turn: { id: string; text: string; kind: string; display?: string } | null;
   turn_start_offset: number;
   started_at: number;
+  last_completed_turn?: string;
   inbox: InboxItem[];
   helpers: { id: string; goal: string; started: number | null }[];
   messages: ChatMessage[];

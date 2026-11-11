@@ -228,6 +228,29 @@ class ProjectStore:
     def transcript(self) -> list[dict]:
         return self._read_jsonl(self.transcript_path)
 
+    def conversation(self) -> list[dict]:
+        """Project chat plus answered questions, including older saved interviews."""
+        entries = self.transcript()
+        state = self.state()
+        turn = state.get("turn")
+        if turn and not any(e.get("ts") == turn.get("started") and e.get("role") == "user" for e in entries):
+            entries.append({"role": "user", "content": turn["text"], "ts": turn.get("started"),
+                            "kind": turn.get("kind"), "active": True})
+        beginning = state.get("chat_started_at") or min(
+            (e["ts"] for e in entries if e.get("ts")), default=0)
+        for item in self.inbox(status="answered"):
+            if item.get("kind") not in {"question", "prototype", "requirements"}:
+                continue
+            if item.get("created", 0) < beginning:
+                continue
+            entries.extend([
+                {"role": "assistant", "content": item.get("question", ""), "ts": item["created"],
+                 "kind": "question", "id": item["id"]},
+                {"role": "user", "content": str(item.get("answer", "")), "ts": item.get("closed", item["created"]),
+                 "kind": "answer", "id": item["id"]},
+            ])
+        return sorted(entries, key=lambda e: e.get("ts") or 0)
+
     def has_transcript(self) -> bool:
         return self.transcript_path.exists()
 
@@ -255,7 +278,7 @@ class ProjectStore:
             if self.transcript_path.exists():
                 os.replace(self.transcript_path, self.chats_dir / f"{old}.transcript.jsonl")
             new_id = uuid.uuid4().hex[:12]
-            self.update_state(chat_id=new_id, rules_hash="")
+            self.update_state(chat_id=new_id, rules_hash="", chat_started_at=round(time.time(), 3))
             return new_id
 
     # -- inbox ---------------------------------------------------------------

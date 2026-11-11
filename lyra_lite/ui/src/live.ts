@@ -38,7 +38,8 @@ export interface LiveTurn {
 
 export interface LiveState {
   turn: LiveTurn | null;
-  queued: { id: string; text: string; kind: string }[];
+  queued: { id: string; text: string; kind: string; display?: string }[];
+  answersChanged: number;
   inbox: InboxItem[];
   activity: ActivityItem[];
   helpers: Record<string, Helper>;
@@ -63,6 +64,7 @@ export const emptyLive = (since = 0): LiveState => ({
   activity: [],
   helpers: {},
   turnsEnded: 0,
+  answersChanged: 0,
   helperChanges: 0,
   paused: false,
   lastProblem: null,
@@ -103,9 +105,9 @@ const str = (v: unknown): string => (typeof v === "string" ? v : "");
 export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
   switch (evt.type) {
     case "queued": {
-      const item = evt.item as { id: string; text: string; kind?: string };
+      const item = evt.item as { id: string; text: string; kind?: string; display?: string };
       if (state.queued.some((q) => q.id === item.id)) return state;
-      return { ...state, queued: [...state.queued, { id: item.id, text: item.text, kind: item.kind ?? "user" }] };
+      return { ...state, queued: [...state.queued, { id: item.id, text: item.text, kind: item.kind ?? "user", display: item.display }] };
     }
     case "turn_start": {
       const id = str(evt.turn);
@@ -158,7 +160,8 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
     case "resumed":
       return { ...state, paused: false, queued: [] };
     case "inbox_closed":
-      return { ...state, inbox: state.inbox.filter((i) => i.id !== evt.id) };
+      return { ...state, inbox: state.inbox.filter((i) => i.id !== evt.id),
+        answersChanged: state.answersChanged + 1 };
     case "turn_end": {
       const status = str(evt.status);
       const problem =

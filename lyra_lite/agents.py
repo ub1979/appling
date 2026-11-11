@@ -91,7 +91,9 @@ REQUIREMENTS_GATE = (
 TEAM_GATE = (
     "Recommend only the smallest useful team. Emit APP_IT_SKILLS_SET to open editable checkboxes, but do not "
     "treat that marker as approval and do not use newly proposed agents. Wait for the user's dashboard "
-    "confirmation, delivered as IDRAK_INTERNAL_SKILLS_UPDATE; that confirmed selection is authoritative."
+    "confirmation, delivered as IDRAK_INTERNAL_SKILLS_UPDATE; that confirmed selection is authoritative. "
+    "Emit the marker in the SAME message as the request to confirm. If you have not emitted it, "
+    "do not tell the owner that a panel is open or ask them to report a missing panel."
 )
 
 SETUP_BEGIN, SETUP_END = "IDRAK_INTERNAL_SETUP_BEGIN", "IDRAK_INTERNAL_SETUP_END"

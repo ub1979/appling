@@ -238,7 +238,7 @@ class HermesEngine:
             from lyra_lite.delegation import _object
 
             if str(_object(args).get("name") or "").split(":")[-1] == "req-engineer":
-                self.store.update_state(requirements_review=True)
+                self.store.update_state(requirements_review=True, requirements_started=True)
         self._emit("tool", phase="start", id=str(tc_id or ""), name=str(name),
                    args=_preview(args, 300))
 
@@ -278,7 +278,7 @@ class HermesEngine:
                                                  state.get("prototype_needs_changes")):
                     return ("The prototype needs work before review. Create or revise prototypes/index.html "
                             "and its clickable flows, then call this checkpoint again.")
-                self.store.update_state(requirements_review=True)
+                self.store.update_state(requirements_review=True, requirements_started=True)
                 return self._ask_blocking(
                     "prototype", question=str(question), choices=list(review.PROTOTYPE_CHOICES),
                     revision=revision, timeout=CLARIFY_TIMEOUT_S,

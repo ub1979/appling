@@ -85,3 +85,38 @@ describe("asksForApproval", () => {
     expect(asksForApproval("I approved the plan. Which colour do you prefer?")).toBe(false);
   });
 });
+
+import { teamProposalForText } from "./pages/Studio";
+
+describe("conversation feedback", () => {
+  it("retains the source and display text of queued agent reports", () => {
+    const s = feed([{ type: "queued", item: { id: "report", kind: "helper_done", text: "[ASYNC DELEGATION BATCH COMPLETE]", display: "Requirements report" } }]);
+    expect(s.queued[0].kind).toBe("helper_done");
+    expect(s.queued[0].display).toBe("Requirements report");
+  });
+
+  it("refreshes the saved conversation after an inbox answer", () => {
+    const s = feed([{ type: "inbox_closed", id: "question-1", status: "answered", answer: "PostgreSQL" }]);
+    expect(s.answersChanged).toBe(1);
+  });
+
+  it("offers a team editor when the reply requests confirmation without a marker", () => {
+    const agents = [
+      { id: "req-engineer", label: "Requirements", description: "", required: true },
+      { id: "ui-designer", label: "Design", description: "", required: false },
+      { id: "qa-engineer", label: "Quality assurance", description: "", required: false },
+    ];
+    expect(teamProposalForText("Confirm the recommended team in the panel. Design and QA will help.", agents, ["req-engineer"]))
+      .toEqual(["req-engineer", "ui-designer", "qa-engineer", "task-planner"]);
+    expect(teamProposalForText("Your team was confirmed.", agents, [])).toBeNull();
+  });
+});
+
+import { agentTaskDescription } from "./pages/Studio";
+
+it("distinguishes discovery from a prototype creation task", () => {
+  expect(agentTaskDescription("req-engineer: Provide an advisory review and prerequisite discovery. Summarize prototype requirements."))
+    .toBe("Checking requirements and available tools");
+  expect(agentTaskDescription("req-engineer: Support requirements by producing ONLY the interactive requirements prototype. Create prototypes/index.html."))
+    .toBe("Creating and checking your clickable prototype");
+});

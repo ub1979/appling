@@ -324,6 +324,7 @@ class ProjectRunner:
             "helpers": self.helpers(),
             "events_size": self.store.events_size(),
             "started_at": self.started_at,
+            "last_completed_turn": state.get("last_completed_turn"),
         }
 
     def helpers(self) -> list[dict]:
@@ -591,7 +592,8 @@ class ProjectRunner:
         # context compression replaces old turns with a summary on purpose.
         # The owner's full chat lives in the append-only transcript.
         now = round(time.time(), 3)
-        entries = [{"role": "user", "content": turn["text"], "ts": turn.get("started") or now}]
+        entries = [{"role": "user", "content": turn["text"], "ts": turn.get("started") or now,
+                    "kind": turn.get("kind", "user")}]
         if result.reply:
             entries.append({"role": "assistant", "content": result.reply, "ts": now})
         self.store.append_transcript(entries)
@@ -620,7 +622,7 @@ class ProjectRunner:
         # (the screen, a watchdog, a test) sees a finished project.
         with self._cond:
             self._busy = False
-            self.store.update_state(running=False, turn=None)
+            self.store.update_state(running=False, turn=None, last_completed_turn=turn_id)
             self._cond.notify_all()
         self.store.append_event(
             "turn_end", turn=turn_id, status=status, reply=result.reply,

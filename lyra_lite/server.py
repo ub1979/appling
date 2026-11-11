@@ -160,20 +160,27 @@ def display_messages(messages: list[dict]) -> list[dict]:
         if not text:
             continue
         kind = "chat"
+        active = {"active": True} if m.get("active") else {}
+        if m.get("kind") == "helper_done" or text.startswith("[ASYNC DELEGATION"):
+            out.append({"role": "user", "content": text, "kind": "system", **active})
+            continue
+        if m.get("kind") in {"question", "answer"}:
+            out.append({"role": role, "content": text, "kind": m["kind"]})
+            continue
         internal = agents.describe_internal(text) if role == "user" else None
         if internal is not None:
-            out.append(internal)
+            out.append({**internal, **active})
             continue
         if role == "user" and text.startswith(HELD_PREFIXES) and HELD_SPLIT in text:
             held, own = text.split(HELD_SPLIT, 1)
-            out.append({"role": "user", "content": held.strip(), "kind": "system"})
+            out.append({"role": "user", "content": held.strip(), "kind": "system", **active})
             text = own.strip()
         elif role == "user" and text == NUDGE:
             out.append({"role": "user", "content": "Appling kept going on its own.", "kind": "auto"})
             continue
         elif role == "user" and text.startswith("["):
             kind = "system"
-        out.append({"role": role, "content": text, "kind": kind})
+        out.append({"role": role, "content": text, "kind": kind, **active})
     return out
 
 
@@ -509,7 +516,11 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         snap["update_available"] = not update and review.built_project(runner.root, ledger)
         snap["next_revision"] = review.next_revision(ledger, state)
         snap["review_pending"] = bool(state.get("requirements_review"))
-        return {"id": pid, **snap, "messages": display_messages(runner.store.transcript())}
+        snap["requirements_started"] = bool(state.get("requirements_started") or
+            (state.get("requirements_review") and any(
+                item.get("kind") in {"question", "prototype", "requirements"} for item in runner.store.inbox()
+            )))
+        return {"id": pid, **snap, "messages": display_messages(runner.store.conversation())}
 
     @app.post("/api/projects/{pid}/update")
     def update_project(pid: str, body: dict = Body(...)):

@@ -67,3 +67,8 @@ inside the project folder given below.
   run a terminal command to see their app. Put anything left untested in a
   short, plain "Not checked yet" list. Avoid words like ledger, sign-off,
   conditional delivery, QA verdict, or phase names.
+
+- **Work status:** when a background agent is running, say which agent is doing
+  what and that its result will arrive here automatically. When its report
+  arrives, distinguish completed discovery from prototype creation and testing.
+  Describe work as running only when an actual active task exists.

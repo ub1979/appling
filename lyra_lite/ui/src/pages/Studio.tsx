@@ -35,11 +35,16 @@ const ANSWERS = [
 ];
 
 interface ResetAction {
-  type: "reset";
+  type: "reset" | "sync";
   detail: ProjectDetail;
 }
 
 function liveReducer(state: LiveState, action: LyraEvent | ResetAction): LiveState {
+  if (action.type === "sync" && "detail" in action) {
+    const { detail } = action as ResetAction;
+    return { ...state, queued: detail.queue, paused: detail.paused,
+      turn: state.turn?.id === detail.last_completed_turn ? null : state.turn };
+  }
   if (action.type === "reset" && "detail" in action) {
     const { detail } = action as ResetAction;
     return { ...emptyLive(detail.started_at ?? 0), inbox: detail.inbox, queued: detail.queue, paused: detail.paused };
@@ -51,6 +56,7 @@ interface Shown {
   role: "user" | "lyra" | "note" | "report";
   text: string;
   proposal: string[] | null;
+  active?: boolean;
 }
 
 function clean(raw: string, ids: string[]): { text: string; proposal: string[] | null; started: string[]; completed: string[] } {
@@ -65,11 +71,11 @@ function clean(raw: string, ids: string[]): { text: string; proposal: string[] |
 }
 
 function shownMessage(m: ChatMessage, ids: string[]): Shown {
-  if (m.kind === "auto") return { role: "note", text: m.content, proposal: null };
-  if (m.kind === "system") return { role: "report", text: m.content, proposal: null };
-  if (m.role === "user") return { role: "user", text: m.content, proposal: null };
+  if (m.kind === "auto") return { active: m.active, role: "note", text: m.content, proposal: null };
+  if (m.kind === "system") return { active: m.active, role: "report", text: m.content, proposal: null };
+  if (m.role === "user") return { active: m.active, role: "user", text: m.content, proposal: null };
   const c = clean(m.content, ids);
-  return { role: "lyra", text: c.text, proposal: c.proposal };
+  return { active: m.active, role: "lyra", text: c.text, proposal: c.proposal };
 }
 
 const timeOf = (ts: number) => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
@@ -99,6 +105,7 @@ export function Studio({ id }: { id: string }) {
   const load = useCallback(async () => {
     const data = await api.project(id);
     setDetail(data);
+    dispatch({ type: "sync", detail: data });
     return data;
   }, [id]);
 
@@ -129,8 +136,13 @@ export function Studio({ id }: { id: string }) {
   }, [id, load]);
 
   useEffect(() => {
-    if (live.turnsEnded > 0 || live.helperChanges > 0) void load();
-  }, [live.turnsEnded, live.helperChanges, load]);
+    if (live.turnsEnded > 0 || live.helperChanges > 0 || live.answersChanged > 0) void load();
+  }, [live.turnsEnded, live.helperChanges, live.answersChanged, load]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => void load().catch(() => undefined), 3000);
+    return () => window.clearInterval(timer);
+  }, [load]);
 
   // A hidden problem comes back if a later turn fails the same way.
   useEffect(() => void setDismissed(null), [live.turnsEnded]);
@@ -195,6 +207,11 @@ export function Studio({ id }: { id: string }) {
       started.push(...p.started);
       p.completed.forEach((c) => completed.add(c));
     }
+    if (detail?.requirements_started) {
+      started.push("req-engineer");
+      if (detail.review_pending) completed.delete("req-engineer");
+      else completed.add("req-engineer");
+    }
     let current: string | null = [...started].reverse().find((s) => !completed.has(s)) ?? null;
     if (map?.markdown) {
       const labels = Object.fromEntries(agents.map((a) => [a.id, a.label]));
@@ -212,7 +229,7 @@ export function Studio({ id }: { id: string }) {
       !!currentAgent &&
       (map?.phases ?? []).some((row) => (row.state === "blocked" || row.state === "owner") && rowIsAgent(row.name, currentAgent));
     return { ordered, completed, current, waiting };
-  }, [detail?.messages, detail?.active_update, live.turn?.reply, ids, agents, map?.markdown, map?.phases, team]);
+  }, [detail?.messages, detail?.active_update, detail?.requirements_started, detail?.review_pending, live.turn?.reply, ids, agents, map?.markdown, map?.phases, team]);
   const allDone = phases.ordered.length > 0 && phases.ordered.every((p) => phases.completed.has(p));
   const workingIds = new Set(helpers.map((h) => agentForGoal(h.goal, agents)).filter((x): x is string => !!x));
 
@@ -220,7 +237,7 @@ export function Studio({ id }: { id: string }) {
   const lastLyra = [...shown].map((s, i) => [s, i] as const).reverse().find(([s]) => s.role === "lyra");
   const lastTeamNote = shown.map((s, i) => [s, i] as const).reverse().find(([s]) => s.role === "note" && s.text.startsWith("Team updated"));
   const openProposal =
-    !busy && lastLyra && lastLyra[0].proposal && (!lastTeamNote || lastTeamNote[1] < lastLyra[1]) ? lastLyra[0].proposal : null;
+    !busy && lastLyra && (lastLyra[0].proposal || teamProposalForText(lastLyra[0].text, agents, team)) && (!lastTeamNote || lastTeamNote[1] < lastLyra[1]) ? lastLyra[0].proposal || teamProposalForText(lastLyra[0].text, agents, team) : null;
   const lastText = lastLyra?.[0].text.trim() ?? "";
   const asksQuestion = !busy && live.queued.length === 0 && /[?？]\s*$/.test(lastText) && !openProposal;
   // Only when the reply actually asks for approval — not when it merely
@@ -331,6 +348,14 @@ export function Studio({ id }: { id: string }) {
       </header>
 
       <div>
+        {helpers.length > 0 && (
+          <div className="banner" role="status">
+            <span><b>{helpers.map((h) => labelOf(agentForGoal(h.goal, agents) ?? "") || "Agent").join(", ")} working</b>
+              {" — "}{agentTaskDescription(helpers[0].goal)}
+              <span className="small"> Please wait. The result or next question will appear here automatically.</span>
+            </span>
+          </div>
+        )}
         {detail.active_update && (
           <div className="banner">Version {detail.active_update.revision} update{detail.active_update.branch ? ` · ${detail.active_update.branch}` : ""}</div>
         )}
@@ -391,7 +416,7 @@ export function Studio({ id }: { id: string }) {
                   : done
                     ? "Done ✓"
                     : phases.current === a.id
-                      ? "Up next"
+                      ? (live.inbox.length ? "Waiting for your answer" : "In progress")
                       : "Not started yet";
               return (
                 <div key={a.id} className={`agent-row ${working ? "working" : ""}`} title={a.description}>
@@ -438,7 +463,7 @@ export function Studio({ id }: { id: string }) {
             proposal={openProposal}
             onSend={(t) => void send(t)}
             onTeam={(t) => void run(async () => { await api.team(id, t); await load(); })}
-            onAnswer={(item, a) => void run(() => api.answer(id, item, a))}
+            onAnswer={(item, a) => void run(async () => { await api.answer(id, item, a); await load(); })}
             emptyNote={detail.update_available ? "Open the app or ask Appling about this project." : undefined}
             seenPrototype={preview?.revision === seenPrototype ? seenPrototype : null}
             onOpenPrototype={() => void openPrototype()}
@@ -761,7 +786,7 @@ function ChatScroll(props: {
         {shown.map((s, i) => (
           <Message key={i} item={s}>
             {i === lastLyraIndex && props.proposal && (
-              <TeamProposal agents={props.agents} proposal={props.proposal} current={props.team} onConfirm={props.onTeam} />
+              <TeamProposal key={props.proposal.join(",")} agents={props.agents} proposal={props.proposal} current={props.team} onConfirm={props.onTeam} />
             )}
             {i === lastLyraIndex && (props.asksQuestion || props.asksApproval) && (
               <div className="answer-row">
@@ -777,7 +802,7 @@ function ChatScroll(props: {
             )}
           </Message>
         ))}
-        {turn && <TurnStart kind={turn.kind} text={turn.text} />}
+        {turn && !shown.some((m) => m.active) && <TurnStart kind={turn.kind} text={turn.text} />}
         {turn && (
           <div className="msg lyra">
             <div className="bubble">
@@ -789,11 +814,15 @@ function ChatScroll(props: {
             </div>
           </div>
         )}
-        {live.queued.map((q) => (
+        {live.queued.map((q) => q.kind === "helper_done" ? (
+          <Message key={q.id} item={{ role: "report", text: q.text, proposal: null }} />
+        ) : q.kind !== "user" ? (
+          <Message key={q.id} item={{ role: "note", text: q.display ?? "Appling has an update queued", proposal: null }} />
+        ) : (
           <div key={q.id} className="msg user queued">
             <div className="bubble">
               <div className="msg-head">You · Appling reads this next</div>
-              {q.text.startsWith("IDRAK_INTERNAL") ? "…" : q.text}
+              {q.display ?? q.text}
             </div>
           </div>
         ))}
@@ -848,6 +877,27 @@ function Message({ item, children }: { item: Shown; children?: React.ReactNode }
       </div>
     </div>
   );
+}
+
+export function agentTaskDescription(goal: string): string {
+  if (/create prototypes\/index|producing[^.]*prototype|build(?:ing)? (?:the |your )?(?:clickable )?prototype/i.test(goal)) {
+    return "Creating and checking your clickable prototype";
+  }
+  if (/discovery|prerequisite|advisory review/i.test(goal)) return "Checking requirements and available tools";
+  if (/qa-engineer|test|verify/i.test(goal)) return "Testing the project and checking the results";
+  if (/task-planner|proj-manager/i.test(goal)) return "Preparing the implementation plan";
+  if (/sw-developer|website-builder/i.test(goal)) return "Building the approved project features";
+  return "Working on the assigned project task";
+}
+
+export function teamProposalForText(text: string, agents: Agent[], current: string[]): string[] | null {
+  if (!/(?:confirm[^.\n]*team|proposed[^.\n]*team[^.\n]*panel)/i.test(text)) return null;
+  const mentioned = agents.filter((agent) => {
+    const label = agent.label.toLowerCase();
+    return text.toLowerCase().includes(label) || text.includes(agent.id)
+      || (agent.id === "qa-engineer" && /\bQA\b/.test(text));
+  }).map((agent) => agent.id);
+  return Array.from(new Set([...current, ...mentioned, "req-engineer", "task-planner"]));
 }
 
 function TeamProposal({ agents, proposal, current, onConfirm }: { agents: Agent[]; proposal: string[]; current: string[]; onConfirm: (t: string[]) => void }) {

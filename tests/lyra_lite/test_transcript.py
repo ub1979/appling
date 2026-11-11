@@ -71,3 +71,35 @@ def test_missing_transcript_is_rebuilt_from_the_activity_log(tmp_path: Path):
         assert [e["content"] for e in store.transcript()] == ["hello", "hi there", "[report]", "all done"]
     finally:
         runner.shutdown()
+
+
+def test_answered_interview_is_visible_during_a_turn_and_after_reload(tmp_path):
+    from lyra_lite.server import display_messages
+
+    store = ProjectStore(tmp_path / "interview").init()
+    store.update_state(turn={"id": "active", "text": "Build a dashboard", "started": 1.0, "kind": "user"})
+    item = store.add_inbox("question", question="Which data?", created=2.0)
+    store.close_inbox(item["id"], "answered", "CSV and PostgreSQL")
+    secret = store.add_inbox("secret", question="Paste token", created=3.0)
+    store.close_inbox(secret["id"], "answered", "private-key")
+    shown = display_messages(store.conversation())
+    assert [e["content"] for e in shown] == ["Build a dashboard", "Which data?", "CSV and PostgreSQL"]
+    assert shown[0]["active"]
+    store.append_transcript([
+        {"role": "user", "content": "Build a dashboard", "ts": 1.0},
+        {"role": "assistant", "content": "Next we will build the prototype.", "ts": time.time() + 1},
+    ])
+    store.update_state(turn=None)
+    reopened = ProjectStore(store.root)
+    shown = display_messages(reopened.conversation())
+    assert [e["content"] for e in shown][:3] == ["Build a dashboard", "Which data?", "CSV and PostgreSQL"]
+    assert len(shown) == 4
+    reopened.archive_chat()
+    assert reopened.conversation() == []
+
+
+def test_agent_report_keeps_its_origin_in_the_saved_conversation():
+    from lyra_lite.server import display_messages
+
+    report = display_messages([{"role": "user", "kind": "helper_done", "content": "Discovery complete"}])
+    assert report == [{"role": "user", "kind": "system", "content": "Discovery complete"}]
