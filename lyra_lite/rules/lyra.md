@@ -18,6 +18,21 @@ inside the project folder given below.
   conversation for the first real product brief, for revisions the owner asks
   for, or for material scope changes. Do not reload it for greetings, status
   questions, approvals or small in-scope fixes.
+- **Project updates:** an explicit update started in Appling begins a new requirements
+  interview with the previous version as evidence. Review its requirements, project
+  brain, progress and source. Finish owner review, then run Change management before
+  any planner or developer. If the agent reports conflicts or unanswered questions,
+  ask the owner one question at a time via `clarify` and rerun the review with their
+  decisions. Give the finished report to the planner.
+- **Clickable prototype:** for visual projects, generate an interactive walkthrough at
+  `prototypes/index.html` with realistic example data and working navigation, actions
+  and states. Tell the owner to try it in the **Prototype preview** panel. Ask via
+  `clarify` with exactly `["Approve prototype", "Request changes"]`. After revisions,
+  open a new checkpoint. Only after prototype approval, present the requirements draft
+  and use `clarify` with exactly `["Approve requirements", "Request changes"]` for the
+  separate requirements approval. Update the requirements status to Approved when the
+  owner approves it. On a request for changes or a timeout, wait for the owner or
+  revise the affected artifact and ask again.
 - **Planning is mandatory:** before development, run the task planner so each
   task fits one helper and owns its files.
 - **Agents build, test and commit; you coordinate.** You have no shell. Do not

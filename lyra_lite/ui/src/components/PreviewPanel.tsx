@@ -35,9 +35,10 @@ interface Props {
   preview: AppPreview;
   onClose: () => void;
   onPicked: (p: PickedElement) => void;
+  onReady: (revision: string) => void;
 }
 
-export function PreviewPanel({ preview, onClose, onPicked }: Props) {
+export function PreviewPanel({ preview, onClose, onPicked, onReady }: Props) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [device, setDevice] = useState<"computer" | "phone">("computer");
   const [picking, setPicking] = useState(false);
@@ -56,15 +57,18 @@ export function PreviewPanel({ preview, onClose, onPicked }: Props) {
   useEffect(() => {
     if (preview.kind !== "web") return;
     const onMessage = (e: MessageEvent) => {
-      if (e.origin !== origin || !e.data || e.data.source !== "appit-preview") return;
+      if (e.source !== frame.current?.contentWindow || e.origin !== origin || !e.data || e.data.source !== "appit-preview") return;
       if (e.data.type === "picked") { setPicking(false); onPicked(e.data.element as PickedElement); }
       if (e.data.type === "pick-cancelled") setPicking(false);
       if (e.data.type === "error") setErrors((all) => [...all.slice(-19), String(e.data.text)]);
-      if (e.data.type === "ready") setPicking(false);
+      if (e.data.type === "ready") {
+        setPicking(false);
+        if (preview.revision) onReady(preview.revision);
+      }
     };
     addEventListener("message", onMessage);
     return () => removeEventListener("message", onMessage);
-  }, [preview, origin, onPicked]);
+  }, [preview, origin, onPicked, onReady]);
 
   const togglePick = () => {
     const on = !picking;
@@ -72,12 +76,13 @@ export function PreviewPanel({ preview, onClose, onPicked }: Props) {
     frame.current?.contentWindow?.postMessage({ source: "appit-panel", type: "pick", on }, origin);
   };
   const reload = () => { setErrors([]); setPicking(false); setNonce((n) => n + 1); };
+  const title = preview.revision ? "Prototype preview" : preview.kind === "expo" ? "Phone preview" : "App preview";
   const tabUrl = preview.kind === "web" ? preview.url : null;
 
   return (
-    <aside className="preview-panel" aria-label="App preview">
+    <aside className="preview-panel" aria-label={title}>
       <header className="preview-bar">
-        <b>{preview.kind === "expo" ? "Phone preview" : "Preview"}</b>
+        <b>{title}</b>
         {preview.kind === "web" && (
           <>
             <div className="seg" role="group" aria-label="Screen size">
@@ -98,7 +103,7 @@ export function PreviewPanel({ preview, onClose, onPicked }: Props) {
 
       {preview.kind === "web" ? (
         <div className={`preview-stage ${device}`}>
-          <iframe key={nonce} ref={frame} src={preview.url} title="Your app" className="preview-frame" />
+          <iframe key={nonce} ref={frame} src={preview.url} title={title} className="preview-frame" />
         </div>
       ) : (
         <div className="phone-qr">

@@ -24,6 +24,7 @@
  */
 export const GUIDED_PHASE_ORDER: readonly string[] = [
   "req-engineer",
+  "change-manager",
   "researcher",
   "spec",
   "ui-designer",

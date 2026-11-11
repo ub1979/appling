@@ -89,6 +89,7 @@ skill does not count as running a specialist.
 | Phase | Playbook | Required artifact |
 |---|---|---|
 | Requirements | `req-engineer` | `requirements.md` |
+| Update impact review | `change-manager` | Revision report in `.sdlc/changes/` |
 | Research | `researcher` | `research-report.md` |
 | Design (any UI) | `ui-designer` | `design-brief.md` |
 | Architecture | `sw-architect` | `plan.md` |

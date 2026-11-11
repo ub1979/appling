@@ -47,6 +47,11 @@ export interface ProjectDetail {
   profile: BuildProfile | null;
   models: Record<string, string>;
   rules_outdated: boolean;
+  chat_id: string;
+  active_update: { revision: number; branch: string | null } | null;
+  update_available: boolean;
+  next_revision: number;
+  review_pending: boolean;
   watchdog: { gave_up?: boolean; count?: number };
   queue: QueueItem[];
   turn: { id: string; text: string; kind: string; display?: string } | null;
@@ -57,11 +62,25 @@ export interface ProjectDetail {
   messages: ChatMessage[];
 }
 
+export interface ModelSelection {
+  provider: string;
+  model: string;
+  effort?: string;
+}
+
+export interface AgentModelSetting {
+  id: string;
+  label: string;
+  default: ModelSelection | null;
+  selection: ModelSelection | null;
+}
+
 export interface AiSettings {
   engine: string;
   hermes: { provider: string; model: string };
   hermes_effort: { effort: string; effective: string; overridden: boolean };
   about_me: string;
+  agent_models: AgentModelSetting[];
 }
 
 export interface ModelOptions {
@@ -141,7 +160,8 @@ export interface NewProject {
 }
 
 export type Platform = "web" | "phone" | "computer";
-export interface AppPreview { kind: "web" | "expo"; url: string }
+export interface AppPreview { kind: "web" | "expo"; url: string; revision?: string }
+export type ReviewAnswer = string | { choice: string; revision: string };
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {
@@ -178,16 +198,21 @@ export const api = {
   catalog: () => call<Catalog>("GET", "/api/catalog"),
   addProject: (body: NewProject) => call<ProjectDetail>("POST", "/api/projects", body),
   project: (id: string) => call<ProjectDetail>("GET", `/api/projects/${id}`),
+  startUpdate: (id: string, branch: string | null) =>
+    call<{ chat_id: string }>("POST", `/api/projects/${id}/update`, { branch }),
   usage: (id: string) => call<unknown>("GET", `/api/projects/${id}/usage`),
-  preview: (id: string) => call<{ available: boolean; build: boolean }>("GET", `/api/projects/${id}/preview`),
+  preview: (id: string) => call<{ available: boolean; build: boolean; prototype?: string }>("GET", `/api/projects/${id}/preview`),
   openApp: (id: string) => call<AppPreview>("POST", `/api/projects/${id}/preview/open`),
+  openPrototype: (id: string) => call<AppPreview>("POST", `/api/projects/${id}/preview/prototype`),
   map: (id: string) => call<ProjectMap>("GET", `/api/projects/${id}/map`),
   send: (id: string, text: string) => call("POST", `/api/projects/${id}/messages`, { text }),
-  answer: (id: string, item: string, answer: string) => call("POST", `/api/projects/${id}/inbox/${item}`, { answer }),
+  answer: (id: string, item: string, answer: ReviewAnswer) => call("POST", `/api/projects/${id}/inbox/${item}`, { answer }),
   team: (id: string, team: string[]) => call("POST", `/api/projects/${id}/team`, { team }),
   settings: (id: string, body: Record<string, unknown>) => call("POST", `/api/projects/${id}/settings`, body),
   settingsGet: () => call<AiSettings>("GET", "/api/settings"),
   settingsSave: (body: Record<string, unknown>) => call<AiSettings>("POST", "/api/settings", body),
+  agentModelSave: (id: string, selection: ModelSelection | null) =>
+    call<AiSettings>("POST", `/api/settings/agents/${id}`, { selection }),
   effortSave: (effort: string) => call<AiSettings["hermes_effort"]>("POST", "/api/settings/effort", { effort }),
   modelOptions: (refresh = false) => call<ModelOptions>("GET", `/api/settings/models${refresh ? "?refresh=true" : ""}`),
   modelSave: (provider: string, model: string, confirm: boolean) =>

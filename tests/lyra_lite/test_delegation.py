@@ -77,3 +77,37 @@ def test_rebuild_restores_batch_and_only_considers_its_own_live_jobs(running):
     assert other.reminder() == ""
     result = other.dispatch(task, lambda args: _record(running, args, key="other", session="other-project"))
     assert json.loads(result)["status"] == "dispatched"
+
+
+@pytest.mark.parametrize(("effort", "reasoning"), [
+    ("high", {"enabled": True, "effort": "high"}),
+    ("off", {"enabled": False}),
+])
+def test_agent_model_effort_is_resolved_with_its_own_provider(monkeypatch, effort, reasoning):
+    from lyra_lite.settings import model_runtime
+
+    calls = []
+
+    def resolve(**kwargs):
+        calls.append(kwargs)
+        return {"provider": "custom", "api_key": "local-key", "base_url": "http://localhost/v1"}
+
+    monkeypatch.setattr("hermes_cli.runtime_provider.resolve_runtime_provider", resolve)
+    selection = {"provider": "custom:local", "model": "chosen-model", "effort": effort}
+    result = model_runtime(selection)
+    assert calls == [{"requested": "custom:local", "target_model": "chosen-model"}]
+    assert result["provider"] == "custom:local"
+    assert result["model"] == "chosen-model"
+    assert result["reasoning"] == reasoning
+
+
+def test_reloading_requirements_holds_planning_even_when_the_previous_draft_matches(tmp_path):
+    from lyra_lite.delegation import dispatch_project_tasks
+    from lyra_lite.review import requirements_revision
+    from lyra_lite.store import ProjectStore
+
+    (tmp_path / "requirements.md").write_text("# Current scope\nKeep orders editable.\n")
+    store = ProjectStore(tmp_path).init()
+    store.update_state(requirements_review=True, requirements_approved=requirements_revision(tmp_path))
+    result = json.loads(dispatch_project_tasks(store, None, {"goal": "task-planner: Schedule new work"}))
+    assert "Finish the owner review" in result["error"]

@@ -181,8 +181,11 @@ def read_map(root: Path) -> dict:
         scope = _revision(row["name"])[0] or (headings[-1][1] if headings else None)
         entries.append((row, table, scope))
     phases, history, delivered = _current_rows(entries)
+    delivery_revision = next((scope for row, _, scope in reversed(entries)
+                              if row in phases and _is_delivery(row)), None)
     return {
         "exists": True,
+        "delivery_revision": delivery_revision,
         "phases": phases,
         "history": history,
         "delivery_complete": delivered,

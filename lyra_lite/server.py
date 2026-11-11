@@ -23,8 +23,9 @@ from typing import Any
 from fastapi import Body, FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, StreamingResponse
 
-from lyra_lite import agents
+from lyra_lite import agents, review
 from lyra_lite.preview import PREVIEW_TYPES, AppHosts, PreviewError
+from lyra_lite.project_map import read_map
 
 UPLOADS = Path("assets") / "uploads"
 BUILTIN_TEMPLATES = Path(__file__).resolve().parent / "templates"
@@ -118,7 +119,7 @@ def default_engine_factory(store: ProjectStore, session_key: str):
     if about_me():
         prompt += f"\nAbout the owner (written by them; applies to every project):\n{about_me()}\n"
     return make_engine("hermes", workspace=str(store.root), session_key=session_key,
-                       system_prompt=prompt, skills=DEFAULT_SKILLS)
+                       system_prompt=prompt, skills=DEFAULT_SKILLS, store=store)
 
 
 def placement(path: Path, *, creating: bool) -> str | None:
@@ -281,10 +282,13 @@ class Lyra:
                 profile = "reusable"
             template = get_template(template_id) if template_id else None
             platforms = agents.normalise_platforms(platforms) if kind == "app" else None
-            runner.store.update_state(team=chosen, style=style or "app-it", models=models or {},
-                                      profile=profile, project_kind=kind,
-                                      template=template["id"] if template else None, platforms=platforms)
-            if not runner.store.transcript() and not runner.snapshot()["running"]:
+            if not runner.store.state().get("team"):
+                runner.store.update_state(team=chosen, style=style or "app-it", models=models or {},
+                                          profile=profile, project_kind=kind,
+                                          template=template["id"] if template else None, platforms=platforms)
+            if not review.built_project(path) and not runner.store.transcript() and not runner.snapshot()["running"]:
+                if kind:
+                    runner.store.update_state(requirements_review=True)
                 runner.submit(agents.setup_message(path, chosen, models, brief, profile, kind, template, platforms),
                               kind="setup",
                               display=brief.strip() or "Project opened")
@@ -436,7 +440,10 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     @app.post("/api/projects/{pid}/team")
     def set_team(pid: str, body: dict = Body(...)):
         runner = lyra.get(pid)
-        team = agents.normalise_team([str(t) for t in (body.get("team") or [])])
+        requested = [str(t) for t in (body.get("team") or [])]
+        if review.active_update(runner.root, runner.store.state()):
+            requested.append("change-manager")
+        team = agents.normalise_team(requested)
         models = body.get("models") if isinstance(body.get("models"), dict) else runner.store.state().get("models") or {}
         runner.store.update_state(team=team, models=models)
         runner.submit(agents.team_message(team, models), kind="team",
@@ -450,7 +457,24 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         snap["rules_outdated"] = bool(
             snap["has_engine"] and snap["rules_hash"] and snap["rules_hash"] != current_rules_hash()
         )
+        state = runner.store.state()
+        ledger = read_map(runner.root)
+        update = review.active_update(runner.root, state, ledger)
+        snap["active_update"] = update
+        snap["update_available"] = not update and review.built_project(runner.root, ledger)
+        snap["next_revision"] = review.next_revision(ledger, state)
+        snap["review_pending"] = bool(state.get("requirements_review"))
         return {"id": pid, **snap, "messages": display_messages(runner.store.transcript())}
+
+    @app.post("/api/projects/{pid}/update")
+    def update_project(pid: str, body: dict = Body(...)):
+        branch = body.get("branch")
+        if branch is not None and not isinstance(branch, str):
+            raise HTTPException(status_code=400, detail="Enter a new branch name.")
+        try:
+            return lyra.get(pid).start_update(branch.strip() if branch is not None else None)
+        except (RuntimeError, OSError, UnicodeError) as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @app.post("/api/projects/{pid}/settings")
     def settings(pid: str, body: dict = Body(...)):
@@ -471,6 +495,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             "hermes": st.hermes_model(),
             "hermes_effort": st.hermes_effort(),
             "about_me": st.about_me(),
+            "agent_models": st.agent_model_settings(),
         }
 
     def _apply_everywhere() -> None:
@@ -521,6 +546,18 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         if result.get("ok"):
             _apply_everywhere()
         return result
+
+    @app.post("/api/settings/agents/{agent_id}")
+    def save_agent_model(agent_id: str, body: dict = Body(...)):
+        from lyra_lite.settings import save_agent_model
+
+        if "selection" not in body:
+            raise HTTPException(status_code=400, detail="Choose a model or reset to the default.")
+        try:
+            save_agent_model(agent_id, body["selection"])
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return _settings_view()
 
     @app.post("/api/settings/effort")
     async def save_effort(body: dict = Body(...)):
@@ -596,7 +633,21 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
         from lyra_lite import preview
 
         root = lyra.get(pid).root
-        return {"available": preview.available(root), "build": preview.build_script(root) is not None}
+        payload = {"available": preview.available(root), "build": preview.build_script(root) is not None}
+        if revision := review.prototype_revision(root):
+            payload["prototype"] = revision
+        return payload
+
+    @app.post("/api/projects/{pid}/preview/prototype")
+    def prototype_open(pid: str):
+        root = lyra.get(pid).root
+        revision = review.prototype_revision(root)
+        if revision is None:
+            raise HTTPException(status_code=409, detail="The clickable prototype isn't ready yet.")
+        try:
+            return {**hosts.open_prototype(root), "revision": revision}
+        except PreviewError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
 
     @app.post("/api/projects/{pid}/preview/open")
     def preview_open(pid: str):
@@ -676,8 +727,6 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
 
     @app.get("/api/projects/{pid}/map")
     def project_map(pid: str):
-        from lyra_lite.project_map import read_map
-
         return read_map(lyra.get(pid).root)
 
     @app.post("/api/projects/{pid}/messages")
@@ -690,7 +739,10 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
 
     @app.post("/api/projects/{pid}/inbox/{item_id}")
     def answer(pid: str, item_id: str, body: dict = Body(...)):
-        ok = lyra.get(pid).answer(item_id, body.get("answer"))
+        try:
+            ok = lyra.get(pid).answer(item_id, body.get("answer"))
+        except ValueError as exc:
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         if not ok:
             raise HTTPException(status_code=409, detail="That request has expired.")
         return {"ok": True}
@@ -712,9 +764,11 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             from lyra_lite.templates import get_template
 
             template = get_template(state["template"]) if state.get("template") else None
+            update = review.active_update(runner.root, state)
             runner.submit(agents.setup_message(runner.root, state["team"], state.get("models"), "",
                                                state.get("profile"), state.get("project_kind"), template,
-                                               state.get("platforms")),
+                                               state.get("platforms"),
+                                               update={**update, "resuming": True} if update else None),
                           kind="setup", display="Project opened")
         return {"chat_id": chat_id}
 

@@ -7,7 +7,7 @@ import { useRoute } from "./router";
 
 function Pages() {
   const route = useRoute();
-  if (route.path.startsWith("/p/")) return <Studio key={route.path} id={route.path.slice(3)} />;
+  if (route.path.startsWith("/p/")) return <Studio key={route.path + (route.params.get("chat") ?? "")} id={route.path.slice(3)} />;
   if (route.path === "/settings") return <Settings key={route.params.get("project") ?? "all"} projectId={route.params.get("project")} />;
   if (route.path === "/new") return <Setup key="new" mode="new" styleId={route.params.get("style")} />;
   if (route.path === "/open") return <Setup key="open" mode="open" styleId={route.params.get("style")} />;

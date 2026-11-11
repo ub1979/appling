@@ -16,11 +16,11 @@ import uuid
 from pathlib import Path
 from typing import Any, Callable
 
-from lyra_lite import watchdog
+from lyra_lite import agents, review, watchdog
 from lyra_lite.engines.base import Engine, TurnResult
 from lyra_lite.project_map import read_map
 from lyra_lite.settings import effective_engine
-from lyra_lite.store import ProjectStore
+from lyra_lite.store import ProjectStore, _atomic_write_text
 
 logger = logging.getLogger(__name__)
 
@@ -168,9 +168,38 @@ class ProjectRunner:
 
     def answer(self, item_id: str, value: Any) -> bool:
         with self._cond:
-            waiter = self._waiters.pop(item_id, None)
+            waiter = self._waiters.get(item_id)
             if waiter is not None:
-                shown = "(hidden)" if (self.store.inbox_item(item_id) or {}).get("kind") == "secret" else value
+                item = self.store.inbox_item(item_id) or {}
+                kind = item.get("kind")
+                state = self.store.state()
+                if kind == "prototype":
+                    choice = value.get("choice") if isinstance(value, dict) else value
+                    if choice not in review.PROTOTYPE_CHOICES:
+                        raise ValueError("Choose an answer from the prototype review.")
+                    if choice == review.PROTOTYPE_CHOICES[0]:
+                        revision = value.get("revision") if isinstance(value, dict) else None
+                        if not revision or revision != item.get("revision") or revision != review.prototype_revision(self.root):
+                            raise ValueError("Open the current prototype before approving it.")
+                        self.store.update_state(prototype_approved=revision, prototype_needs_changes=None)
+                    else:
+                        self.store.update_state(prototype_approved=None, prototype_needs_changes=item.get("revision"))
+                    value = choice
+                elif kind == "requirements":
+                    if value not in review.REQUIREMENTS_CHOICES:
+                        raise ValueError("Choose an answer from the requirements review.")
+                    if value == review.REQUIREMENTS_CHOICES[0]:
+                        revision = review.requirements_revision(self.root)
+                        if not revision or revision != item.get("revision"):
+                            raise ValueError("The requirements changed. Ask Appling to share the revised draft.")
+                        if item.get("prototype") and (item["prototype"] != state.get("prototype_approved")
+                                                      or item["prototype"] != review.prototype_revision(self.root)):
+                            raise ValueError("Review the current prototype before approving the requirements.")
+                        self.store.update_state(requirements_approved=revision, requirements_review=False)
+                    else:
+                        self.store.update_state(requirements_approved=None)
+                self._waiters.pop(item_id)
+                shown = "(hidden)" if kind == "secret" else value
                 self.store.close_inbox(item_id, "answered", answer=value)
                 self.store.append_event("inbox_closed", id=item_id, status="answered", answer=shown)
         if waiter is None:
@@ -214,6 +243,50 @@ class ProjectRunner:
             self.store.update_state(focus_hash=None, focus_turns=0)
         self.store.append_event("chat_started", chat_id=chat_id)
         return chat_id
+
+    def start_update(self, branch: str | None) -> dict:
+        from lyra_lite.templates import get_template
+
+        with self._cond:
+            state = self.store.state()
+            ledger = read_map(self.root)
+            if review.active_update(self.root, state, ledger):
+                raise RuntimeError("An update is already in progress.")
+            if not review.built_project(self.root, ledger):
+                raise RuntimeError("This project has no completed build to update yet.")
+            if self._busy or self.helpers() or state.get("queue"):
+                raise RuntimeError("Wait for Appling and its agents to finish, or press Stop and retry.")
+            revision = review.next_revision(ledger, state)
+            baseline_dir = self.store.dir / "updates" / f"v{revision}"
+            baseline_requirements = None
+            try:
+                original = (self.root / "requirements.md").read_text(encoding="utf-8")
+            except FileNotFoundError:
+                pass
+            else:
+                baseline_requirements = (baseline_dir / "requirements.md").relative_to(self.root).as_posix()
+                _atomic_write_text(self.root / baseline_requirements, original)
+            update = {
+                "revision": revision,
+                "branch": branch,
+                "baseline_requirements": baseline_requirements,
+                "baseline_requirements_revision": review.requirements_revision(self.root),
+                "baseline_prototype_revision": review.prototype_revision(self.root),
+            }
+            if branch is not None:
+                review.create_update_branch(self.root, branch)
+            chat_id = self.new_chat()
+            team = agents.normalise_team([*(state.get("team") or []), "change-manager"])
+            template = get_template(state["template"]) if state.get("template") else None
+            self.store.update_state(update=update, team=team, paused=False, watchdog={},
+                                    requirements_review=True, requirements_approved=None,
+                                    prototype_approved=None, prototype_needs_changes=None,
+                                    turn_start_offset=self.store.events_size())
+            self.submit(agents.setup_message(self.root, team, state.get("models"), "",
+                                             state.get("profile"), state.get("project_kind"), template,
+                                             state.get("platforms"), update=update),
+                        kind="setup", display=f"Started version {revision} requirements")
+            return {"chat_id": chat_id, "update": update}
 
     def snapshot(self) -> dict:
         state = self.store.state()
@@ -546,7 +619,9 @@ class ProjectRunner:
 
             from lyra_lite.focus import focus_note
 
-            note = focus_note(self.root, open_inbox=len(self.store.inbox(status="open")))
+            update = review.active_update(self.root, self.store.state()) or {}
+            note = focus_note(self.root, open_inbox=len(self.store.inbox(status="open")),
+                              update_revision=update.get("revision"))
         except Exception:
             logger.debug("focus note failed", exc_info=True)
             return ""

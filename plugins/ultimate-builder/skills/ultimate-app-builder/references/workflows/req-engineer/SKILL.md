@@ -223,17 +223,21 @@ Per endpoint: method, path, query params (types/defaults) · auth roles and unau
 
 Ask which walkthrough format the user wants before quality checks. Honor Skip by using text-based walkthrough, and honor Decide for me / Use smart defaults by choosing the format that best matches the interface.
 
-Present:
+In Appling, visual projects always get a clickable prototype. Create
+`prototypes/index.html` as the entry point, with linked screens or interactive
+controls, realistic example data, responsive CSS, visible focus states, and
+requirements references. Simulate the primary journeys and key empty, error,
+loading and success states. For slides or video, make the sequence or storyboard
+clickable. For an update, show the revised journeys against the existing product.
+Tell the owner that **Prototype preview** is beside the chat and where to click
+first. Use `clarify` with choices exactly `["Approve prototype", "Request changes"]`.
+If changes are requested, ask what to adjust, revise the files and repeat the
+checkpoint. For API or CLI projects without a visual surface, walk through
+realistic commands or requests and responses.
 
-> "Before we review the prototypes, how would you like to walk through them?"
-> **1. Visual** — interactive HTML/CSS prototype files to click through in your browser: real layouts, colors, responsive behavior. Best when look-and-feel matters.
-> **2. Text-based** — I narrate each screen/command/endpoint here in the conversation. Faster; good for APIs and CLIs.
-
-**Option 1 — Visual**: create `prototypes/` with `index.html` hub + one file per screen (`01-login.html`, `02-dashboard.html`, ...). Realistic data from the requirements (no Lorem ipsum) · real-enough CSS (layout, colors, typography, spacing) · hover/focus states and basic transitions · responsive media queries · visible notes panel with FR-XXX, validation rules, states. CLI tools → simulated-terminal HTML page; APIs → readable request/response page. Then: "Open `prototypes/index.html`, click through each screen, and tell me what doesn't match your expectations — this is the cheapest point to change anything." Iterate on feedback.
-
-**Option 2 — Text-based**: narrate the main user journey in sequence ("User opens the app → sees [Login]. They enter credentials... → [Dashboard]. They click [Create Order]..."). After each screen/command/endpoint: "Does this match what you had in mind?" Update the prototype immediately on objections.
-
-Both options: pay special attention to transitions between screens — that's where misunderstandings hide. Walkthrough confirmed → quality checks; changes requested → update prototypes (HTML or ASCII wireframes) first.
+Outside Appling, show the interactive files with instructions to open
+`prototypes/index.html`, or use a text walkthrough for projects without a visual
+surface. Confirm the walkthrough before continuing to quality checks.
 
 ## Step 7 — Quality Checks
 
@@ -248,9 +252,19 @@ Both options: pay special attention to transitions between screens — that's wh
 
 ## Step 8 — Summary (Final Checkpoint)
 
+In Appling, delegate a focused `req-engineer:` draft review after writing
+`requirements.md`. Ask for missing, contradictory, or untestable requirements.
+Use the returned notes in the interview or draft before asking the owner to
+approve. Keep the interview and approval in the main conversation.
+
 Present: FR/NFR counts · MoSCoW breakdown · prototype coverage (X screens / Y commands / Z endpoints) · chosen approach one-liner · key risks/gaps needing stakeholder input · failure-mode count · path to `requirements.md`.
 
-Tell the user: "Review the prototypes carefully — this is the cheapest point to change anything. Once architecture starts, changes get expensive." Then suggest: "When you're satisfied, feed this to the `sw-architect` skill."
+In Appling, share the requirements summary and use `clarify` with choices exactly
+`["Approve requirements", "Request changes"]`. If the owner requests edits,
+revise the requirements and repeat the review. Mark `requirements.md` Approved
+after approval. For an update, hand off to Change management before planning.
+Outside Appling, ask the user to review and explicitly approve the requirements
+before passing them to architecture.
 
 ## Principles & Anti-Patterns
 

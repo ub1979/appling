@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from threading import Lock
 from typing import Any
 
 ENGINES = ("hermes",)
@@ -145,3 +146,115 @@ def set_hermes_model(provider: str, model: str, confirm: bool = False) -> dict[s
 def effective_engine(state: dict) -> str:
     """All Appling projects use Hermes; ProjectStore handles legacy state."""
     return "hermes"
+
+
+CODEX_DEFAULT = {"provider": "openai-codex", "model": "gpt-6.1-sol"}
+CLAUDE_DEVELOPMENT = {"provider": "anthropic", "model": "claude-opus-5-5", "effort": "high"}
+CLAUDE_DOCUMENTS = {"provider": "anthropic", "model": "claude-sonnet-5"}
+LUNA_DOCUMENTS = {"provider": "openai-codex", "model": "gpt-6-luna"}
+
+_AGENT_DEFAULTS = {
+    "sw-developer": CLAUDE_DEVELOPMENT,
+    "website-builder": CLAUDE_DEVELOPMENT,
+    "oop-restructurer": CLAUDE_DEVELOPMENT,
+    "debugger": CLAUDE_DEVELOPMENT,
+    "tech-writer": CLAUDE_DOCUMENTS,
+    "req-engineer": CLAUDE_DOCUMENTS,
+    "task-planner": CLAUDE_DOCUMENTS,
+    "proj-manager": CLAUDE_DOCUMENTS,
+    "context-save": CLAUDE_DOCUMENTS,
+    "deck-builder": CLAUDE_DOCUMENTS,
+    "ux-writer": CLAUDE_DOCUMENTS,
+    "spec": CLAUDE_DOCUMENTS,
+}
+
+
+def agent_model_overrides() -> dict:
+    selections = _section().get("agent_models")
+    return selections if isinstance(selections, dict) else {}
+
+
+def agent_model_settings() -> list[dict]:
+    from lyra_lite.agents import AGENTS
+
+    saved = agent_model_overrides()
+    return [
+        {"id": agent_id, "label": label, "default": _AGENT_DEFAULTS.get(agent_id),
+         "selection": saved.get(agent_id)}
+        for agent_id, label, _ in AGENTS
+    ]
+
+
+_agent_model_lock = Lock()
+
+
+def save_agent_model(agent_id: str, selection: Any) -> None:
+    from hermes_cli.config import read_raw_config, save_config
+    from lyra_lite.agents import LABELS
+
+    if agent_id not in LABELS:
+        raise ValueError("Unknown agent.")
+
+    if selection is not None:
+        if not isinstance(selection, dict):
+            raise ValueError("Choose a provider and a model.")
+        provider = str(selection.get("provider") or "").strip()
+        model = str(selection.get("model") or "").strip()
+        effort = str(selection.get("effort") or "").strip()
+        if not provider or not model or len(provider) > 120 or len(model) > 500:
+            raise ValueError("Choose a provider and a model.")
+        if effort not in ("", "off", *EFFORTS):
+            raise ValueError("Unknown effort level.")
+        selection = {"provider": provider, "model": model, "effort": effort}
+
+    with _agent_model_lock:
+        config = read_raw_config()
+        section = _section()
+        saved = dict(section.get("agent_models") or {})
+        if selection is None:
+            saved.pop(agent_id, None)
+        else:
+            saved[agent_id] = selection
+        # Replace this map so resetting actually removes the key.
+        config["lyra_lite"] = {**section, "agent_models": saved}
+        save_config(config)
+
+
+def model_runtime(selection: dict) -> dict:
+    from hermes_cli.runtime_provider import resolve_runtime_provider
+    from hermes_constants import parse_reasoning_effort
+
+    provider, model = selection["provider"], selection["model"]
+    try:
+        runtime = resolve_runtime_provider(requested=provider, target_model=model)
+    except (ValueError, RuntimeError) as exc:
+        raise ValueError(
+            f"Could not use {model} on {provider}. Link the provider or change the agent model in Settings."
+        ) from exc
+    if not runtime.get("api_key") or not runtime.get("provider"):
+        raise ValueError(f"Link {provider} or change the model for this agent in Settings.")
+    effort = selection.get("effort") or ""
+    return {
+        **runtime, "model": model,
+        "provider": provider if runtime["provider"] == "custom" else runtime["provider"],
+        "reasoning": parse_reasoning_effort("none" if effort == "off" else effort),
+    }
+
+
+def resolve_agent_model(agent_id: str | None, preferences: dict, legacy: dict) -> dict | None:
+    if agent_id is None:
+        return None
+    if preferences.get(agent_id):
+        return model_runtime(preferences[agent_id])
+    if isinstance(legacy.get(agent_id), str) and legacy[agent_id]:
+        return {"model": legacy[agent_id]}
+    default = _AGENT_DEFAULTS.get(agent_id)
+    if default is None:
+        return None
+    alternate = CODEX_DEFAULT if default is CLAUDE_DEVELOPMENT else LUNA_DOCUMENTS
+    for selection in (default, {**default, "provider": "claude-cli"}, alternate):
+        try:
+            return model_runtime(selection)
+        except ValueError:
+            continue
+    return None

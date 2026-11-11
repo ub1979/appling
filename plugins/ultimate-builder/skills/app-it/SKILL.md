@@ -111,6 +111,16 @@ that already has `.sdlc/progress.md`: follow "Returning to a project" below.
 
 ## Returning to a project
 
+For an Appling setup message containing `project_update`, the owner has chosen
+a new version. Start a fresh Requirements interview using the baseline and
+current project as evidence. Once the owner approves the new requirements,
+load `ultimate-builder:change-manager` and delegate the impact review. When it
+reports a conflict or unclear change, use `clarify` to ask the owner one
+question at a time, and return their decisions to Change management. Pass its
+ready report to planning. Preserve the history and record the new work and
+Delivery row in the revision table requested by Appling.
+
+
 When a project with `.sdlc/progress.md` is reopened, resumed, or the user asks
 what is next, the project's files are the record — not this conversation. Chat
 history can be incomplete (compressed, reset, or never saved). Before replying:
@@ -406,12 +416,12 @@ Between phases, tell the user in one line what finished and who is next, then
 continue. Stop only at the approval checkpoints below, a real user decision, a
 permission request, or a blocker.
 
-Honor `specialist_models`: pass the assigned model in the corresponding
-`delegate_task` call. An unassigned specialist inherits the project default.
-Exact assignments are valid only while the active provider exposes that model.
-After a provider change, wait for the dashboard's user-confirmed replacement
-map. Do not guess an equivalent model, silently replace the assignment, or keep
-searching for the old provider's model id.
+Start every delegated goal with its exact agent ID, such as `sw-developer:`,
+so Appling can apply the owner's saved model and effort. Appling resolves those
+assignments at dispatch. Use a focused `req-engineer:` advisory task for draft
+review while the owner-facing interview and approval stay here in this conversation. In other launchers, pass
+the model ID from the dashboard's `specialist_models` map as `delegate_task.model`
+while the selected provider offers it.
 
 Requirements has already run when it was needed, and its `requirements.md` is
 the input to every affected later phase — pass its path to each specialist you
@@ -421,5 +431,6 @@ for ordinary feedback or implementation details already inside the approved
 scope.
 
 Stop for explicit approval at requirements, visual preview for UI projects,
-and final delivery. Never approve a checkpoint, add a skill, or make a product
+and final delivery. For a built UI, tell the owner to use **Open app** in the
+project toolbar and say which flows to try before asking them to approve it. Never approve a checkpoint, add a skill, or make a product
 decision on the user's behalf unless they explicitly asked for smart defaults.

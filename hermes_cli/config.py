@@ -932,6 +932,10 @@ def _ensure_hermes_home_managed(home: Path):
 
 DEFAULT_CONFIG = {
     "model": "",
+    "lyra_lite": {
+        # Appling's persistent provider/model/effort selection for each agent.
+        "agent_models": {},
+    },
     "providers": {},
     "fallback_providers": [],
     "credential_pool_strategies": {},

@@ -1219,6 +1219,7 @@ def _build_child_agent(
     # 'leaf' (default) cannot; 'orchestrator' retains the delegation
     # toolset subject to depth/kill-switch bounds applied below.
     role: str = "leaf",
+    override_reasoning: Optional[Dict[str, Any]] = None,
 ):
     """
     Build a child AIAgent on the main thread (thread-safe construction).
@@ -1452,6 +1453,9 @@ def _build_child_agent(
                 )
     except Exception as exc:
         logger.debug("Could not load delegation reasoning_effort: %s", exc)
+
+    if override_reasoning is not None:
+        child_reasoning = override_reasoning
 
     # Inherit the parent's fallback provider chain so subagents can recover
     # from rate-limits and credential exhaustion exactly like the top-level
@@ -2637,6 +2641,8 @@ def delegate_task(
     role: Optional[str] = None,
     background: Optional[bool] = None,
     parent_agent=None,
+    *,
+    task_runtimes: Optional[List[Optional[Dict[str, Any]]]] = None,
 ) -> str:
     """
     Spawn one or more child agents to handle delegated tasks.
@@ -2649,6 +2655,9 @@ def delegate_task(
     'leaf' (default) cannot; 'orchestrator' retains the delegation
     toolset and can spawn its own workers, bounded by
     delegation.max_spawn_depth.  Per-task role beats the top-level one.
+
+    Trusted Python callers may pass resolved per-task runtimes. Model-facing
+    calls cannot set credentials or effort.
 
     Returns JSON with results array, one entry per task.
     """
@@ -2715,7 +2724,8 @@ def delegate_task(
     # used by CLI/gateway startup.  When unconfigured, returns None values so
     # children inherit from the parent.
     try:
-        creds = _resolve_delegation_credentials(cfg, parent_agent)
+        creds = ({} if task_runtimes and all(r and r.get("provider") for r in task_runtimes)
+                 else _resolve_delegation_credentials(cfg, parent_agent))
     except ValueError as exc:
         return tool_error(str(exc))
 
@@ -2763,8 +2773,12 @@ def delegate_task(
     except ValueError as exc:
         return tool_error(str(exc))
 
+    if task_runtimes is not None and len(task_runtimes) != len(task_list):
+        return tool_error("Per-task runtime count must match the number of tasks.")
+
     # Validate each task has a goal
     task_models = []
+    resolved_tasks = []
     for i, task in enumerate(task_list):
         if not isinstance(task, dict):
             return tool_error(
@@ -2772,10 +2786,14 @@ def delegate_task(
             )
         if not task.get("goal", "").strip():
             return tool_error(f"Task {i} is missing a 'goal'.")
+        selected = task_runtimes[i] if task_runtimes is not None else None
+        task_runtime = (selected if selected and selected.get("provider") else {**creds, **(selected or {})})
+        resolved_tasks.append(task_runtime)
         try:
             task_models.append(
-                _normalize_model_name(task.get("model"), f"Task {i}")
-                or top_model or creds["model"]
+                (selected or {}).get("model")
+                or _normalize_model_name(task.get("model"), f"Task {i}")
+                or top_model or task_runtime.get("model")
             )
         except ValueError as exc:
             return tool_error(str(exc))
@@ -2830,6 +2848,7 @@ def delegate_task(
             # Per-task role beats top-level; normalise again so unknown
             # per-task values warn and degrade to leaf uniformly.
             effective_role = _normalize_role(t.get("role") or top_role)
+            runtime = resolved_tasks[i]
             child = _build_child_agent(
                 task_index=i,
                 goal=t["goal"],
@@ -2841,15 +2860,16 @@ def delegate_task(
                 max_iterations=effective_max_iter,
                 task_count=n_tasks,
                 parent_agent=parent_agent,
-                override_provider=creds["provider"],
-                override_base_url=creds["base_url"],
-                override_api_key=creds["api_key"],
-                override_api_mode=creds["api_mode"],
-                override_request_overrides=creds.get("request_overrides"),
-                override_max_tokens=creds.get("max_output_tokens"),
-                override_acp_command=creds.get("command"),
-                override_acp_args=creds.get("args"),
+                override_provider=runtime.get("provider"),
+                override_base_url=runtime.get("base_url"),
+                override_api_key=runtime.get("api_key"),
+                override_api_mode=runtime.get("api_mode"),
+                override_request_overrides=runtime.get("request_overrides"),
+                override_max_tokens=runtime.get("max_output_tokens"),
+                override_acp_command=runtime.get("command"),
+                override_acp_args=runtime.get("args"),
                 role=effective_role,
+                override_reasoning=runtime.get("reasoning"),
             )
             # Override with correct parent tool names (before child construction mutated global)
             child._delegate_saved_tool_names = _parent_tool_names
@@ -3283,7 +3303,7 @@ def delegate_task(
             # parent's toolsets (no model-facing toolsets arg).
             toolsets=None,
             role=top_role,
-            model=creds["model"],
+            model=(task_models[0] if task_runtimes and len(set(task_models)) == 1 else creds.get("model")),
             session_key=_session_key,
             origin_ui_session_id=_origin_ui_session_id,
             origin_session_id=_wake_sid,

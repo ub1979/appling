@@ -11,12 +11,14 @@ import {
   type ChatMessage,
   type ProjectDetail,
   type ProjectMap,
+  type ReviewAnswer,
 } from "../api";
 import { ArrowLeft, ArrowUp, Check, Copy, Crosshair, MessageSquarePlus, Paperclip, Play, Square, UsersRound, X } from "lucide-react";
 import { PreviewPanel, pickLabel, pickNote, type PickedElement } from "../components/PreviewPanel";
 import { Avatar, IconButton, PrefButtons, TeamPicker } from "../components/common";
 import { activeHelpers, applyEvent, emptyLive, type InboxItem, type LiveState, type LyraEvent } from "../live";
 import { go } from "../router";
+import { UpdateDialog } from "../components/UpdateDialog";
 import {
   extractAppItSkillSelection,
   orderGuidedPhases,
@@ -80,10 +82,13 @@ export function Studio({ id }: { id: string }) {
   const [problem, setProblem] = useState<string | null>(null);
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [showTeam, setShowTeam] = useState(false);
+  const [showUpdate, setShowUpdate] = useState(false);
   // Bumped on every owner message so the chat jumps to the bottom to show it.
   const [sent, setSent] = useState(0);
   // The live preview beside the chat, and parts of it the owner picked.
   const [preview, setPreview] = useState<AppPreview | null>(null);
+  const [seenPrototype, setSeenPrototype] = useState<string | null>(null);
+  const [prototypeRevision, setPrototypeRevision] = useState<string | null>(null);
   const [picks, setPicks] = useState<PickedElement[]>([]);
   const addPick = useCallback((p: PickedElement) => setPicks((all) => [...all.slice(-4), p]), []);
   // Files dropped anywhere on the chat go to the composer's attachments.
@@ -106,6 +111,7 @@ export function Studio({ id }: { id: string }) {
     load().then((data) => {
       if (cancelled) return;
       dispatch({ type: "reset", detail: data });
+      setShowUpdate(data.update_available);
       source = new EventSource(streamUrl(id, data.turn_start_offset));
       source.onmessage = (msg) => {
         try {
@@ -142,7 +148,10 @@ export function Studio({ id }: { id: string }) {
   const [canOpen, setCanOpen] = useState(false);
   const [opening, setOpening] = useState(false);
   useEffect(() => {
-    void api.preview(id).then((p) => setCanOpen(p.available)).catch(() => undefined);
+    void api.preview(id).then((p) => {
+      setCanOpen(p.available);
+      setPrototypeRevision(p.prototype ?? null);
+    }).catch(() => undefined);
   }, [id, live.turnsEnded, live.helperChanges]);
 
   useAttentionSignals(detail?.name ?? "Appling", live);
@@ -156,7 +165,19 @@ export function Studio({ id }: { id: string }) {
     }
   }, []);
 
-  const agents = catalog?.agents ?? [];
+  const openPrototype = useCallback(() => run(async () => {
+    setPreview(null);
+    setSeenPrototype(null);
+    setPreview(await api.openPrototype(id));
+  }), [id, run]);
+  const pendingPrototype = live.inbox.find((item) => item.kind === "prototype")?.revision;
+  useEffect(() => {
+    if (pendingPrototype) void openPrototype();
+  }, [pendingPrototype, openPrototype]);
+
+  const agents = useMemo(() => (catalog?.agents ?? []).map((agent) =>
+    detail?.active_update && agent.id === "change-manager" ? { ...agent, required: true } : agent,
+  ), [catalog, detail?.active_update]);
   const ids = useMemo(() => agents.map((a) => a.id), [agents]);
   const team = detail?.team?.length ? detail.team : ["req-engineer", "task-planner"];
   const helpers = detail?.helpers ?? [];
@@ -176,7 +197,10 @@ export function Studio({ id }: { id: string }) {
     let current: string | null = [...started].reverse().find((s) => !completed.has(s)) ?? null;
     if (map?.markdown) {
       const labels = Object.fromEntries(agents.map((a) => [a.id, a.label]));
-      const ledger = phasesFromProgressLedger(map.markdown, labels);
+      const section = detail?.active_update
+        ? map.markdown.split(new RegExp(`^## Revision ${detail.active_update.revision}\\s*$`, "im"))[1]
+        : map.markdown;
+      const ledger = phasesFromProgressLedger(section ?? "", labels);
       ledger.completed.forEach((c) => completed.add(c));
       if (ledger.current) current = ledger.current;
     }
@@ -187,7 +211,7 @@ export function Studio({ id }: { id: string }) {
       !!currentAgent &&
       (map?.phases ?? []).some((row) => (row.state === "blocked" || row.state === "owner") && rowIsAgent(row.name, currentAgent));
     return { ordered, completed, current, waiting };
-  }, [detail?.messages, live.turn?.reply, ids, agents, map?.markdown, map?.phases, team]);
+  }, [detail?.messages, detail?.active_update, live.turn?.reply, ids, agents, map?.markdown, map?.phases, team]);
   const allDone = phases.ordered.length > 0 && phases.ordered.every((p) => phases.completed.has(p));
   const workingIds = new Set(helpers.map((h) => agentForGoal(h.goal, agents)).filter((x): x is string => !!x));
 
@@ -200,7 +224,7 @@ export function Studio({ id }: { id: string }) {
   const asksQuestion = !busy && live.queued.length === 0 && /[?？]\s*$/.test(lastText) && !openProposal;
   // Only when the reply actually asks for approval — not when it merely
   // says an approval was recorded (that showed the button after every turn).
-  const asksApproval = !busy && live.queued.length === 0 && !openProposal && asksForApproval(lastText);
+  const asksApproval = !busy && live.queued.length === 0 && !openProposal && !detail?.review_pending && asksForApproval(lastText);
 
   if (!detail) {
     return (
@@ -271,10 +295,18 @@ export function Studio({ id }: { id: string }) {
               <Square size={14} fill="currentColor" />
             </IconButton>
           )}
+          {detail.update_available && (
+            <button className="btn small" disabled={busy || helpers.length > 0} onClick={() => setShowUpdate(true)}>
+              Update project
+            </button>
+          )}
+          {(prototypeRevision || pendingPrototype) && (
+            <button className="btn small" onClick={() => void openPrototype()}>Open prototype</button>
+          )}
           {canOpen && (
-            <IconButton label={opening ? "Getting your app ready…" : "Open the app Appling built"} tone="accent" disabled={opening} onClick={openApp}>
-              <Play size={16} fill="currentColor" />
-            </IconButton>
+            <button className="btn small" disabled={opening} onClick={openApp}>
+              <Play size={14} fill="currentColor" /> {opening ? "Opening app…" : "Open app"}
+            </button>
           )}
           <IconButton
             label="New chat — project files stay as they are"
@@ -289,6 +321,9 @@ export function Studio({ id }: { id: string }) {
       </header>
 
       <div>
+        {detail.active_update && (
+          <div className="banner">Version {detail.active_update.revision} update{detail.active_update.branch ? ` · ${detail.active_update.branch}` : ""}</div>
+        )}
         {detail.rules_outdated && (
           <div className="banner warn">
             Appling's rules were updated since this chat started.
@@ -394,6 +429,9 @@ export function Studio({ id }: { id: string }) {
             onSend={(t) => void send(t)}
             onTeam={(t) => void run(async () => { await api.team(id, t); await load(); })}
             onAnswer={(item, a) => void run(() => api.answer(id, item, a))}
+            emptyNote={detail.update_available ? "Open the app or ask Appling about this project." : undefined}
+            seenPrototype={preview?.revision === seenPrototype ? seenPrototype : null}
+            onOpenPrototype={() => void openPrototype()}
           />
           <Composer busy={busy} onSend={send} projectId={id} dropped={dropped} picks={picks} onPicksChange={setPicks} />
         </section>
@@ -450,9 +488,21 @@ export function Studio({ id }: { id: string }) {
             )}
           </section>
         </aside>
-        {preview && <PreviewPanel preview={preview} onClose={() => setPreview(null)} onPicked={addPick} />}
+        {preview && <PreviewPanel key={preview.url + (preview.revision ?? "")} preview={preview}
+          onClose={() => setPreview(null)} onPicked={addPick} onReady={setSeenPrototype} />}
       </div>
 
+      {showUpdate && (
+        <UpdateDialog
+          name={detail.name}
+          revision={detail.next_revision}
+          onClose={() => setShowUpdate(false)}
+          onStart={async (branch) => {
+            const result = await api.startUpdate(id, branch);
+            go(`/p/${id}?chat=${result.chat_id}`);
+          }}
+        />
+      )}
       {showTeam && catalog && (
         <TeamDialog
           agents={agents}
@@ -632,7 +682,10 @@ function ChatScroll(props: {
   proposal: string[] | null;
   onSend: (text: string) => void;
   onTeam: (team: string[]) => void;
-  onAnswer: (item: string, answer: string) => void;
+  onAnswer: (item: string, answer: ReviewAnswer) => void;
+  emptyNote?: string;
+  seenPrototype: string | null;
+  onOpenPrototype: () => void;
 }) {
   const { shown, live, ids } = props;
   const box = useRef<HTMLDivElement>(null);
@@ -693,7 +746,7 @@ function ChatScroll(props: {
       )}
       <div className="chat-inner" ref={inner}>
         {shown.length === 0 && !turn && (
-          <div className="empty-note">Let's start building. What's the idea? ✨</div>
+          <div className="empty-note">{props.emptyNote ?? "Let's start building. What's the idea? ✨"}</div>
         )}
         {shown.map((s, i) => (
           <Message key={i} item={s}>
@@ -735,7 +788,8 @@ function ChatScroll(props: {
           </div>
         ))}
         {live.inbox.map((item) => (
-          <NeedCard key={item.id} item={item} onAnswer={(a) => props.onAnswer(item.id, a)} />
+          <NeedCard key={item.id} item={item} onAnswer={(a) => props.onAnswer(item.id, a)}
+            seenPrototype={props.seenPrototype} onOpenPrototype={props.onOpenPrototype} />
         ))}
       </div>
     </div>
@@ -745,7 +799,7 @@ function ChatScroll(props: {
 function TurnStart({ kind, text }: { kind: string; text: string }) {
   if (kind === "user") return <Message item={{ role: "user", text, proposal: null }} />;
   if (kind === "helper_done") return <Message item={{ role: "report", text, proposal: null }} />;
-  const note = kind === "watchdog" ? "Appling kept going on its own." : kind === "team" ? text : kind === "setup" && text !== "Project opened" ? null : "Project opened";
+  const note = kind === "setup" && text.startsWith("Started version ") ? text : kind === "watchdog" ? "Appling kept going on its own." : kind === "team" ? text : kind === "setup" && text !== "Project opened" ? null : "Project opened";
   if (note === null) return <Message item={{ role: "user", text, proposal: null }} />;
   return <Message item={{ role: "note", text: note, proposal: null }} />;
 }
@@ -811,8 +865,33 @@ const APPROVAL_CHOICES = [
   { value: "deny", label: "Don't allow", tone: "danger" },
 ];
 
-function NeedCard({ item, onAnswer }: { item: InboxItem; onAnswer: (a: string) => void }) {
+function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype }: {
+  item: InboxItem;
+  onAnswer: (a: ReviewAnswer) => void;
+  seenPrototype: string | null;
+  onOpenPrototype: () => void;
+}) {
   const [text, setText] = useState("");
+  if (item.kind === "prototype" || item.kind === "requirements") {
+    const prototype = item.kind === "prototype";
+    const viewed = !!item.revision && seenPrototype === item.revision;
+    const approve = prototype ? "Approve prototype" : "Approve requirements";
+    return (
+      <div className="need-card">
+        <b>{prototype ? "Review the clickable prototype" : "Review the requirements"}</b>
+        <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{item.question ?? ""}</ReactMarkdown></div>
+        {prototype && <p className="small">Try the main flows in <b>Prototype preview</b> beside the chat.</p>}
+        <div className="answer-row">
+          {prototype && <button className="btn small" onClick={onOpenPrototype}>Open prototype</button>}
+          <button className="btn primary small" disabled={prototype && !viewed}
+            onClick={() => onAnswer(prototype && seenPrototype ? { choice: approve, revision: seenPrototype } : approve)}>
+            {approve}
+          </button>
+          <button className="btn small" onClick={() => onAnswer("Request changes")}>Request changes</button>
+        </div>
+      </div>
+    );
+  }
   if (item.kind === "approval") {
     return (
       <div className="need-card">

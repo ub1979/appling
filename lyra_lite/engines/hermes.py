@@ -110,11 +110,13 @@ class HermesEngine:
         session_key: str,
         system_prompt: str = "",
         skills: list[str] | None = None,
+        store=None,
     ):
         self.workspace = workspace
         self.session_key = session_key
         self.system_prompt = system_prompt
         self.skills = list(skills or [])
+        self.store = store
         from lyra_lite.delegation import DelegationGuard
 
         self._delegations = DelegationGuard(session_key)
@@ -129,19 +131,36 @@ class HermesEngine:
         from run_agent import AIAgent
 
         guard = self._delegations
+        engine = self
 
         class ProjectAgent(AIAgent):
             def _dispatch_delegate_task(self, function_args: dict) -> str:
-                return guard.dispatch(function_args, super()._dispatch_delegate_task)
+                if engine.store is None:
+                    return guard.dispatch(function_args, super()._dispatch_delegate_task)
+                from lyra_lite.delegation import dispatch_project_tasks
+
+                return guard.dispatch(function_args, lambda args: dispatch_project_tasks(engine.store, self, args))
 
         cfg = gw._load_cfg()
         model, requested_provider = gw._resolve_startup_runtime()
-        resolution = gw._resolve_runtime_with_fallback(
-            {"requested": requested_provider, "target_model": model or None}
-        )
-        runtime = resolution.runtime
-        if resolution.used_fallback and resolution.selected_model:
-            model = resolution.selected_model
+        runtime = None
+        if self.store is not None and not cfg.get("model") and not requested_provider and not (
+            os.environ.get("HERMES_MODEL") or os.environ.get("HERMES_INFERENCE_MODEL")
+        ):
+            from lyra_lite.settings import CODEX_DEFAULT, model_runtime
+
+            try:
+                runtime = model_runtime(CODEX_DEFAULT)
+                model = runtime["model"]
+            except ValueError:
+                pass
+        if runtime is None:
+            resolution = gw._resolve_runtime_with_fallback(
+                {"requested": requested_provider, "target_model": model or None}
+            )
+            runtime = resolution.runtime
+            if resolution.used_fallback and resolution.selected_model:
+                model = resolution.selected_model
 
         prompt = self.system_prompt
         if self.skills:
@@ -215,6 +234,11 @@ class HermesEngine:
                 logger.debug("lyra-lite emit failed", exc_info=True)
 
     def _on_tool_start(self, tc_id, name, args) -> None:
+        if self.store is not None and name == "skill_view":
+            from lyra_lite.delegation import _object
+
+            if str(_object(args).get("name") or "").split(":")[-1] == "req-engineer":
+                self.store.update_state(requirements_review=True)
         self._emit("tool", phase="start", id=str(tc_id or ""), name=str(name),
                    args=_preview(args, 300))
 
@@ -242,6 +266,38 @@ class HermesEngine:
         self._emit("interim", text=str(text), already_streamed=bool(already_streamed))
 
     def _on_clarify(self, question: str, choices) -> str:
+        if self.store is not None:
+            from lyra_lite import review
+
+            state = self.store.state()
+            root = self.store.root
+            update = review.active_update(root, state) or {}
+            if list(choices or []) == list(review.PROTOTYPE_CHOICES):
+                revision = review.prototype_revision(root)
+                if not revision or revision in (update.get("baseline_prototype_revision"),
+                                                 state.get("prototype_needs_changes")):
+                    return ("The prototype needs work before review. Create or revise prototypes/index.html "
+                            "and its clickable flows, then call this checkpoint again.")
+                self.store.update_state(requirements_review=True)
+                return self._ask_blocking(
+                    "prototype", question=str(question), choices=list(review.PROTOTYPE_CHOICES),
+                    revision=revision, timeout=CLARIFY_TIMEOUT_S,
+                    on_timeout="Prototype review is still pending. Ask the owner to reopen the prototype checkpoint.",
+                )
+            if list(choices or []) == list(review.REQUIREMENTS_CHOICES):
+                revision = review.requirements_revision(root)
+                if not revision or revision == update.get("baseline_requirements_revision"):
+                    return "Write the new requirements draft before asking for approval."
+                prototype = None
+                if review.visual_project(root, state):
+                    prototype = review.prototype_revision(root)
+                    if not prototype or prototype != state.get("prototype_approved"):
+                        return "The owner must open and approve the current clickable prototype first."
+                return self._ask_blocking(
+                    "requirements", question=str(question), choices=list(review.REQUIREMENTS_CHOICES),
+                    revision=revision, prototype=prototype, timeout=CLARIFY_TIMEOUT_S,
+                    on_timeout="Requirements approval is still pending. Wait for the owner.",
+                )
         return self._ask_blocking(
             "question",
             question=str(question),

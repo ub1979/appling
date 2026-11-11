@@ -14,6 +14,7 @@ _ALLOWED_CHECKOUT_WORKSPACES = (
 
 _SPECIALIST_SKILLS = {
     "req-engineer": "Requirements engineering",
+    "change-manager": "Impact and conflict review for approved project updates",
     "researcher": "Internet research and source verification",
     "spec": "Technical specification",
     "sw-architect": "Software architecture",

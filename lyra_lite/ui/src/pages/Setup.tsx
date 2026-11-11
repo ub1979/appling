@@ -130,7 +130,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
         <p>
           {mode === "new"
             ? "Choose the folder and tell Appling the outcome you want. Everything else can be adjusted later."
-            : "Pick the folder with your code and tell Appling what you'd like to improve."}
+            : "Choose the project folder. Appling will offer to start a new version when it finds a built project."}
         </p>
       </div>
 
@@ -293,7 +293,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
             )}
           </section>
 
-          <section className="card card-pad">
+          {mode === "new" && <section className="card card-pad">
             <h3>What should Appling help with?</h3>
             <textarea
               className="textarea"
@@ -306,7 +306,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
               }
               onChange={(e) => setBrief(e.target.value)}
             />
-          </section>
+          </section>}
         </div>
 
         <aside className="setup-side">

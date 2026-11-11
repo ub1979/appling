@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type AiSettings, type ModelOptions, type ProjectDetail } from "../api";
+import { api, type AgentModelSetting, type AiSettings, type ModelOptions, type ModelSelection, type ProjectDetail } from "../api";
 import { Brand, PrefButtons } from "../components/common";
 import { DEFAULT_EFFORT_LABEL, HERMES_EFFORT_LEVELS, effortName } from "../effort";
 import { go } from "../router";
@@ -100,6 +100,18 @@ export function Settings({ projectId }: { projectId: string | null }) {
             }
           />
 
+          <section className="card card-pad">
+            <h2 style={{ fontSize: 20 }}>Agent models</h2>
+            <p className="muted small">Choose a provider, model and effort for each agent. Saved choices apply to future tasks in all projects. Appling leads the Requirements interview and uses the Requirements model for its draft review.</p>
+            {settings.agent_models.map((agent) => (
+              <AgentModel key={agent.id} agent={agent} options={options}
+                onSave={async (selection) => {
+                  setSettings(await api.agentModelSave(agent.id, selection));
+                  setNote(`${agent.label} model saved.`);
+                }} />
+            ))}
+          </section>
+
           <AboutMe
             initial={settings.about_me}
             onSave={(text) => run(async () => setSettings(await api.settingsSave({ about_me: text })), "Saved. Open projects will offer to use it.")}
@@ -109,7 +121,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
             <section className="card card-pad">
               <h2 style={{ fontSize: 20 }}>This project: {project.name}</h2>
               <p style={{ margin: "14px 0 4px" }}><b>Hermes</b> · Locked to this project</p>
-              <p className="muted small">Uses the model and effort settings above.</p>
+              <p className="muted small">Uses the saved model and effort for each agent.</p>
             </section>
           )}
         </div>
@@ -151,9 +163,9 @@ function HermesModel({
     <section className="card card-pad">
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
         <div>
-          <h2 style={{ fontSize: 20 }}>Model</h2>
+          <h2 style={{ fontSize: 20 }}>Appling’s model</h2>
           <p className="muted small" style={{ margin: "4px 0 0" }}>
-            Now: <b>{settings.hermes.model || "not set"}</b>
+            Now: <b>{settings.hermes.model || "GPT-6.1 Sol via Codex when linked"}</b>
             {settings.hermes.provider ? ` · ${providers.find((p) => p.slug === settings.hermes.provider)?.name ?? settings.hermes.provider}` : ""}
           </p>
         </div>
@@ -203,6 +215,82 @@ function HermesModel({
         </p>
       )}
     </section>
+  );
+}
+
+interface AgentModelProps {
+  agent: AgentModelSetting;
+  options: ModelOptions | null;
+  onSave: (selection: ModelSelection | null) => Promise<void>;
+}
+
+function AgentModel({ agent, options, onSave }: AgentModelProps) {
+  const initial = agent.selection ?? agent.default;
+  const [provider, setProvider] = useState(initial?.provider ?? "");
+  const [model, setModel] = useState(initial?.model ?? "");
+  const [effort, setEffort] = useState(initial?.effort ?? "");
+  const [saving, setSaving] = useState(false);
+  const [problem, setProblem] = useState<string | null>(null);
+  const providers = options?.providers ?? [];
+  const models = providers.find((p) => p.slug === provider)?.models ?? [];
+  const status = initial
+    ? `${initial.model}${initial.effort ? ` · ${effortName(initial.effort)}` : ""}`
+    : "Appling’s model";
+
+  const save = async (selection: ModelSelection | null) => {
+    setSaving(true);
+    setProblem(null);
+    try {
+      await onSave(selection);
+      if (!selection) {
+        setProvider(agent.default?.provider ?? "");
+        setModel(agent.default?.model ?? "");
+        setEffort(agent.default?.effort ?? "");
+      }
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <details className="agent-model">
+      <summary><b>{agent.label}</b><span className="muted small">{status}{agent.selection ? "" : " · Default"}</span></summary>
+      <div className="agent-model-fields">
+        <label>
+          <span className="field-label">Provider</span>
+          <select className="input" value={provider} onChange={(e) => {
+            const chosen = e.target.value;
+            setProvider(chosen);
+            setModel(providers.find((p) => p.slug === chosen)?.models[0] ?? "");
+          }}>
+            <option value="">Choose a provider</option>
+            {provider && !providers.some((p) => p.slug === provider) && <option value={provider}>{provider}</option>}
+            {providers.map((p) => <option key={p.slug} value={p.slug}>{p.name}</option>)}
+          </select>
+        </label>
+        <label>
+          <span className="field-label">Model</span>
+          <input className="input" list={`models-${agent.id}`} value={model} onChange={(e) => setModel(e.target.value)}
+            placeholder="Choose or enter a model ID" />
+          <datalist id={`models-${agent.id}`}>{models.map((m) => <option key={m} value={m} />)}</datalist>
+        </label>
+        <label>
+          <span className="field-label">Effort</span>
+          <select className="input" value={effort} onChange={(e) => setEffort(e.target.value)}>
+            <option value="">Appling’s effort</option>
+            {HERMES_EFFORT_LEVELS.map((l) => <option key={l.id} value={l.id}>{effortName(l.id)}</option>)}
+          </select>
+        </label>
+      </div>
+      {problem && <p className="small" role="alert">{problem}</p>}
+      <div className="dialog-actions">
+        {agent.selection && <button className="btn small" disabled={saving} onClick={() => void save(null)}>Reset default</button>}
+        <button className="btn primary small" disabled={saving || !provider || !model.trim()}
+          onClick={() => void save({ provider, model: model.trim(), effort })}>Save model</button>
+      </div>
+    </details>
   );
 }
 

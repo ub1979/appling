@@ -95,3 +95,87 @@ class DelegationGuard:
             result = send(args)
             self._remember(args, _object(result))
             return result
+
+
+def dispatch_project_tasks(store, agent, args: dict) -> str:
+    """Enforce Appling's review sequence and resolve trusted per-agent settings."""
+    from lyra_lite import review, settings
+    from lyra_lite.agents import agent_for_goal
+    from tools.delegate_tool import (
+        _recover_tasks_from_json_string, _strip_model_hidden_task_fields, delegate_task,
+    )
+
+    tasks = args.get("tasks")
+    recovered, error = _recover_tasks_from_json_string(tasks)
+    if error:
+        return json.dumps({"error": error})
+    tasks = recovered if recovered is not None else tasks
+    tasks = _strip_model_hidden_task_fields(tasks)
+    single = not tasks
+    batch = [{k: args[k] for k in ("goal", "context", "role", "model") if k in args}] if single else tasks
+    if not isinstance(batch, list) or any(not isinstance(task, dict) for task in batch):
+        return json.dumps({"error": "Provide a list of agent tasks."})
+    state = store.state()
+    root = store.root
+    update = review.active_update(root, state)
+    identities = [agent_for_goal(str(task.get("goal") or "")) for task in batch]
+    requirements = review.requirements_revision(root)
+    needs_prototype = review.visual_project(root, state)
+    prototype = review.prototype_revision(root) if needs_prototype else None
+    approval_required = bool(update or state.get("requirements_review") or state.get("requirements_approved"))
+    approved = (
+        not state.get("requirements_review")
+        and requirements
+        and requirements == state.get("requirements_approved")
+        and (not needs_prototype or (prototype and prototype == state.get("prototype_approved")))
+    )
+    report = review.change_report(root, update, requirements) if update and requirements else None
+    ready = report is not None and review.change_review_ready(report)
+    for agent_id in identities:
+        if agent_id in {"req-engineer", "researcher"}:
+            continue
+        if approval_required and not approved:
+            return json.dumps({"error": "Finish the owner review of the clickable prototype (when applicable) "
+                                        "and requirements before handing off downstream work."})
+        if update and agent_id != "change-manager" and not ready:
+            return json.dumps({"error": "Change management must finish its impact review and resolve any "
+                                        "owner decisions before planning or implementation."})
+
+    if update and "change-manager" in identities:
+        if len(batch) != 1:
+            return json.dumps({"error": "Run Change management on its own before starting other agents."})
+        report_path = report.relative_to(root).as_posix()
+        task = batch[0]
+        task_context = task.get("context") or ""
+        batch = [{**task, "role": "leaf", "context": (
+            f"{task_context}\n\nRead requirements.md, the current source and tests, the Project Brain and "
+            f"progress ledger, and the previous requirements at {update.get('baseline_requirements') or 'no saved path'}. "
+            "Check the impact on existing features, interfaces, data/migrations, dependencies and tests. "
+            f"Write your findings to {report_path}. First line: 'Status: Ready' only when there are no "
+            "unresolved owner decisions, otherwise 'Status: Needs input'. Include the conflicts, trade-offs, "
+            "recommended options, and specific questions in the report and your reply. Apply any owner "
+            "decisions in the handoff before reassessing. Do not edit product code or write the implementation plan."
+        )}]
+        single = False
+    elif ready and any(agent_id not in {"req-engineer", "researcher"} for agent_id in identities):
+        report_path = report.relative_to(root).as_posix()
+        batch = [
+            {**task, "context": f"{task.get('context') or ''}\nRead the approved change review at {report_path}."}
+            for task in batch
+        ]
+        single = False
+
+    preferences = settings.agent_model_overrides()
+    runtimes = []
+    legacy_models = state.get("models") or {}
+    for agent_id in identities:
+        try:
+            selection = settings.resolve_agent_model(agent_id, preferences, legacy_models)
+        except ValueError as exc:
+            return json.dumps({"error": str(exc)})
+        runtimes.append(selection)
+    return delegate_task(
+        goal=args.get("goal"), context=args.get("context"), tasks=None if single else batch,
+        model=args.get("model"), max_iterations=args.get("max_iterations"), role=args.get("role"),
+        background=True, parent_agent=agent, task_runtimes=runtimes,
+    )

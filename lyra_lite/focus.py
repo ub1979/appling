@@ -43,12 +43,14 @@ def _brain_sections(root: Path, *, delivered: bool = False) -> list[str]:
     return out
 
 
-def focus_note(root: Path, open_inbox: int = 0) -> str:
+def focus_note(root: Path, open_inbox: int = 0, update_revision: int | None = None) -> str:
     root = Path(root)
     lines: list[str] = []
     ledger = read_map(root)
     delivered = bool(ledger.get("delivery_complete"))
-    if ledger.get("current_phase"):
+    if update_revision is not None:
+        lines.append(f"Version {update_revision} is an owner-requested update. Earlier verified work is the baseline.")
+    if ledger.get("current_phase") and not (delivered and update_revision is not None):
         lines.append(f"Current step: {ledger['current_phase']}")
     unfinished = [p for p in ledger.get("phases", []) if p["state"] != "done"]
     done = [p["name"] for p in ledger.get("phases", []) if p["state"] == "done"]
@@ -59,7 +61,7 @@ def focus_note(root: Path, open_inbox: int = 0) -> str:
     if ledger.get("history"):
         lines.append("Earlier ledger rows superseded by later phase records or delivery are history, "
                      "not unfinished work.")
-    if delivered:
+    if delivered and update_revision is None:
         lines.append("The ledger records delivery with no current unfinished rows. "
                      "Do not restart development or QA from historical rows or old next-action notes.")
     lines.extend(_brain_sections(root, delivered=delivered))

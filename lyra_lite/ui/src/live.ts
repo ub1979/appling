@@ -10,6 +10,7 @@ export interface InboxItem {
   description?: string;
   choices?: string[];
   env_var?: string;
+  revision?: string;
 }
 
 export interface ActivityItem {

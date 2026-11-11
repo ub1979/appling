@@ -52,6 +52,12 @@ def preview_root(project: Path) -> Path | None:
     return None
 
 
+def prototype_root(project: Path) -> Path | None:
+    base = (project / "prototypes").resolve()
+    index = base / "index.html"
+    return base if base.is_relative_to(project.resolve()) and index.is_file() and not index.is_symlink() else None
+
+
 def build_script(project: Path) -> str | None:
     try:
         scripts = json.loads((project / "package.json").read_text(encoding="utf-8")).get("scripts") or {}
@@ -288,16 +294,16 @@ class _Host:
         parts = [p for p in unquote(raw_path).split("/") if p]
         if any(p.startswith(".") or "\\" in p for p in parts):
             return None
-        target = self.base.joinpath(*parts).resolve() if parts else self.base / "index.html"
+        target = self.base.joinpath(*parts).resolve() if parts else (self.base / "index.html").resolve()
         if target.is_dir():
-            target = target / "index.html"
+            target = (target / "index.html").resolve()
         if not target.is_relative_to(self.base):
             return None
         if not target.is_file():
             # Single-page apps route in the browser: unknown pages get the app.
             if parts and "." not in parts[-1]:
-                target = self.base / "index.html"
-            if not target.is_file():
+                target = (self.base / "index.html").resolve()
+            if not target.is_relative_to(self.base) or not target.is_file():
                 return None
         return target if target.suffix.lower() in PREVIEW_TYPES else None
 
@@ -324,13 +330,21 @@ class AppHosts:
         project = Path(project)
         if is_expo(project):
             return {"kind": "expo", "url": self._open_expo(project)}
-        base = prepare(project).resolve()
+        return self._open_static(str(project), prepare(project).resolve())
+
+    def open_prototype(self, project: Path) -> dict:
+        base = prototype_root(project)
+        if base is None:
+            raise PreviewError("The clickable prototype isn't ready yet.")
+        return self._open_static(f"prototype:{project}", base)
+
+    def _open_static(self, key: str, base: Path) -> dict:
         with self._lock:
-            host = self._hosts.get(str(project))
+            host = self._hosts.get(key)
             if host is None or host.base != base:
                 if host is not None:
                     host.stop()
-                host = self._hosts[str(project)] = _Host(base)
+                host = self._hosts[key] = _Host(base)
         return {"kind": "web", "url": f"http://127.0.0.1:{host.port}/?lyra={host.secret}"}
 
     def _open_expo(self, project: Path) -> str:

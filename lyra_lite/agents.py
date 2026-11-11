@@ -12,6 +12,7 @@ from pathlib import Path
 
 AGENTS: list[tuple[str, str, str]] = [
     ("req-engineer", "Requirements", "Clarify goals, users, scope, and acceptance criteria."),
+    ("change-manager", "Change management", "Check the update against the existing project and resolve conflicts before planning."),
     ("researcher", "Research", "Investigate markets, competitors, standards, and technical choices with verified sources."),
     ("spec", "Technical specification", "Turn the request into detailed, testable behavior."),
     ("ui-designer", "Design", "Set the look and feel from real references, then review the build against it."),
@@ -164,7 +165,8 @@ def normalise_platforms(value: list[str] | None) -> list[str]:
 
 def setup_message(root: Path, team: list[str], models: dict | None, brief: str,
                   profile: str | None = None, kind: str | None = None,
-                  template: dict | None = None, platforms: list[str] | None = None) -> str:
+                  template: dict | None = None, platforms: list[str] | None = None,
+                  update: dict | None = None) -> str:
     payload = {
         "instruction": INSTRUCTION,
         "first_turn_gate": FIRST_TURN_GATE,
@@ -209,6 +211,35 @@ def setup_message(root: Path, team: list[str], models: dict | None, brief: str,
                 "`.lyra/kit/cutout`; AI pictures (only after the owner says yes; each uses "
                 "their ChatGPT plan) → `.lyra/kit/imagine`. Never pass AI pictures off as "
                 "real photos of a real product, place or person.")
+    if update:
+        payload["first_turn_gate"] = (
+            "Read the existing project context named in project_update first, then summarize what is built "
+            "and ask one question about the new version."
+        )
+        payload.pop("template_gate", None)
+        payload["project_update"] = {
+            "revision": update["revision"],
+            "branch": update["branch"],
+            "baseline_requirements": update["baseline_requirements"],
+            "instruction": (
+                "The owner chose to update a built project. This revision starts a fresh Requirements interview "
+                "even if earlier requirements were approved. First read the baseline requirements if supplied, "
+                ".sdlc/progress.md, .sdlc/project-brain.md, and README if present. Summarize what already works, "
+                "then ask one question about what the owner wants to change. Start the interview from step one "
+                "for this revision, using known facts as context. Treat previous approvals as historical. "
+                "Use clarify to review the clickable prototype and the new requirements. After requirements "
+                "approval, delegate Change management before any planning. Record this revision's progress "
+                "in a separate Phase / Status table under '## Revision " + str(update["revision"]) + "' in "
+                ".sdlc/progress.md, including a verified Delivery row only when this version is delivered."
+            ),
+        }
+        if update.get("resuming"):
+            payload["project_update"]["instruction"] = (
+                "Resume this version using requirements.md, .sdlc/progress.md and the Project Brain. "
+                "Previously recorded owner review is still valid for unchanged artifacts. "
+                "Do not restart the interview. Continue from the current step and finish "
+                "Change management before planning."
+            )
     return f"{SETUP_BEGIN} {json.dumps(payload, ensure_ascii=False)} {SETUP_END}"
 
 
@@ -239,6 +270,9 @@ def describe_internal(text: str) -> dict | None:
     setup = _payload(text, SETUP_BEGIN, SETUP_END)
     if setup is not None:
         request = str(setup.get("user_request") or "")
+        if setup.get("project_update"):
+            revision = setup["project_update"]["revision"]
+            return {"role": "user", "content": f"Started version {revision} requirements", "kind": "auto"}
         if request and request != GREETING_REQUEST:
             return {"role": "user", "content": request, "kind": "chat"}
         return {"role": "user", "content": "Project opened", "kind": "auto"}
@@ -262,7 +296,10 @@ def agent_for_goal(goal: str) -> str | None:
     """Which team member a delegated goal is for ("Act as … sw-developer …")."""
     import re
 
-    text = (goal or "").lower()
+    text = (goal or "").strip().lower()
+    prefix = text.partition(":")[0].strip()
+    if prefix in LABELS:
+        return prefix
     for agent_id in AGENT_IDS:
         if agent_id in text:
             return agent_id
