@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import re
 import subprocess
+import time
 from pathlib import Path
 
 from lyra_lite.preview import PREVIEW_TYPES, _built, prototype_root
@@ -21,13 +22,70 @@ def visual_project(root: Path, state: dict) -> bool:
     )
 
 
+def requirements_content(text: str) -> str:
+    """Approval bookkeeping is metadata; product and verification sections are not."""
+    text = _STATUS.sub("", text, count=1)
+    lines = []
+    skip_level = None
+    fence = None
+    for line in text.splitlines():
+        stripped = line.lstrip()
+        if stripped.startswith(("```", "~~~")):
+            marker = stripped[:3]
+            fence = None if fence == marker else marker if fence is None else fence
+        heading = re.match(r"^(#{1,6})\s+(.+?)\s*#*\s*$", line) if fence is None else None
+        if heading:
+            level = len(heading[1])
+            if skip_level is not None and level <= skip_level:
+                skip_level = None
+            if heading[2].strip().casefold() == "approval gates and current state":
+                skip_level = level
+                continue
+        if skip_level is None:
+            lines.append(line)
+    return "\n".join(lines).strip()
+
+
 def requirements_revision(root: Path) -> str | None:
     try:
         text = (root / "requirements.md").read_text(encoding="utf-8")
     except (OSError, UnicodeError):
         return None
-    draft = _STATUS.sub("", text, count=1).strip()
+    draft = requirements_content(text)
     return hashlib.sha256(draft.encode()).hexdigest() if draft else None
+
+
+def reconcile_requirements_approval(store) -> bool:
+    """Migrate a proven legacy approval without accepting any product changes."""
+    state = store.state()
+    approved = state.get("requirements_approved")
+    current = requirements_revision(store.root)
+    if not approved or not current or approved == current:
+        return False
+    if state.get("requirements_revision_format") == 2:
+        return False
+    try:
+        text = (store.root / "requirements.md").read_text(encoding="utf-8")
+        candidates = [text]
+        history = subprocess.run(["git", "log", "-40", "--format=%H", "--", "requirements.md"],
+                                 cwd=store.root, capture_output=True, text=True, timeout=3)
+        deadline = time.monotonic() + 3
+        for commit in history.stdout.splitlines():
+            if time.monotonic() >= deadline:
+                break
+            result = subprocess.run(["git", "show", f"{commit}:requirements.md"], cwd=store.root,
+                                    capture_output=True, text=True, timeout=1)
+            if result.returncode == 0:
+                candidates.append(result.stdout)
+    except (OSError, UnicodeError, subprocess.TimeoutExpired):
+        return False
+    for candidate in candidates:
+        legacy = hashlib.sha256(_STATUS.sub("", candidate, count=1).strip().encode()).hexdigest()
+        if legacy == approved and requirements_content(candidate) == requirements_content(text):
+            store.update_state(requirements_approved=current, requirements_revision_format=2)
+            store.append_event("approval_reconciled", kind="requirements")
+            return True
+    return False
 
 
 def prototype_revision(root: Path) -> str | None:

@@ -295,6 +295,7 @@ class ProjectStore:
             "kind": kind,
             "status": "open",
             "created": round(time.time(), 3),
+            "chat_id": self.state().get("chat_id"),
             **fields,
         }
         with self._lock:

@@ -9,6 +9,22 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.2 beta — 2026-11-11
+
+Desktop package 0.17.2-beta.1.
+
+- An approved prototype opens the ready requirements draft for review if the AI
+  ends its turn without presenting that checkpoint. No extra approval is inferred.
+- After requirements approval, an acknowledgement-only reply gets one bounded
+  continuation to start the next permitted agent. Repeated inaction is reported
+  visibly instead of silently appearing to work.
+- Status lines and the named approval/current-state section no longer invalidate
+  requirements approval. Feature, scope, acceptance, and verification changes still
+  do. Legacy approvals migrate only with evidence of an unchanged approved draft.
+- Review cards track their chat identity so a new chat cannot revive an old review.
+  Dispatch gate failures explain whether content changed or a checkpoint is missing.
+- Restart recovery preserves chat ordering by timestamping the recovered turn.
+
 ### Appling v0.17.1 beta — 2026-11-11
 
 Desktop package 0.17.1-beta.1.
@@ -349,6 +365,15 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.23-a] - 2026-11-11 — Reliable approval handoffs
+
+Appling v0.17.2 beta. Desktop package 0.17.2-beta.1.
+
+- Fixed automatic review and planning handoffs, bounded stalled-agent detection,
+  requirements approval fingerprinting, and legacy metadata-only reconciliation.
+- Verified prototype approval through requirements review and actual planner
+  dispatch using the real daemon, Hermes runtime, and local scripted model servers.
 
 ## [0.19.22-a] - 2026-11-11 — Persistent review controls
 

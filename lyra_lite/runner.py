@@ -171,6 +171,9 @@ class ProjectRunner:
                 self.store.append_event("resumed")
             queue.append(item)
             changes: dict[str, Any] = {"queue": queue}
+            if kind == "approval_continue":
+                # Persist the queued handoff and its consumed flag together.
+                changes["approval_followup"] = None
             if kind == "user":
                 wd = dict(state.get("watchdog") or {})
                 wd.update(no_progress=0, gave_up=False, last_mark=None)
@@ -213,7 +216,10 @@ class ProjectRunner:
                         if item.get("prototype") and (item["prototype"] != state.get("prototype_approved")
                                                       or item["prototype"] != review.prototype_revision(self.root)):
                             raise ValueError("Review the current prototype before approving the requirements.")
-                        self.store.update_state(requirements_approved=revision, requirements_review=False)
+                        self.store.update_state(requirements_approved=revision, requirements_review=False,
+                                                requirements_revision_format=2,
+                                                approval_followup={"revision": revision,
+                                                                   "offset": self.store.events_size()})
                     else:
                         self.store.update_state(requirements_approved=None)
                     value = choice
@@ -236,7 +242,7 @@ class ProjectRunner:
         with self._cond:
             if self._stop:
                 return
-            changes: dict[str, Any] = {"paused": True, "provider_statuses": {}}
+            changes: dict[str, Any] = {"paused": True, "provider_statuses": {}, "approval_followup": None}
             if clear_queue:
                 changes["queue"] = []
             self.store.update_state(**changes)
@@ -265,7 +271,7 @@ class ProjectRunner:
                 raise RuntimeError("Agents are still working; press Stop first")
             self._drop_engine()
             chat_id = self.store.archive_chat()
-            self.store.update_state(focus_hash=None, focus_turns=0, provider_statuses={})
+            self.store.update_state(focus_hash=None, focus_turns=0, provider_statuses={}, approval_followup=None)
         self.store.append_event("chat_started", chat_id=chat_id)
         return chat_id
 
@@ -274,9 +280,7 @@ class ProjectRunner:
         state = self.store.state()
         if not state.get("requirements_review"):
             return None
-        cards = [i for i in self.store.inbox()
-                 if i.get("kind") in {"prototype", "requirements"}
-                 and i.get("created", 0) >= state.get("chat_started_at", 0)]
+        cards = self._chat_reviews()
         if not cards:
             return None
         if any(i.get("status") == "open" for i in cards):
@@ -301,6 +305,12 @@ class ProjectRunner:
                     return None
         return item
 
+    def _chat_reviews(self) -> list[dict]:
+        state = self.store.state()
+        return [i for i in self.store.inbox() if i.get("kind") in {"prototype", "requirements"}
+                and (i.get("chat_id") == state.get("chat_id") if i.get("chat_id")
+                     else not state.get("chat_started_at") or i.get("created", 0) > state["chat_started_at"])]
+
     def reopen_review(self, item_id: str) -> str:
         """Restore review controls without asking a model to recreate them."""
         with self._cond:
@@ -310,13 +320,93 @@ class ProjectRunner:
             if item is None or item["id"] != item_id:
                 raise RuntimeError("This review is no longer current. Ask Appling to share the latest draft.")
             self.store.update_state(paused=False)
-
-            def resume(value):
-                if value is not None:
-                    self.submit(f"Owner's {item['kind']} review decision:\n\n{value}")
-
             fields = {k: item[k] for k in ("question", "choices", "revision", "prototype") if k in item}
-            return self._open_inbox(item["kind"], resume, turn=None, **fields)
+            return self._open_review_decision(item["kind"], **fields)
+
+    def _open_review_decision(self, kind: str, **fields) -> str:
+        def resume(value):
+            if value is not None:
+                self.submit(f"Owner's {kind} review decision:\n\n{value}")
+
+        return self._open_inbox(kind, resume, turn=None, **fields)
+
+    def _offer_requirements_review(self) -> None:
+        """Do not leave an approved prototype stranded without its next action."""
+        with self._cond:
+            state = self.store.state()
+            if (self._stop or self._busy or state.get("paused") or state.get("queue")
+                    or not state.get("requirements_review") or self.helpers()
+                    or self.store.inbox(status="open")):
+                return
+            prototype = review.prototype_revision(self.root)
+            if not prototype or prototype != state.get("prototype_approved"):
+                return
+            revision = review.requirements_revision(self.root)
+            update = review.active_update(self.root, state) or {}
+            if (not revision or revision in (state.get("requirements_approved"),
+                                            update.get("baseline_requirements_revision"))):
+                return
+            # Keep existing reviews and requests for changes authoritative.
+            # Expired current cards already have the explicit recovery action.
+            if any(i.get("kind") == "requirements" and i.get("revision") == revision for i in self._chat_reviews()):
+                return
+            try:
+                draft = (self.root / "requirements.md").read_text(encoding="utf-8")
+            except (OSError, UnicodeError):
+                return
+            self._open_review_decision(
+                "requirements", revision=revision, prototype=prototype,
+                choices=list(review.REQUIREMENTS_CHOICES),
+                question=("Your prototype is approved. Review the requirements below, then choose "
+                          "Approve requirements or Request changes. Planning and development wait "
+                          "for your separate requirements approval.\n\n---\n\n" + draft),
+            )
+
+    def _approval_progress(self, offset: int) -> bool:
+        events, _ = self.store.read_events(offset)
+        return any(e["type"] == "helper" and e.get("event") == "start" for e in events)
+
+    def _continue_approved_work(self, turn: dict) -> None:
+        """One bounded handoff when the model acknowledges approval then stops."""
+        with self._cond:
+            state = self.store.state()
+            if self._stop or state.get("paused"):
+                return
+            pending = state.get("approval_followup")
+            if not pending:
+                if (turn.get("kind") == "approval_continue" and not self.helpers()
+                        and not self.store.inbox(status="open") and not state.get("queue")
+                        and not self._approval_progress(state.get("turn_start_offset", 0))):
+                    self.store.append_event(
+                        "problem", kind="workflow_stalled",
+                        text="The AI ended its reply without starting the next step. No work is running. "
+                             "Send ‘Continue to planning’ to retry, or change the AI in Settings.",
+                    )
+                return
+            revision = review.requirements_revision(self.root)
+            if (pending["revision"] != state.get("requirements_approved")
+                    or pending["revision"] != revision or self._approval_progress(pending["offset"])):
+                self.store.update_state(approval_followup=None)
+                return
+            if self.helpers() or self.store.inbox(status="open") or state.get("queue"):
+                return
+            if review.visual_project(self.root, state):
+                prototype = review.prototype_revision(self.root)
+                if not prototype or prototype != state.get("prototype_approved"):
+                    self.store.update_state(approval_followup=None)
+                    return
+            update = review.active_update(self.root, state)
+            needs_change_review = update and not review.change_review_ready(review.change_report(self.root, update, revision))
+            step = "Change Management review before planning" if needs_change_review else "task planning"
+            self.submit(
+                f"{agents.APPROVAL_CONTINUE}\nThe owner has approved the current requirements and any required "
+                f"prototype. Continue the authorized workflow now with {step}. Read requirements.md and the "
+                "Project Brain, then use delegate_task to start the next permitted agent task. Include unresolved "
+                "technical compatibility checks in that task. Do not end with only an approval acknowledgement "
+                "or a statement that work is next. If genuinely blocked, use clarify to ask the specific question. "
+                "Respect the selected team and all subsequent review gates. Do not redo completed approvals.",
+                kind="approval_continue", display=f"Requirements approved — continuing with {step}.",
+            )
 
     def start_update(self, branch: str | None) -> dict:
         from lyra_lite.templates import get_template
@@ -577,6 +667,7 @@ class ProjectRunner:
 
     def _recover(self) -> None:
         """Make the files consistent after a crash or restart."""
+        review.reconcile_requirements_approval(self.store)
         if not self.store.has_transcript():
             self._rebuild_transcript()
         state = self.store.state()
@@ -591,13 +682,18 @@ class ProjectRunner:
                 messages.append({"role": "user", "content": user_text})
             messages.append({"role": "assistant", "content": RESTART_NOTE})
             self.store.save_messages(messages)
-            self.store.append_transcript([{"role": "user", "content": user_text},
-                                          {"role": "assistant", "content": RESTART_NOTE}])
+            recovered_at = round(time.time(), 3)
+            self.store.append_transcript([
+                {"role": "user", "content": user_text, "ts": turn.get("started") or recovered_at,
+                 "kind": turn.get("kind", "user")},
+                {"role": "assistant", "content": RESTART_NOTE, "ts": recovered_at},
+            ])
             self.store.append_event("turn_end", turn=turn.get("id"), status="lost_on_restart",
                                     reply=RESTART_NOTE)
             checkpoint(self.root, role="lyra", status="interrupted",
                        exit_reason="restart", goal=user_text[:200])
         self.store.update_state(running=False, turn=None)
+        self._offer_requirements_review()
 
     # -- worker ----------------------------------------------------------
 
@@ -711,6 +807,9 @@ class ProjectRunner:
         with self._cond:
             self._busy = False
             self.store.update_state(running=False, turn=None, last_completed_turn=turn_id)
+            if not result.error and not result.interrupted and result.completed:
+                self._offer_requirements_review()
+                self._continue_approved_work(turn)
             self._cond.notify_all()
         self.store.append_event(
             "turn_end", turn=turn_id, status=status, reply=result.reply,

@@ -135,8 +135,14 @@ def dispatch_project_tasks(store, agent, args: dict) -> str:
         if agent_id in {"req-engineer", "researcher"}:
             continue
         if approval_required and not approved:
+            if requirements and state.get("requirements_approved") and requirements != state["requirements_approved"]:
+                reason = "The requirements content changed after approval. Present the revised draft for review."
+            elif needs_prototype and prototype and state.get("prototype_approved") and prototype != state["prototype_approved"]:
+                reason = "The prototype changed after approval. Open its current review checkpoint."
+            else:
+                reason = "An approval is still pending. Open the missing review checkpoint with its actual controls."
             return json.dumps({"error": "Finish the owner review of the clickable prototype (when applicable) "
-                                        "and requirements before handing off downstream work."})
+                                        "and requirements before handing off downstream work. " + reason})
         if update and agent_id != "change-manager" and not ready:
             return json.dumps({"error": "Change management must finish its impact review and resolve any "
                                         "owner decisions before planning or implementation."})

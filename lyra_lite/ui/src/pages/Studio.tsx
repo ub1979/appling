@@ -893,6 +893,7 @@ function ChatScroll(props: {
 
 function TurnStart({ kind, text }: { kind: string; text: string }) {
   if (kind === "user") return <Message item={{ role: "user", text, proposal: null }} />;
+  if (kind === "approval_continue") return <Message item={{ role: "note", text: "Requirements approved — continuing to the next step.", proposal: null }} />;
   if (kind === "helper_done") return <Message item={{ role: "report", text, proposal: null }} />;
   const note = kind === "setup" && text.startsWith("Started version ") ? text : kind === "watchdog" ? "Appling kept going on its own." : kind === "team" ? text : kind === "setup" && text !== "Project opened" ? null : "Project opened";
   if (note === null) return <Message item={{ role: "user", text, proposal: null }} />;

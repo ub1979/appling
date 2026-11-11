@@ -88,7 +88,13 @@ REQUIREMENTS_GATE = (
     'skill_view(name="ultimate-builder:req-engineer") and run its interactive playbook in this conversation; '
     "do not delegate it. Complete its relevant interview, Grill, design-space exploration, prototype choice, "
     "requirements.md update, and approval gate before downstream work affected by that change. Once approved, "
-    "emit the done marker and do not restart it unless a later material change requires a focused delta."
+    "emit the done marker and do not restart it unless a later material change requires a focused delta. "
+    "After prototype approval, present the requirements draft and open its separate approval checkpoint. "
+    "After requirements approval, start the next permitted agent task immediately: Change Management for "
+    "an update, otherwise task planning. Do not end the turn with only an approval acknowledgement or a "
+    "statement that planning is next. Keep approval bookkeeping in the Status line or the section named "
+    "'Approval gates and current state'; do not rewrite approved product requirements to record progress. "
+    "If blocked, open clarify with the actual blocker."
 )
 TEAM_GATE = (
     "Recommend only the smallest useful team. Emit APP_IT_SKILLS_SET to open editable checkboxes, but do not "
@@ -101,6 +107,7 @@ TEAM_GATE = (
 SETUP_BEGIN, SETUP_END = "IDRAK_INTERNAL_SETUP_BEGIN", "IDRAK_INTERNAL_SETUP_END"
 TEAM_BEGIN, TEAM_END = "IDRAK_INTERNAL_SKILLS_UPDATE_BEGIN", "IDRAK_INTERNAL_SKILLS_UPDATE_END"
 GREETING_REQUEST = "Start this project conversation now with Appling's greeting and first focused question."
+APPROVAL_CONTINUE = "[APPLING_APPROVAL_CONTINUE]"
 
 
 def normalise_team(ids: list[str] | None) -> list[str]:
@@ -271,6 +278,8 @@ def _payload(text: str, begin: str, end: str) -> dict | None:
 
 def describe_internal(text: str) -> dict | None:
     """How an internal setup/team message is shown in the chat, or None."""
+    if text.startswith(APPROVAL_CONTINUE):
+        return {"role": "user", "content": "Requirements approved — continuing to the next step.", "kind": "auto"}
     setup = _payload(text, SETUP_BEGIN, SETUP_END)
     if setup is not None:
         request = str(setup.get("user_request") or "")
