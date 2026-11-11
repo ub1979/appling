@@ -9,6 +9,20 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.16 beta — 2026-11-11
+
+Desktop package 0.16.0-beta.1.
+
+- Built projects offer a new version workflow with an optional Git branch and
+  a fresh requirements interview informed by the existing project.
+- Change Management checks approved updates for conflicts and unresolved
+  decisions before planning begins.
+- Clickable prototypes open beside the chat, with approval tied to the
+  revision the owner views.
+- Agent provider, model, and effort preferences persist across projects.
+- Delete project moves the project folder, chats, and Git history to
+  Appling Projects/Archive and removes it from the active project list.
+
 ### Appling v0.15 beta — 2026-10-30
 
 - Replaced the mixed Appling/Lyra onboarding with current install, model setup,
@@ -311,6 +325,13 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.20-a] - 2026-11-11 — Project updates and archives
+
+Appling v0.16 beta. Desktop package 0.16.0-beta.1.
+
+- Added project version workflows, Change Management review, clickable prototype
+  approvals, persistent agent models, and project deletion into Archive.
 
 ## [0.19.19-a] - 2026-10-30 — Installer download links
 

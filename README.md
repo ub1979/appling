@@ -6,7 +6,12 @@ Appling is a local-first product studio for apps, websites, slide decks, and sho
 
 Appling is in beta. Review generated work and test it for your own use before publishing it.
 
+The current source version is **v0.16 beta**, with project updates, prototype
+review, saved agent models, and project archiving.
+
 ## Desktop installers (beta)
+
+The downloadable installers below are the v0.15 beta packages.
 
 Download the [installer preview](https://github.com/ub1979/appling/releases/tag/appling-v0.15.0-beta.1) for [macOS Apple Silicon](https://github.com/ub1979/appling/releases/download/appling-v0.15.0-beta.1/Appling-0.15.0-beta.1-mac-arm64.dmg), [Windows x64](https://github.com/ub1979/appling/releases/download/appling-v0.15.0-beta.1/Appling-0.15.0-beta.1-win-x64.exe), or [Linux x86_64](https://github.com/ub1979/appling/releases/download/appling-v0.15.0-beta.1/Appling-0.15.0-beta.1-linux-x86_64.AppImage). The first launch downloads Python and its locked dependencies, so it needs internet. Node.js and npm are included.
 
