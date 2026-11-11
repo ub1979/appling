@@ -9,6 +9,15 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.6 beta — 2026-11-11
+
+Desktop package 0.17.6-beta.1.
+
+- All agents use direct file tools for routine project edits. Scripts wrapping
+  those tools receive an immediate retry instruction instead of an owner
+  permission prompt. The wrapper never executes; file and role checks remain.
+- General scripts and risky actions still require explicit permission.
+
 ### Appling v0.17.5 beta — 2026-11-11
 
 Desktop package 0.17.5-beta.1.
@@ -403,6 +412,14 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.27-a] - 2026-11-11 — Routine edits without permission prompts
+
+Appling v0.17.6 beta. Desktop package 0.17.6-beta.1.
+
+- Redirect file-tool scripts to ordinary checked file operations for every agent
+  without asking the owner to approve routine bookkeeping.
+- Preserve explicit permission for arbitrary scripts and out-of-scope actions.
 
 ## [0.19.26-a] - 2026-11-11 — Restore expired plan reviews
 

@@ -43,6 +43,38 @@ def test_native_build_tests_allowed_for_dev_and_qa_but_not_planner(scope):
     assert len(asks) == 1
 
 
+@pytest.mark.parametrize('agent_id,label,purpose', AGENTS)
+def test_file_batches_retry_direct_tools_without_owner_prompt(scope, agent_id, label, purpose):
+    base, asks = scope
+    guard = base.for_task(f'{agent_id}: {purpose}')
+    code = "from hermes_tools import read_file, write_file, patch\ns=read_file('.sdlc/progress.md')['content']\nwrite_file('.sdlc/progress.md',s.replace('Pending','Running'))"
+    result = guard('execute_code', {'code': code}, task_id='scope-test')
+    assert 'Retry these file operations now' in result
+    assert 'No script was executed' in result
+    assert not asks
+    assert guard('write_file', {'path': '.sdlc/progress.md', 'content': 'Running'}, task_id='scope-test') is None
+    assert not asks
+    assert guard('write_file', {'path': '.lyra/state.json', 'content': '{}'}, task_id='scope-test').startswith('BLOCKED: Agents cannot')
+    assert not asks
+
+
+@pytest.mark.parametrize('code', [
+    'from hermes_tools import write_file as save\nsave("a.md", "text")',
+    'import hermes_tools as tools\ntools.write_file("a.md", "text")',
+    'from hermes_tools import *\nwrite_file("a.md", "text")',
+])
+def test_file_batch_aliases_are_redirected_without_execution(scope, code):
+    guard, asks = scope
+    assert 'Retry these file operations now' in guard('execute_code', {'code': code})
+    assert not asks
+
+
+def test_general_scripts_still_require_exact_permission(scope):
+    guard, asks = scope
+    assert 'owner did not permit' in guard('execute_code', {'code': 'print(1)'})
+    assert len(asks) == 1
+
+
 def test_role_files_host_paths_and_authority_files(scope):
     base, asks = scope
     planner = base.for_task('task-planner: Write the plan')

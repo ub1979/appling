@@ -5,6 +5,7 @@ Opaque execution and scope exceptions require the owner's exact, one-off consent
 """
 from __future__ import annotations
 
+import ast
 import hashlib
 import json
 from pathlib import Path
@@ -39,6 +40,22 @@ _LIVE = re.compile(r"(?:^|[\s/])(?:hermes|codex|claude|ollama)(?:\s|$)|python\S*
 
 def _key(tool, args):
     return hashlib.sha256(json.dumps([tool, args], sort_keys=True, default=str).encode()).hexdigest()
+
+
+def _wraps_file_tools(code):
+    """Route file batches back to checked tools; never execute or trust the script."""
+    try:
+        tree = ast.parse(code)
+    except (SyntaxError, ValueError, RecursionError):
+        return False
+    files = {"read_file", "write_file", "patch", "search_files"}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.ImportFrom) and node.module == "hermes_tools":
+            if any(name.name in files or name.name == "*" for name in node.names):
+                return True
+        if isinstance(node, ast.Import) and any(name.name == "hermes_tools" for name in node.names):
+            return True
+    return False
 
 
 class AgentScope:
@@ -231,6 +248,11 @@ class AgentScope:
                 return "Running a command outside the selected project needs permission."
             return self._command_reason(str(args.get("command") or ""), args, task_id)
         if tool == "execute_code":
+            if _wraps_file_tools(str(args.get("code") or "")):
+                return ("!Retry these file operations now using read_file, search_files, write_file or patch directly. "
+                        "Do not wrap file tools in execute_code or ask the owner to approve routine file edits. "
+                        "Each direct operation will use the normal role and workspace checks. "
+                        "No script was executed and no owner decision is needed for this retry.")
             return "Arbitrary script execution can start processes or access host files; review this exact script first."
         if tool == "browser_console":
             code = str(args.get("code") or args.get("expression") or args.get("script") or "")
