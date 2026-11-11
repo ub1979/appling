@@ -9,6 +9,18 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.8 beta — 2026-11-11
+
+Desktop package 0.17.8-beta.1.
+
+- Development/QA inline runtime checks receive guidance to save and run a project
+  test instead of another permission prompt. Denied risky probes cannot use this
+  guidance as permission. Node tests support the SQLite runtime flag.
+- Skill discovery, project scripts and local dev/test commands use normal role
+  checks. Documentation downloads route to existing web/file tools. Shell parsing
+  preserves URLs and quoted arguments. Read-only dependency audits and managing
+  an agent's own project processes no longer create extra permission prompts.
+
 ### Appling v0.17.7 beta — 2026-11-11
 
 Desktop package 0.17.7-beta.1.
@@ -421,6 +433,13 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.29-a] - 2026-11-11 — File-first runtime checks
+
+Appling v0.17.8 beta. Desktop package 0.17.8-beta.1.
+
+- Route routine inline runtime checks to durable project tests without owner prompts.
+- Preserve explicit consent for risky probes and checks outside an agent role.
 
 ## [0.19.28-a] - 2026-11-11 — Routine project inspection permissions
 

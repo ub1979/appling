@@ -32,7 +32,7 @@ _VERSION_FLAGS = {
 }
 _VERSION_FLAGS.update({name: {"--version", "-V"} for name in ("python", "python3")})
 _VERSION_FLAGS.update({name: {"--version"} for name in ("git", "pytest", "ruff", "mypy")})
-_TOOL_READS = frozenset({"skill_view", "project_recall", "web_search", "web_extract", "browser_snapshot",
+_TOOL_READS = frozenset({"skills_list", "skill_view", "project_recall", "web_search", "web_extract", "browser_snapshot",
                          "browser_vision", "browser_get_images", "browser_click", "browser_type", "browser_press",
                          "browser_scroll", "browser_back", "browser_close", "todo", "tool_search", "tool_describe",
                          "clarify"})
@@ -148,7 +148,10 @@ class AgentScope:
         if re.search(r"\$(?:[A-Za-z_0-9{(]|[?!*@#-])|`|<<|(?:^|\s)(?:bash|sh|zsh|eval|exec)\s", command):
             return "This command contains opaque shell execution or expansion that cannot be checked against the assigned scope."
         try:
-            tokens = list(shlex.shlex(command, posix=True, punctuation_chars=";&|<>"))
+            lexer = shlex.shlex(command, posix=True, punctuation_chars=";&|<>")
+            lexer.whitespace_split = True  # Preserve URLs, flags and quoted arguments as shell words.
+            lexer.commenters = ""
+            tokens = list(lexer)
         except ValueError:
             return "The command cannot be safely parsed for a scope check."
         if not tokens:
@@ -164,6 +167,13 @@ class AgentScope:
                 current.append(token)
         if current: chunks.append(current)
         for chunk in chunks:
+            if Path(chunk[0]).name in {"curl", "wget"} and any(
+                word.startswith(("https://", "http://")) for word in chunk[1:]
+            ):
+                return ("!For documentation and HTTP inspection use web_extract with the URL directly, "
+                        "then write_file if a local copy is needed. Continue with these normal tools "
+                        "without another owner prompt. No download command was executed. "
+                        "Do not use this guidance to send credentials, upload data or bypass a denied action.")
             if any((token in {"..", ".env", "auth.json", "credentials.json"}
                     or token.startswith(("/", "~/", "../", "./")) or "/" in token)
                    and not token.startswith("-") and not self._readable(self._path(token, task_id))
@@ -204,20 +214,41 @@ class AgentScope:
                 if paths and all(self._writable(self._path(word, task_id)) for word in paths):
                     continue
             if self.agent_id in _EXECUTORS:
-                if program == "node" and words and words[0] == "--test" and all(
+                if program in {"node", "python", "python3"} and any(
+                    word in {"-e", "--eval", "-p", "--print", "-c"}
+                    or word.startswith(("--eval=", "--print=")) for word in words
+                ):
+                    return ("!For routine checks within your assigned development/QA task, save the check "
+                            "as a project test using write_file or patch, then run the normal test command "
+                            "(node --test or python -m pytest). Continue without asking the owner to approve "
+                            "the inline wrapper. This script did not run. Do not transfer denied probes, "
+                            "destructive actions or host-file access into a test to bypass permission.")
+                node_words = [word for word in words if word != "--experimental-sqlite"]
+                if program == "node" and node_words and node_words[0] == "--test" and all(
                     not word.startswith("-") or word.startswith("--test-") or word in {"--watch"}
-                    for word in words[1:]
+                    for word in node_words[1:]
                 ):
                     continue
+                if program in {"node", "python", "python3"} and node_words and not node_words[0].startswith("-"):
+                    script = self._path(node_words[0], task_id)
+                    if self._inside(script) and script.is_file() and script.suffix in {".js", ".mjs", ".cjs", ".py"}:
+                        source = script.read_text(encoding="utf-8", errors="replace")
+                        if _RISK.search(source) or _LIVE.search(source):
+                            return "The project script contains a live AI or risky diagnostic action."
+                        continue
                 if program in {"pytest", "ruff", "mypy", "tsc"}:
                     continue
                 if program in {"python", "python3"} and len(words) >= 2 and words[0] == "-m" and words[1] in {"pytest", "compileall", "unittest"}:
                     continue
                 if program in {"npm", "pnpm", "yarn", "bun"} and words:
+                    if words[0] in {"audit", "ls", "list", "outdated", "explain", "view", "info"} and not any(
+                        word in {"fix", "--fix", "--force", "--global", "-g"} for word in words[1:]
+                    ):
+                        continue
                     if words[0] in {"install", "ci"} and not any(w in {"-g", "--global", "--prefix", "--cwd"} for w in words):
                         continue
                     script = words[1] if words[0] == "run" and len(words) > 1 else words[0]
-                    if re.fullmatch(r"(?:test|build|lint|typecheck|check|fmt|format)(?::[\w-]+)?", script) and not any(w in {"--eval", "-e", "exec", "dlx"} for w in words):
+                    if re.fullmatch(r"(?:test|build|lint|typecheck|check|fmt|format|start|dev|preview)(?::[\w-]+)?", script) and not any(w in {"--eval", "-e", "exec", "dlx"} for w in words):
                         # Catch direct probe commands hidden in a package script.
                         manifest = self.root / "package.json"
                         try:
@@ -233,6 +264,16 @@ class AgentScope:
         return None
 
     def reason(self, tool, args, task_id=""):
+        if tool == "process" and self.agent_id in _EXECUTORS and task_id:
+            from tools.process_registry import process_registry
+            action = args.get("action")
+            if action == "list":
+                return None
+            if action in {"poll", "log", "wait", "kill"}:
+                session = process_registry.get(str(args.get("session_id") or ""))
+                if session and session.task_id == task_id and self._inside(Path(session.cwd).resolve()):
+                    return None
+            return "Managing an unrelated process or sending interactive commands needs explicit permission."
         if tool in {"read_file", "search_files", "write_file", "patch"}:
             paths = [args.get("path") or "."]
             if tool == "patch" and args.get("mode") == "patch":

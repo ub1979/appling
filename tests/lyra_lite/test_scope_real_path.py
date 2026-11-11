@@ -5,6 +5,38 @@ from tests.fakes.fake_openai_server import FakeOpenAIServer, text_step, tool_ste
 from tests.lyra_lite.test_lyrad_real_path import Daemon, _events, _new_project, _wait_event, _write_config, env  # noqa: F401
 
 
+def test_sqlite_check_continues_as_a_saved_test_without_owner_prompt(env):
+    import json
+    import shutil
+    if not shutil.which('node'):
+        pytest.skip('Node is required for SQLite runtime check')
+    goal = 'sw-developer: Verify SQLite availability for assigned implementation'
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env['hermes_home'], llm.base_url, lyra_lite={'watchdog': {'enabled': False}})
+        daemon = Daemon(env).start()
+        try:
+            pid, root = _new_project(daemon, env, 'Saved runtime check')
+            code = "const {DatabaseSync}=require('node:sqlite'); const d=new DatabaseSync(':memory:'); const row=d.prepare('select 1 as available').get(); require('node:assert/strict').equal(row.available,1); d.close(); console.log('sqlite-check-passed');"
+            target = root / 'tests/runtime.test.cjs'
+            llm.script = [tool_step('delegate_task', {'goal': goal}), text_step('Checking SQLite.'), text_step('Check completed.')]
+            llm.side_scripts = {goal: [
+                tool_step('terminal', {'command': 'node --experimental-sqlite -e ' + __import__('shlex').quote(code)}, call_id='inline-check'),
+                tool_step('write_file', {'path': str(target), 'content': code}, call_id='save-check'),
+                tool_step('terminal', {'command': 'node --experimental-sqlite --test tests/runtime.test.cjs'}, call_id='run-check'),
+                text_step('SQLite check saved and passed.'),
+            ]}
+            assert daemon.post(f'/api/projects/{pid}/messages', {'text': 'Check SQLite availability'}).is_success
+            _wait_event(root, lambda e: e['type'] == 'helper' and e.get('event') == 'reported')
+            assert target.read_text() == code
+            assert not any(e['type'] == 'inbox' and e['item']['kind'] in {'scope_permission', 'approval'} for e in _events(root))
+            results = [str(m.get('content', '')) for r in llm.main_requests() for m in r['messages'] if m.get('role') == 'tool']
+            assert any('save the check as a project test' in result for result in results)
+            assert any(json.loads(result).get('exit_code') == 0 and 'sqlite-check-passed' in json.loads(result).get('output', '')
+                       for result in results if '"exit_code"' in result), results
+        finally:
+            daemon.stop()
+
+
 def test_developer_inspects_git_and_runtime_then_edits_without_owner_prompt(env):
     import json
     import re

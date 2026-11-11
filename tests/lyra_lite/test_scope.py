@@ -40,6 +40,15 @@ def test_native_build_tests_allowed_for_dev_and_qa_but_not_planner(scope):
         assert guard('terminal', {'command': 'python -m pytest tests'}, task_id='scope-test') is None
         assert guard('terminal', {'command': 'node --test tests/task1/'}, task_id='scope-test') is None
     assert not asks
+
+
+@pytest.mark.parametrize('agent_id,label,purpose', AGENTS)
+def test_skill_discovery_and_reading_are_normal_for_every_role(scope, agent_id, label, purpose):
+    base, asks = scope
+    guard = base.for_task(f'{agent_id}: {purpose}')
+    assert guard('skills_list', {}) is None
+    assert guard('skill_view', {'name': 'ultimate-builder:sw-developer'}) is None
+    assert not asks
     assert base.for_task('task-planner: Plan the work')('terminal', {'command': 'npm test'}, task_id='scope-test')
     assert len(asks) == 1
 
@@ -58,7 +67,7 @@ def test_routine_git_branch_and_runtime_inspection_needs_no_owner_prompt(scope, 
 @pytest.mark.parametrize('command', [
     'git branch -D main', 'git branch new-branch', 'git checkout other',
     'git -c core.pager=custom branch --show-current',
-    'node --version --eval "console.log(1)"', 'npm --version exec custom',
+    'npm --version exec custom',
     'python3 -v', 'node --test --import custom tests/', 'node --test -r custom tests/',
     'node --version && hermes -z probe',
 ])
@@ -66,6 +75,70 @@ def test_inspection_exceptions_do_not_cover_other_execution(scope, command):
     base, asks = scope
     assert base.for_task('sw-developer: Build app')('terminal', {'command': command}, task_id='scope-test')
     assert len(asks) == 1
+
+
+@pytest.mark.parametrize('role', ['sw-developer', 'qa-engineer', 'debugger'])
+@pytest.mark.parametrize('command', [
+    'node --experimental-sqlite -e "const {DatabaseSync}=require(\'node:sqlite\'); const d=new DatabaseSync(\':memory:\'); console.log(d.prepare(\'select 1 as available\').get()); d.close()"',
+    'node -p "1+1"', 'node --eval="console.log(1)"', 'python3 -c "print(1)"',
+])
+def test_inline_runtime_checks_use_saved_project_tests_without_owner_prompt(scope, role, command):
+    base, asks = scope
+    guard = base.for_task(role + ': Verify assigned runtime')
+    result = guard('terminal', {'command': command}, task_id='scope-test')
+    assert 'save the check as a project test' in result
+    assert not asks
+    assert guard('write_file', {'path': 'tests/runtime.test.cjs', 'content': 'test'}, task_id='scope-test') is None
+    assert guard('terminal', {'command': 'node --experimental-sqlite --test tests/runtime.test.cjs'}, task_id='scope-test') is None
+    assert not asks
+
+
+def test_planning_inline_checks_and_risky_development_probes_still_need_permission(scope):
+    base, asks = scope
+    assert base.for_task('task-planner: Plan')('terminal', {'command': 'node -e "console.log(1)"'}, task_id='scope-test')
+    assert len(asks) == 1
+    assert base.for_task('sw-developer: Verify')('terminal', {'command': 'node -e "read(\'/etc/passwd\')"'}, task_id='scope-test')
+    assert len(asks) == 2
+
+
+def test_documentation_download_uses_existing_web_and_file_tools(scope):
+    base, asks = scope
+    guard = base.for_task('sw-developer: Inspect runtime documentation')
+    command = 'node --version && curl -fsSL https://nodejs.org/api/sqlite.json -o sqlite-api-reference.json'
+    assert 'use web_extract' in guard('terminal', {'command': command}, task_id='scope-test')
+    assert guard('web_extract', {'urls': ['https://nodejs.org/api/sqlite.json']}, task_id='scope-test') is None
+    assert not asks
+
+
+def test_development_project_scripts_and_dev_server_commands_are_normal_work(scope, tmp_path):
+    base, asks = scope
+    script = tmp_path / 'server.mjs'
+    script.write_text('console.log("local application");')
+    guard = base.for_task('sw-developer: Build and preview app')
+    for command in ['node server.mjs', 'node --experimental-sqlite server.mjs', 'npm start', 'npm run dev', 'npm run preview',
+                    'node --test tests/; npm audit --omit=dev', 'npm ls --depth=0']:
+        assert guard('terminal', {'command': command}, task_id='scope-test') is None
+    assert not asks
+    script.write_text('hermes -z probe')
+    assert guard('terminal', {'command': 'node server.mjs'}, task_id='scope-test')
+    assert len(asks) == 1
+    assert base.for_task('task-planner: Plan')('terminal', {'command': 'node server.mjs'}, task_id='scope-test')
+    assert len(asks) == 2
+
+
+def test_development_can_manage_only_its_own_project_processes(scope, tmp_path, monkeypatch):
+    from types import SimpleNamespace
+    from tools.process_registry import process_registry
+    base, asks = scope
+    guard = base.for_task('sw-developer: Verify local preview')
+    monkeypatch.setattr(process_registry, 'get', lambda sid: SimpleNamespace(task_id='scope-test', cwd=str(tmp_path)) if sid == 'own' else None)
+    assert guard('process', {'action': 'list'}, task_id='scope-test') is None
+    for action in ['poll', 'log', 'wait', 'kill']:
+        assert guard('process', {'action': action, 'session_id': 'own'}, task_id='scope-test') is None
+    assert not asks
+    assert guard('process', {'action': 'poll', 'session_id': 'other'}, task_id='scope-test')
+    assert guard('process', {'action': 'submit', 'session_id': 'own', 'data': 'command'}, task_id='scope-test')
+    assert len(asks) == 2
 
 
 @pytest.mark.parametrize('agent_id,label,purpose', AGENTS)
