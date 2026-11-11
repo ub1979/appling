@@ -246,11 +246,44 @@ class HermesEngine:
         self._emit("tool", phase="done", id=str(tc_id or ""), name=str(name),
                    result=_preview(result, 300))
 
+    def _provider_status(self, text, *, subagent_id="main", goal="") -> None:
+        from lyra_lite.delegation import _object
+
+        status = _object(text)
+        if not status.get("state"):
+            return
+        payload = {key: status.get(key) for key in (
+            "state", "provider", "model", "reason", "retry_at", "attempt", "max_attempts"
+        )}
+        payload.update(id=subagent_id, goal=goal)
+        if self.store is not None:
+            with self.store._lock:
+                if self.store.state().get("paused") and status["state"] != "recovered":
+                    return
+                statuses = dict(self.store.state().get("provider_statuses") or {})
+                if status["state"] == "recovered":
+                    if subagent_id not in statuses:
+                        return
+                    statuses.pop(subagent_id, None)
+                else:
+                    statuses[subagent_id] = payload
+                self.store.update_state(provider_statuses=statuses)
+        self._emit("provider_status", **payload)
+
     def _on_progress(self, event_type, name=None, preview=None, args=None, **kwargs) -> None:
         event_type = str(event_type or "")
         if not event_type.startswith("subagent.") or event_type == "subagent.text":
             return
+        if event_type == "subagent.provider_status":
+            self._provider_status(preview, subagent_id=str(kwargs.get("subagent_id") or "agent"),
+                                  goal=str(kwargs.get("goal") or ""))
+            return
         fields = _helper_fields(kwargs)
+        if event_type == "subagent.start" and self.store is not None:
+            # A replacement task supersedes a previous failure for the same goal.
+            for old_id, old in list((self.store.state().get("provider_statuses") or {}).items()):
+                if old.get("goal") == kwargs.get("goal"):
+                    self._provider_status({"state": "recovered"}, subagent_id=old_id)
         if preview and event_type in {"subagent.tool", "subagent.start", "subagent.spawn_requested"}:
             fields["preview"] = _preview(preview, 200)
         if name and event_type == "subagent.tool":
@@ -260,6 +293,9 @@ class HermesEngine:
         self._emit("helper", event=event_type.removeprefix("subagent."), **fields)
 
     def _on_status(self, kind, text=None) -> None:
+        if kind == "provider_status":
+            self._provider_status(text)
+            return
         self._emit("status", kind=str(kind), text=None if text is None else str(text))
 
     def _on_interim(self, text: str, *, already_streamed: bool = False) -> None:

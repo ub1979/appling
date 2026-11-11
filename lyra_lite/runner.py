@@ -217,7 +217,7 @@ class ProjectRunner:
         with self._cond:
             if self._stop:
                 return
-            changes: dict[str, Any] = {"paused": True}
+            changes: dict[str, Any] = {"paused": True, "provider_statuses": {}}
             if clear_queue:
                 changes["queue"] = []
             self.store.update_state(**changes)
@@ -246,7 +246,7 @@ class ProjectRunner:
                 raise RuntimeError("Agents are still working; press Stop first")
             self._drop_engine()
             chat_id = self.store.archive_chat()
-            self.store.update_state(focus_hash=None, focus_turns=0)
+            self.store.update_state(focus_hash=None, focus_turns=0, provider_statuses={})
         self.store.append_event("chat_started", chat_id=chat_id)
         return chat_id
 
@@ -325,6 +325,7 @@ class ProjectRunner:
             "events_size": self.store.events_size(),
             "started_at": self.started_at,
             "last_completed_turn": state.get("last_completed_turn"),
+            "provider_statuses": state.get("provider_statuses") or {},
         }
 
     def helpers(self) -> list[dict]:

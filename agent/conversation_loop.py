@@ -829,6 +829,24 @@ def _apply_context_engine_selection(
     return api_messages
 
 
+def _notify_provider_status(agent, state: str, *, reason: str = "", wait_seconds: float = 0,
+                            attempt: int = 0, max_attempts: int = 0) -> None:
+    """Report provider recovery state immediately without changing conversation context."""
+    callback = getattr(agent, "status_callback", None)
+    if callback is None:
+        return
+    payload = {
+        "state": state, "provider": str(getattr(agent, "provider", "") or ""),
+        "model": str(getattr(agent, "model", "") or ""), "reason": reason,
+        "retry_at": time.time() + wait_seconds if state == "retrying" else None,
+        "attempt": attempt, "max_attempts": max_attempts,
+    }
+    try:
+        callback("provider_status", json.dumps(payload))
+    except Exception:
+        logger.debug("Provider status callback failed", exc_info=True)
+
+
 def _notify_context_engine_turn_complete(
     agent: Any,
     messages: List[Dict[str, Any]],
@@ -3012,6 +3030,7 @@ def run_conversation(
                     except Exception:
                         pass
                 agent._touch_activity(f"API call #{api_call_count} completed")
+                _notify_provider_status(agent, "recovered")
                 break  # Success, exit retry loop
 
             except InterruptedError:
@@ -3353,6 +3372,7 @@ def run_conversation(
                     context_length=_ctx_len,
                     num_messages=len(api_messages) if api_messages else 0,
                 )
+                _notify_provider_status(agent, "error", reason=classified.reason.value)
                 logger.debug(
                     "Error classified: reason=%s status=%s retryable=%s compress=%s rotate=%s fallback=%s",
                     classified.reason.value, classified.status_code,
@@ -4999,6 +5019,10 @@ def run_conversation(
                         agent._buffer_status(_rate_limit_status)
                 else:
                     agent._buffer_status(f"⏳ Retrying in {wait_time:.1f}s (attempt {retry_count}/{max_retries})...")
+                _notify_provider_status(
+                    agent, "retrying", reason=classified.reason.value,
+                    wait_seconds=wait_time, attempt=retry_count, max_attempts=max_retries,
+                )
                 logger.warning(
                     "Retrying API call in %ss (attempt %s/%s) %s policy=%s error=%s",
                     wait_time,

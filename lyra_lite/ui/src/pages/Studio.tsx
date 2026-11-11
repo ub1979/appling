@@ -18,6 +18,7 @@ import { PreviewPanel, pickLabel, pickNote, type PickedElement } from "../compon
 import { Avatar, IconButton, PrefButtons, TeamPicker } from "../components/common";
 import { activeHelpers, applyEvent, emptyLive, type InboxItem, type LiveState, type LyraEvent } from "../live";
 import { go } from "../router";
+import { ProviderAlerts } from "../components/ProviderAlerts";
 import { UpdateDialog } from "../components/UpdateDialog";
 import {
   extractAppItSkillSelection,
@@ -34,6 +35,21 @@ const ANSWERS = [
   { label: "Use smart defaults", text: "Use sensible defaults for all remaining requirements questions. Summarize the complete requirements and choices for my approval before any coding." },
 ];
 
+// Stop first only when the owner explicitly chooses to interrupt active work.
+export async function applyUpdatedRules(id: string, stopFirst: boolean) {
+  if (stopFirst) {
+    await api.stop(id);
+    let stopped = false;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const project = await api.project(id);
+      if (!project.running && project.helpers.length === 0) { stopped = true; break; }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (!stopped) throw new Error("The agents are still stopping. Try applying the rules again shortly.");
+  }
+  await api.applyRules(id);
+}
+
 interface ResetAction {
   type: "reset" | "sync";
   detail: ProjectDetail;
@@ -43,11 +59,13 @@ function liveReducer(state: LiveState, action: LyraEvent | ResetAction): LiveSta
   if (action.type === "sync" && "detail" in action) {
     const { detail } = action as ResetAction;
     return { ...state, queued: detail.queue, paused: detail.paused,
-      turn: state.turn?.id === detail.last_completed_turn ? null : state.turn };
+      turn: state.turn?.id === detail.last_completed_turn ? null : state.turn,
+      providerStatuses: detail.provider_statuses ?? state.providerStatuses };
   }
   if (action.type === "reset" && "detail" in action) {
     const { detail } = action as ResetAction;
-    return { ...emptyLive(detail.started_at ?? 0), inbox: detail.inbox, queued: detail.queue, paused: detail.paused };
+    return { ...emptyLive(detail.started_at ?? 0), inbox: detail.inbox, queued: detail.queue, paused: detail.paused,
+      providerStatuses: detail.provider_statuses ?? {} };
   }
   return applyEvent(state, action as LyraEvent);
 }
@@ -90,6 +108,7 @@ export function Studio({ id }: { id: string }) {
   const [showTeam, setShowTeam] = useState(false);
   const [showUpdate, setShowUpdate] = useState(false);
   const [deletingProject, setDeletingProject] = useState(false);
+  const [applyingRules, setApplyingRules] = useState(false);
   // Bumped on every owner message so the chat jumps to the bottom to show it.
   const [sent, setSent] = useState(0);
   // The live preview beside the chat, and parts of it the owner picked.
@@ -196,6 +215,7 @@ export function Studio({ id }: { id: string }) {
   const helpers = detail?.helpers ?? [];
   const liveHelpers = activeHelpers(live);
   const busy = !!live.turn;
+  const providerStatuses = Object.values(live.providerStatuses);
 
   // Phase state from Appling's markers, then the project's own plan file.
   const phases = useMemo(() => {
@@ -253,7 +273,9 @@ export function Studio({ id }: { id: string }) {
     );
   }
 
-  const status = live.inbox.length
+  const status = providerStatuses.length
+    ? { text: "AI needs attention", tone: "need" }
+    : live.inbox.length
     ? { text: "Needs you", tone: "need" }
     : busy
       ? { text: "Appling is working", tone: "busy" }
@@ -349,7 +371,10 @@ export function Studio({ id }: { id: string }) {
       </header>
 
       <div>
-        {helpers.length > 0 && (
+        {providerStatuses.length > 0 && <ProviderAlerts statuses={providerStatuses}
+          agentName={(goal) => labelOf(agentForGoal(goal, agents) ?? "") || "Agent"}
+          onChangeAi={() => void run(async () => { await api.stop(id); go(`/settings?project=${id}`); })} />}
+        {helpers.length > 0 && providerStatuses.length === 0 && (
           <div className="banner" role="status">
             <span><b>{helpers.map((h) => labelOf(agentForGoal(h.goal, agents) ?? "") || "Agent").join(", ")} working</b>
               {" — "}{agentTaskDescription(helpers[0].goal)}
@@ -362,10 +387,18 @@ export function Studio({ id }: { id: string }) {
         )}
         {detail.rules_outdated && (
           <div className="banner warn">
-            Appling's rules were updated since this chat started.
-            <button className="btn small" disabled={busy || helpers.length > 0} onClick={() => void run(async () => { await api.applyRules(id); await load(); })}>
-              Use the new rules
-            </button>
+            <span>Appling's rules were updated since this chat started.
+              {(busy || helpers.length > 0) && <span className="small"> Finish or stop the current work to apply them.</span>}
+            </span>
+            <button className="btn small" disabled={applyingRules} onClick={() => {
+              setApplyingRules(true);
+              void run(async () => {
+                try {
+                  await applyUpdatedRules(id, busy || helpers.length > 0);
+                  await load();
+                } finally { setApplyingRules(false); }
+              });
+            }}>{applyingRules ? "Applying…" : busy || helpers.length > 0 ? "Stop and apply rules" : "Use the new rules"}</button>
           </div>
         )}
         {(() => {
@@ -893,7 +926,7 @@ function Message({ item, children }: { item: Shown; children?: React.ReactNode }
 }
 
 export function agentTaskDescription(goal: string): string {
-  if (/create prototypes\/index|producing[^.]*prototype|build(?:ing)? (?:the |your )?(?:clickable )?prototype/i.test(goal)) {
+  if (/create[^.]*walkthrough at prototypes\/index|create prototypes\/index|producing[^.]*prototype|build(?:ing)? (?:the |your )?(?:clickable )?prototype/i.test(goal)) {
     return "Creating and checking your clickable prototype";
   }
   if (/discovery|prerequisite|advisory review/i.test(goal)) return "Checking requirements and available tools";

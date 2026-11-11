@@ -120,3 +120,8 @@ it("distinguishes discovery from a prototype creation task", () => {
   expect(agentTaskDescription("req-engineer: Support requirements by producing ONLY the interactive requirements prototype. Create prototypes/index.html."))
     .toBe("Creating and checking your clickable prototype");
 });
+
+it("labels the pre-approval walkthrough as prototype work", () => {
+  expect(agentTaskDescription("req-engineer: Create ONLY the pre-approval clickable requirements walkthrough at prototypes/index.html."))
+    .toBe("Creating and checking your clickable prototype");
+});

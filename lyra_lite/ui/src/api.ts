@@ -1,4 +1,4 @@
-import type { InboxItem } from "./live";
+import type { InboxItem, ProviderStatus } from "./live";
 
 declare global {
   interface Window {
@@ -60,6 +60,7 @@ export interface ProjectDetail {
   turn_start_offset: number;
   started_at: number;
   last_completed_turn?: string;
+  provider_statuses?: Record<string, ProviderStatus>;
   inbox: InboxItem[];
   helpers: { id: string; goal: string; started: number | null }[];
   messages: ChatMessage[];

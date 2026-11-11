@@ -1044,6 +1044,10 @@ def _build_child_progress_callback(
             _relay("subagent.start", preview=preview or goal_label or "", **kwargs)
             return
 
+        if event_type == "subagent.provider_status":
+            _relay("subagent.provider_status", preview=preview)
+            return
+
         if event_type == "subagent.complete":
             _relay("subagent.complete", preview=preview, **kwargs)
             return
@@ -1501,6 +1505,10 @@ def _build_child_agent(
     if isinstance(child_max_tokens, int):
         child_optional_kwargs["max_tokens"] = child_max_tokens
 
+    def _child_status(kind, text=None):
+        if kind == "provider_status" and child_progress_cb:
+            child_progress_cb("subagent.provider_status", preview=text)
+
     from agent.delegation_context import delegated_child_context
 
     with delegated_child_context():
@@ -1527,6 +1535,7 @@ def _build_child_agent(
             skip_memory=True,
             clarify_callback=None,
             thinking_callback=child_thinking_cb,
+            status_callback=_child_status,
             session_db=getattr(parent_agent, "_session_db", None),
             parent_session_id=getattr(parent_agent, "session_id", None),
             providers_allowed=child_providers_allowed,

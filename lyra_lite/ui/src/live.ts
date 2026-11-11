@@ -13,6 +13,18 @@ export interface InboxItem {
   revision?: string;
 }
 
+export interface ProviderStatus {
+  id: string;
+  state: "error" | "retrying" | "recovered";
+  provider: string;
+  model: string;
+  goal?: string;
+  reason: string;
+  retry_at?: number | null;
+  attempt?: number;
+  max_attempts?: number;
+}
+
 export interface ActivityItem {
   key: string;
   ts: number;
@@ -47,6 +59,7 @@ export interface LiveState {
   helperChanges: number;
   paused: boolean;
   lastProblem: string | null;
+  providerStatuses: Record<string, ProviderStatus>;
   // When Appling started; replayed problems older than this are not shown.
   since: number;
 }
@@ -68,6 +81,7 @@ export const emptyLive = (since = 0): LiveState => ({
   helperChanges: 0,
   paused: false,
   lastProblem: null,
+  providerStatuses: {},
   since,
 });
 
@@ -134,6 +148,19 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
         }),
       };
     }
+    case "provider_status": {
+      const status = evt as unknown as ProviderStatus;
+      const statuses = { ...state.providerStatuses };
+      if (status.state === "recovered") delete statuses[status.id];
+      else statuses[status.id] = status;
+      return { ...state, providerStatuses: statuses,
+        activity: addActivity(state, {
+          key: `provider-${status.id}-${evt.ts}`, ts: evt.ts,
+          text: status.state === "recovered" ? "AI connection recovered" : `AI needs attention · ${status.model}`,
+          detail: status.reason, tone: status.state === "recovered" ? "done" : "problem",
+        }),
+      };
+    }
     case "helper":
       return applyHelper(state, evt);
     case "inbox": {
@@ -156,7 +183,7 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
         }),
       };
     case "stop_requested":
-      return { ...state, paused: true, queued: evt.cleared_queue ? [] : state.queued };
+      return { ...state, providerStatuses: {}, paused: true, queued: evt.cleared_queue ? [] : state.queued };
     case "resumed":
       return { ...state, paused: false, queued: [] };
     case "inbox_closed":
