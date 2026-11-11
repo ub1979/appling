@@ -38,8 +38,33 @@ def test_native_build_tests_allowed_for_dev_and_qa_but_not_planner(scope):
         guard = base.for_task(role + ': Run project tests')
         assert guard('terminal', {'command': 'npm test'}, task_id='scope-test') is None
         assert guard('terminal', {'command': 'python -m pytest tests'}, task_id='scope-test') is None
+        assert guard('terminal', {'command': 'node --test tests/task1/'}, task_id='scope-test') is None
     assert not asks
     assert base.for_task('task-planner: Plan the work')('terminal', {'command': 'npm test'}, task_id='scope-test')
+    assert len(asks) == 1
+
+
+@pytest.mark.parametrize('agent_id,label,purpose', AGENTS)
+def test_routine_git_branch_and_runtime_inspection_needs_no_owner_prompt(scope, agent_id, label, purpose):
+    base, asks = scope
+    guard = base.for_task(f'{agent_id}: {purpose}')
+    command = 'git status --short && git branch --show-current && node --version && npm --version'
+    assert guard('terminal', {'command': command}, task_id='scope-test') is None
+    for command in ['git branch', 'git branch --list', 'python3 --version', 'python -V', 'node -v', 'npm -v']:
+        assert guard('terminal', {'command': command}, task_id='scope-test') is None
+    assert not asks
+
+
+@pytest.mark.parametrize('command', [
+    'git branch -D main', 'git branch new-branch', 'git checkout other',
+    'git -c core.pager=custom branch --show-current',
+    'node --version --eval "console.log(1)"', 'npm --version exec custom',
+    'python3 -v', 'node --test --import custom tests/', 'node --test -r custom tests/',
+    'node --version && hermes -z probe',
+])
+def test_inspection_exceptions_do_not_cover_other_execution(scope, command):
+    base, asks = scope
+    assert base.for_task('sw-developer: Build app')('terminal', {'command': command}, task_id='scope-test')
     assert len(asks) == 1
 
 

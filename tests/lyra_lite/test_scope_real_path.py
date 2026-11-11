@@ -5,6 +5,44 @@ from tests.fakes.fake_openai_server import FakeOpenAIServer, text_step, tool_ste
 from tests.lyra_lite.test_lyrad_real_path import Daemon, _events, _new_project, _wait_event, _write_config, env  # noqa: F401
 
 
+def test_developer_inspects_git_and_runtime_then_edits_without_owner_prompt(env):
+    import json
+    import re
+    import shutil
+    import subprocess
+    if not shutil.which('node') or not shutil.which('npm'):
+        pytest.skip('Node and npm are required for the real inspection path')
+    goal = 'sw-developer: Inspect project runtime and begin implementation'
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env['hermes_home'], llm.base_url, lyra_lite={'watchdog': {'enabled': False}})
+        daemon = Daemon(env).start()
+        try:
+            pid, root = _new_project(daemon, env, 'Runtime inspection')
+            subprocess.run(['git', 'init', '-q', str(root)], check=True)
+            target = root / 'implementation.md'
+            command = 'git status --short && git branch --show-current && node --version && npm --version'
+            llm.script = [tool_step('delegate_task', {'goal': goal}), text_step('Inspecting project.'), text_step('Implementation started.')]
+            llm.side_scripts = {goal: [
+                tool_step('terminal', {'command': command}),
+                tool_step('write_file', {'path': str(target), 'content': 'Implementation started.'}),
+                text_step('Runtime inspected and first file saved.'),
+            ]}
+            assert daemon.post(f'/api/projects/{pid}/messages', {'text': 'Begin implementation'}).is_success
+            _wait_event(root, lambda e: e['type'] == 'helper' and e.get('event') == 'reported')
+            assert target.read_text() == 'Implementation started.'
+            assert not any(e['type'] == 'inbox' and e['item']['kind'] in {'scope_permission', 'approval'} for e in _events(root))
+            results = [str(m.get('content', '')) for r in llm.main_requests() for m in r['messages'] if m.get('role') == 'tool']
+            inspections = [json.loads(result) for result in results if '"exit_code"' in result]
+            branch = subprocess.check_output(['git', 'branch', '--show-current'], cwd=root, text=True).strip()
+            # The terminal uses a login shell, whose Node installation can differ
+            # from the test runner's PATH. Verify real output, not a frozen version.
+            assert any(result.get('exit_code') == 0 and re.fullmatch(
+                re.escape(branch) + r'\nv\d+\.\d+\.\d+\S*\n\d+\.\d+\.\d+\S*', result.get('output', '').strip())
+                for result in inspections)
+        finally:
+            daemon.stop()
+
+
 def test_routine_file_batch_recovers_through_direct_tools_without_permission(env):
     goal = 'sw-developer: Update the project progress document'
     with FakeOpenAIServer([]) as llm:

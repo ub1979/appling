@@ -9,6 +9,15 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.7 beta — 2026-11-11
+
+Desktop package 0.17.7-beta.1.
+
+- Recognize read-only Git branch inspection and exact runtime version queries
+  for every agent, including chained inspection commands, without owner prompts.
+- Development and QA can run native Node tests. Additional execution flags, branch
+  mutations, host access and live provider probes retain their permission checks.
+
 ### Appling v0.17.6 beta — 2026-11-11
 
 Desktop package 0.17.6-beta.1.
@@ -412,6 +421,13 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.28-a] - 2026-11-11 — Routine project inspection permissions
+
+Appling v0.17.7 beta. Desktop package 0.17.7-beta.1.
+
+- Correct false permission prompts for Git branch inspection and Node/npm versions.
+- Verify the reported compound command through a real delegated terminal call.
 
 ## [0.19.27-a] - 2026-11-11 — Routine edits without permission prompts
 

@@ -27,6 +27,11 @@ _PRODUCT_WRITERS = frozenset({"sw-developer", "oop-restructurer", "debugger", "w
 _PREVIEW_WRITERS = frozenset({"req-engineer", "ui-designer"})
 _READ_COMMANDS = frozenset({"pwd", "ls", "rg", "grep", "head", "tail", "cat", "sed", "find", "which", "type", "wc", "file", "echo", "printf", "true"})
 _GIT_READ_WRITE = frozenset({"status", "diff", "log", "show", "rev-parse", "ls-files", "add", "commit"})
+_VERSION_FLAGS = {
+    name: {"--version", "-v"} for name in ("node", "npm", "pnpm", "yarn", "bun", "tsc")
+}
+_VERSION_FLAGS.update({name: {"--version", "-V"} for name in ("python", "python3")})
+_VERSION_FLAGS.update({name: {"--version"} for name in ("git", "pytest", "ruff", "mypy")})
 _TOOL_READS = frozenset({"skill_view", "project_recall", "web_search", "web_extract", "browser_snapshot",
                          "browser_vision", "browser_get_images", "browser_click", "browser_type", "browser_press",
                          "browser_scroll", "browser_back", "browser_close", "todo", "tool_search", "tool_describe",
@@ -170,6 +175,8 @@ class AgentScope:
                 if len(words) != 1 or not self._inside(self._path(words[0], task_id)):
                     return "Changing the working directory outside the assigned project needs permission."
                 continue
+            if len(words) == 1 and words[0] in _VERSION_FLAGS.get(program, ()):
+                continue
             if words and words[-1] == "--help" and all(re.fullmatch(r"[A-Za-z][\w-]*", word) for word in words[:-1]):
                 if program in {"hermes", "codex", "claude", "ollama", "git", "npm", "python", "python3", "pytest"}:
                     continue
@@ -186,7 +193,8 @@ class AgentScope:
                         return "Git operations outside this project need permission."
                     words = words[:index] + words[index + 2:]
                 subcommand = next((w for w in words if not w.startswith("-")), "")
-                if subcommand in _GIT_READ_WRITE and not any(
+                branch_inspection = words in (["branch"], ["branch", "--show-current"], ["branch", "--list"])
+                if (subcommand in _GIT_READ_WRITE or branch_inspection) and not any(
                     w.startswith(("--exec", "--config-env", "--git-dir", "--work-tree", "-c"))
                     or w in {"--no-verify", "--amend", "--ext-diff", "--textconv"} for w in words
                 ):
@@ -196,6 +204,11 @@ class AgentScope:
                 if paths and all(self._writable(self._path(word, task_id)) for word in paths):
                     continue
             if self.agent_id in _EXECUTORS:
+                if program == "node" and words and words[0] == "--test" and all(
+                    not word.startswith("-") or word.startswith("--test-") or word in {"--watch"}
+                    for word in words[1:]
+                ):
+                    continue
                 if program in {"pytest", "ruff", "mypy", "tsc"}:
                     continue
                 if program in {"python", "python3"} and len(words) >= 2 and words[0] == "-m" and words[1] in {"pytest", "compileall", "unittest"}:
