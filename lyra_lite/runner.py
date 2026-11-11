@@ -141,6 +141,18 @@ class ProjectRunner:
         with self._cond:
             if self._stop:
                 raise ValueError("This project has been closed.")
+            # The composer and a question card answer the same wait. Resolve
+            # under the queue lock so clarify cannot open between this check
+            # and enqueueing the message.
+            targets = [i for i in self.store.inbox(status="open")
+                       if i["id"] in self._waiters
+                       and i.get("kind") in {"question", "prototype", "requirements"}]
+            target = targets[0] if (kind == "user" and len(targets) == 1
+                                   and not self.store.state().get("paused")) else None
+            if target is not None:
+                value = text if target["kind"] == "question" else {"choice": "Request changes", "feedback": text}
+                if self.answer(target["id"], value):
+                    return {**item, "answered": target["id"]}
             state = self.store.state()
             queue = list(state.get("queue") or [])
             if state.get("paused") and kind == "user":
@@ -175,6 +187,9 @@ class ProjectRunner:
                 item = self.store.inbox_item(item_id) or {}
                 kind = item.get("kind")
                 state = self.store.state()
+                feedback = value.get("feedback") if isinstance(value, dict) else None
+                if feedback is not None and not isinstance(feedback, str):
+                    raise ValueError("Feedback must be text.")
                 if kind == "prototype":
                     choice = value.get("choice") if isinstance(value, dict) else value
                     if choice not in review.PROTOTYPE_CHOICES:
@@ -188,9 +203,10 @@ class ProjectRunner:
                         self.store.update_state(prototype_approved=None, prototype_needs_changes=item.get("revision"))
                     value = choice
                 elif kind == "requirements":
-                    if value not in review.REQUIREMENTS_CHOICES:
+                    choice = value.get("choice") if isinstance(value, dict) else value
+                    if choice not in review.REQUIREMENTS_CHOICES:
                         raise ValueError("Choose an answer from the requirements review.")
-                    if value == review.REQUIREMENTS_CHOICES[0]:
+                    if choice == review.REQUIREMENTS_CHOICES[0]:
                         revision = review.requirements_revision(self.root)
                         if not revision or revision != item.get("revision"):
                             raise ValueError("The requirements changed. Ask Appling to share the revised draft.")
@@ -200,6 +216,9 @@ class ProjectRunner:
                         self.store.update_state(requirements_approved=revision, requirements_review=False)
                     else:
                         self.store.update_state(requirements_approved=None)
+                    value = choice
+                if kind in {"prototype", "requirements"} and value == "Request changes" and feedback:
+                    value += "\n\nOwner feedback:\n" + feedback.strip()
                 self._waiters.pop(item_id)
                 shown = "(hidden)" if kind == "secret" else value
                 self.store.close_inbox(item_id, "answered", answer=value)
@@ -441,6 +460,25 @@ class ProjectRunner:
             stopped = self._stop or self.store.state().get("paused")
         if stopped:
             self._close_inbox(item["id"], "expired")
+        elif kind == "question":
+            # A message can arrive just before clarify opens its card (for
+            # example while leaving prototype review). Deliver it as the
+            # answer instead of trapping it behind the turn that needs it.
+            with self._cond:
+                state = self.store.state()
+                queue = state.get("queue") or []
+                turn = state.get("turn") or {}
+                pending = [q for q in queue if q.get("kind") == "user"
+                           and q.get("queued", 0) >= turn.get("started", 0)]
+                if (pending and not self._stop and not state.get("paused")
+                        and item["id"] in self._waiters
+                        and sum(i.get("kind") in {"question", "prototype", "requirements"}
+                                for i in self.store.inbox(status="open")) == 1):
+                    answer = "\n\n".join(q["text"] for q in pending)
+                    if self.answer(item["id"], answer):
+                        consumed = {q["id"] for q in pending}
+                        self.store.update_state(queue=[q for q in queue if q["id"] not in consumed])
+                        self.store.append_event("queue_consumed", ids=sorted(consumed), inbox=item["id"])
         return item["id"]
 
     def _close_inbox(self, item_id: str, status: str) -> None:

@@ -165,7 +165,7 @@ export interface NewProject {
 
 export type Platform = "web" | "phone" | "computer";
 export interface AppPreview { kind: "web" | "expo"; url: string; revision?: string }
-export type ReviewAnswer = string | { choice: string; revision: string };
+export type ReviewAnswer = string | { choice: string; revision?: string; feedback?: string };
 
 async function call<T>(method: string, path: string, body?: unknown): Promise<T> {
   const res = await fetch(path, {

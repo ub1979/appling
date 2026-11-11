@@ -20,6 +20,7 @@ import { activeHelpers, applyEvent, emptyLive, type InboxItem, type LiveState, t
 import { go } from "../router";
 import { ProviderAlerts } from "../components/ProviderAlerts";
 import { UpdateDialog } from "../components/UpdateDialog";
+import { composerContext } from "./composer-context";
 import {
   extractAppItSkillSelection,
   orderGuidedPhases,
@@ -503,7 +504,7 @@ export function Studio({ id }: { id: string }) {
             seenPrototype={preview?.revision === seenPrototype ? seenPrototype : null}
             onOpenPrototype={() => void openPrototype()}
           />
-          <Composer busy={busy} onSend={send} projectId={id} dropped={dropped} picks={picks} onPicksChange={setPicks} />
+          <Composer busy={busy} inbox={live.inbox} onSend={send} projectId={id} dropped={dropped} picks={picks} onPicksChange={setPicks} />
         </section>
 
         <aside className="side right">
@@ -1049,14 +1050,16 @@ export function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype, requi
 
 interface Attachment { key: string; name: string; progress: number; path?: string; error?: string }
 
-function Composer({ busy, onSend, projectId, dropped, picks, onPicksChange }: {
+function Composer({ busy, inbox, onSend, projectId, dropped, picks, onPicksChange }: {
   busy: boolean; onSend: (text: string) => Promise<void>; projectId: string; dropped: File[];
+  inbox: InboxItem[];
   picks: PickedElement[]; onPicksChange: (p: PickedElement[]) => void;
 }) {
   const [text, setText] = useState("");
   const [files, setFiles] = useState<Attachment[]>([]);
   const area = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
+  const context = composerContext(inbox, busy);
   useEffect(() => {
     const el = area.current;
     if (!el) return;
@@ -1114,7 +1117,7 @@ function Composer({ busy, onSend, projectId, dropped, picks, onPicksChange }: {
           ref={area}
           rows={1}
           value={text}
-          placeholder={busy ? "Appling is working — write anyway, it reads this next…" : "Message Appling…"}
+          placeholder={context.placeholder}
           onChange={(e) => setText(e.target.value)}
           onPaste={(e) => { const pasted = Array.from(e.clipboardData.files); if (pasted.length) { e.preventDefault(); attach(pasted); } }}
           onKeyDown={(e) => {
@@ -1126,7 +1129,7 @@ function Composer({ busy, onSend, projectId, dropped, picks, onPicksChange }: {
         />
         <button className="send" onClick={() => void send()} disabled={(!text.trim() && !ready.length && !picks.length) || uploading} aria-label="Send" title={uploading ? "Wait for the upload to finish" : "Send"}><ArrowUp size={18} /></button>
       </div>
-      <div className="hint">Enter to send · Shift+Enter for a new line · drop files here or use 📎</div>
+      <div className="hint">{context.hint}</div>
     </div>
   );
 }

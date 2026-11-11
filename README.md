@@ -6,8 +6,8 @@ Appling is a local-first product studio for apps, websites, slide decks, and sho
 
 Appling is in beta. Review generated work and test it for your own use before publishing it.
 
-The current source version is **v0.16 beta**, with project updates, prototype
-review, saved agent models, and project archiving.
+The current source version is **v0.17 beta**, with reliable prototype feedback,
+visible AI retry status, project updates, saved agent models, and project archiving.
 
 ## Desktop installers (beta)
 

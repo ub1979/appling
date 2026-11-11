@@ -9,6 +9,20 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17 beta — 2026-11-11
+
+Desktop package 0.17.0-beta.1.
+
+- Feedback from the main chat answers the active question immediately, including
+  picked prototype elements and attachments. Messages arriving just before a
+  question opens are delivered once rather than trapped in the queue.
+- Comments during prototype or requirements review request changes and retain
+  the feedback; approval still requires the explicit review controls.
+- Provider failures and retry countdowns remain visible after a page refresh,
+  with a Stop and change AI action. Busy chats offer Stop and apply rules.
+- Restored requirements question shortcuts, all available models in agent model
+  pickers, agent portraits, and visible background-work status.
+
 ### Appling v0.16 beta — 2026-11-11
 
 Desktop package 0.16.0-beta.1.
@@ -325,6 +339,16 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.21-a] - 2026-11-11 — Prototype feedback and AI status
+
+Appling v0.17 beta. Desktop package 0.17.0-beta.1.
+
+- Fixed prototype feedback and question routing without changing the model's
+  conversation prefix or bypassing prototype, requirements, or command approvals.
+- Added persistent provider retry warnings and an action to stop active work
+  before applying updated rules.
+- Included conversation, agent model picker, question shortcut, and portrait fixes.
 
 ## [0.19.20-a] - 2026-11-11 — Project updates and archives
 

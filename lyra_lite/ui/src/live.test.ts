@@ -125,3 +125,12 @@ it("labels the pre-approval walkthrough as prototype work", () => {
   expect(agentTaskDescription("req-engineer: Create ONLY the pre-approval clickable requirements walkthrough at prototypes/index.html."))
     .toBe("Creating and checking your clickable prototype");
 });
+
+it("removes only messages delivered to a waiting question from the queue", () => {
+  const queued = feed([
+    { type: "queued", item: { id: "feedback", text: "Inset the arrow" } },
+    { type: "queued", item: { id: "report", text: "Agent handoff", kind: "helper_done" } },
+  ]);
+  const answered = applyEvent(queued, { type: "queue_consumed", ts: 4, ids: ["feedback"] });
+  expect(answered.queued.map((q) => q.id)).toEqual(["report"]);
+});

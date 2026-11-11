@@ -148,6 +148,10 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
         }),
       };
     }
+    case "queue_consumed": {
+      const ids = Array.isArray(evt.ids) ? evt.ids : [];
+      return { ...state, queued: state.queued.filter((item) => !ids.includes(item.id)) };
+    }
     case "provider_status": {
       const status = evt as unknown as ProviderStatus;
       const statuses = { ...state.providerStatuses };

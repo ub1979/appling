@@ -791,7 +791,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             item = lyra.get(pid).submit(str(body.get("text") or ""))
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc))
-        return {"queued": item}
+        return {"answered": item["answered"]} if item.get("answered") else {"queued": item}
 
     @app.post("/api/projects/{pid}/inbox/{item_id}")
     def answer(pid: str, item_id: str, body: dict = Body(...)):
