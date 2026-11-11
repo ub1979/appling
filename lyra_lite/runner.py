@@ -729,10 +729,11 @@ class ProjectRunner:
         if not self.store.has_transcript():
             self._rebuild_transcript()
         state = self.store.state()
-        if any(i.get("kind") == "question" and review.requests_plan_approval(i.get("question", ""), i.get("choices"))
+        if any(i.get("kind") == "question" and i.get("status") in {"open", "expired"}
+               and review.requests_plan_approval(i.get("question", ""), i.get("choices"))
                and (i.get("chat_id") == state.get("chat_id") if i.get("chat_id")
                     else i.get("created", 0) > (state.get("chat_started_at") or 0))
-               for i in self.store.inbox(status="open")):
+               for i in self.store.inbox()):
             self.store.update_state(plan_review_required=True)
         self._expire_turn_inbox(None)
         turn = state.get("turn")

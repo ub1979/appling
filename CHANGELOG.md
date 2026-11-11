@@ -9,6 +9,14 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.5 beta — 2026-11-11
+
+Desktop package 0.17.5-beta.1.
+
+- Restore unanswered legacy plan questions that expired before restart as visible,
+  revision-bound plan reviews. Preserve answered decisions and chat boundaries;
+  recovery never approves the plan or starts an AI call.
+
 ### Appling v0.17.4 beta — 2026-11-11
 
 Desktop package 0.17.4-beta.1.
@@ -395,6 +403,14 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.26-a] - 2026-11-11 — Restore expired plan reviews
+
+Appling v0.17.5 beta. Desktop package 0.17.5-beta.1.
+
+- Migrate expired legacy plan questions during restart without reopening answered
+  decisions, crossing chat boundaries, approving drafts, or making model calls.
+- Verified visible revision-bound review recovery through the real local API.
 
 ## [0.19.25-a] - 2026-11-11 — Agent scope and visible plan review
 
