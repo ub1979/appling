@@ -94,6 +94,8 @@ REQUIREMENTS_GATE = (
     "an update, otherwise task planning. Do not end the turn with only an approval acknowledgement or a "
     "statement that planning is next. Keep approval bookkeeping in the Status line or the section named "
     "'Approval gates and current state'; do not rewrite approved product requirements to record progress. "
+    "Save and show the implementation plan before asking to start development. Use clarify with choices "
+    "['Approve implementation plan', 'Request changes'] to open its visible revision-bound review. "
     "If blocked, open clarify with the actual blocker."
 )
 TEAM_GATE = (

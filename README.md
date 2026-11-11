@@ -6,8 +6,25 @@ Appling is a local-first product studio for apps, websites, slide decks, and sho
 
 Appling is in beta. Review generated work and test it for your own use before publishing it.
 
-The current source version is **v0.17.3 beta**, with reliable prototype feedback,
+The current source version is **v0.17.4 beta**, with reliable prototype feedback,
 visible AI retry status, project updates, saved agent models, and project archiving.
+
+Agents share an enforced role and workspace check. Ordinary project builds and
+tests are available to development and QA roles. Live AI probes, adversarial or
+destructive diagnostics, host-file access, opaque execution, and role exceptions
+require **Allow once** for the exact action. A general command allowlist does not
+bypass this check. This checks direct tool actions; it is not an OS sandbox for
+all behavior inside project programs. The native Codex app-server tool runtime is
+rejected because it bypasses this check; the normal Codex Responses connection
+remains supported. Implementation plans must be shown before their approval.
+
+Project state stays file-first under `.lyra`: `state.json` holds workflow state,
+`inbox/*.json` holds questions and answers, and `events.jsonl` records ordered
+communication. Permission decisions and checked payloads live in
+`permissions/<run>/actions/*.json` and `permissions/<run>/checks/*.json`.
+Permission records use schema 1 with an ID, agent, tool, payload hash, decision,
+remaining uses, and timestamps. Records survive restarts; dangerous actions are
+never automatically replayed from an interrupted run.
 
 ## Desktop installers (beta)
 

@@ -17,6 +17,7 @@ _DELEGATED_CHILD_CONTEXT: ContextVar[bool] = ContextVar(
     default=False,
 )
 _DELEGATED_REQUESTER: ContextVar[dict | None] = ContextVar("hermes_delegated_requester", default=None)
+_TOOL_PERMISSION_GUARD: ContextVar[object | None] = ContextVar("hermes_tool_permission_guard", default=None)
 
 DELEGATED_CHILD_ENV_MARKER = "HERMES_DELEGATED_CHILD_CONTEXT"
 
@@ -51,6 +52,20 @@ def delegated_child_context(*, subagent_id: str | None = None, goal: str = "", m
 def delegated_requester() -> dict | None:
     requester = _DELEGATED_REQUESTER.get()
     return dict(requester) if requester is not None else None
+
+
+@contextmanager
+def tool_permission_context(guard) -> Iterator[None]:
+    token = _TOOL_PERMISSION_GUARD.set(guard) if guard is not None else None
+    try:
+        yield
+    finally:
+        if token is not None:
+            _TOOL_PERMISSION_GUARD.reset(token)
+
+
+def tool_permission_guard():
+    return _TOOL_PERMISSION_GUARD.get()
 
 
 def is_delegated_child_context() -> bool:

@@ -375,7 +375,7 @@ export function Studio({ id }: { id: string }) {
         {providerStatuses.length > 0 && <ProviderAlerts statuses={providerStatuses}
           agentName={(goal) => labelOf(agentForGoal(goal, agents) ?? "") || "Agent"}
           onChangeAi={() => void run(async () => { await api.stop(id); go(`/settings?project=${id}`); })} />}
-        {helpers.length > 0 && providerStatuses.length === 0 && (
+        {helpers.length > 0 && providerStatuses.length === 0 && live.inbox.length === 0 && (
           <div className="banner" role="status">
             <span><b>{helpers.map((h) => labelOf(agentForGoal(h.goal, agents) ?? "") || "Agent").join(", ")} working</b>
               {" — "}{agentTaskDescription(helpers[0].goal)}
@@ -990,6 +990,22 @@ export function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype, requi
   onOpenPrototype: () => void;
 }) {
   const [text, setText] = useState("");
+  const [planShown, setPlanShown] = useState(false);
+  if (item.kind === "plan") {
+    return (
+      <div className="need-card">
+        <b>Review the implementation plan</b>
+        <p>Read the plan before allowing the development agent to begin.</p>
+        <button className="btn small" onClick={() => setPlanShown(true)}>Show implementation plan</button>
+        {planShown && <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{item.question ?? ""}</ReactMarkdown></div>}
+        <div className="answer-row">
+          <button className="btn primary small" disabled={!planShown || !item.revision}
+            onClick={() => onAnswer({ choice: "Approve implementation plan", revision: item.revision })}>Approve implementation plan</button>
+          <button className="btn small" onClick={() => onAnswer("Request changes")}>Request changes</button>
+        </div>
+      </div>
+    );
+  }
   if (item.kind === "prototype" || item.kind === "requirements") {
     const prototype = item.kind === "prototype";
     const viewed = !!item.revision && seenPrototype === item.revision;
@@ -1006,6 +1022,21 @@ export function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype, requi
             {approve}
           </button>
           <button className="btn small" onClick={() => onAnswer("Request changes")}>Request changes</button>
+        </div>
+      </div>
+    );
+  }
+  if (item.kind === "scope_permission") {
+    return (
+      <div className="need-card">
+        <b>{item.requester?.label ?? "Agent"} needs your permission</b>
+        <p>{item.description}</p>
+        {item.requester?.goal && <p className="small">Assigned work: {item.requester.goal}</p>}
+        <pre>{item.command}</pre>
+        <p className="small">Applies only to this exact action. Denying it keeps the agent within its assigned work.</p>
+        <div className="answer-row">
+          <button className="btn small" onClick={() => onAnswer("Allow once")}>Allow once</button>
+          <button className="btn danger small" onClick={() => onAnswer("Deny")}>Deny</button>
         </div>
       </div>
     );

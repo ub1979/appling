@@ -58,3 +58,23 @@ describe("command approval origin", () => {
     expect(html).toContain("Don&#x27;t allow");
   });
 });
+
+describe("implementation plan review", () => {
+  it("offers a real plan viewer and disables approval until it is opened", () => {
+    const html = renderToStaticMarkup(createElement(NeedCard, {
+      item: { id: "plan", kind: "plan", created: 1, question: "Actual saved implementation plan", revision: "current" },
+      seenPrototype: null, onOpenPrototype: () => {}, onAnswer: () => {},
+    }));
+    expect(html).toContain("Show implementation plan");
+    expect(html).toContain('disabled=""');
+    expect(html).not.toContain("Actual saved implementation plan");
+  });
+  it("scope permissions offer only one action or denial", () => {
+    const html = renderToStaticMarkup(createElement(NeedCard, {
+      item: { id: "scope", kind: "scope_permission", created: 1, command: "Exact proposed action", description: "Outside assigned work" },
+      requirementsInterview: true, seenPrototype: null, onOpenPrototype: () => {}, onAnswer: () => {},
+    }));
+    for (const label of ["Exact proposed action", "Allow once", "Deny"]) expect(html).toContain(label);
+    for (const label of ["Decide for me", "Use smart defaults", "Always allow"]) expect(html).not.toContain(label);
+  });
+});

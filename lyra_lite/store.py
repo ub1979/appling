@@ -239,7 +239,7 @@ class ProjectStore:
         beginning = state.get("chat_started_at") or min(
             (e["ts"] for e in entries if e.get("ts")), default=0)
         for item in self.inbox(status="answered"):
-            if item.get("kind") not in {"question", "prototype", "requirements"}:
+            if item.get("kind") not in {"question", "prototype", "requirements", "plan"}:
                 continue
             if item.get("created", 0) < beginning:
                 continue

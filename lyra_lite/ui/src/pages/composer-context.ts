@@ -1,7 +1,7 @@
 import type { InboxItem } from "../live";
 
 export function composerContext(inbox: InboxItem[], busy: boolean) {
-  const targets = inbox.filter((item) => ["question", "prototype", "requirements"].includes(item.kind));
+  const targets = inbox.filter((item) => ["question", "prototype", "requirements", "plan"].includes(item.kind));
   if (targets.length === 1) {
     if (targets[0].kind === "question") return {
       placeholder: "Answer Appling’s question…",

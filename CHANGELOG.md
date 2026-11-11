@@ -9,6 +9,26 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.4 beta — 2026-11-11
+
+Desktop package 0.17.4-beta.1.
+
+- All agents, including nested helpers, inherit runtime role/workspace checks.
+  Live AI probes, destructive/adversarial diagnostics, host-file access, opaque
+  scripts, and role exceptions require exact one-off owner permission. Agent
+  goals, command allowlists and YOLO mode cannot grant that permission.
+- Permission denial or a failed permission UI blocks execution. Direct writes
+  to Appling approval state and Git internals are blocked. Normal project builds
+  and tests remain available to development/QA roles. Native Codex app-server
+  execution fails closed because its built-in tools bypass this boundary.
+- Implementation review includes the saved plan, a Show implementation plan
+  control, revision-bound approval, and a development dispatch gate. Readiness
+  handoffs also restore missing plan review controls after a turn or restart.
+- Permission requests, decisions, checked payloads, and one-off consumption are
+  structured JSON under .lyra/permissions with append-only event references.
+  Restart preserves those records and never automatically replays an old grant.
+- These are direct tool checks, not a full OS sandbox for project programs.
+
 ### Appling v0.17.3 beta — 2026-11-11
 
 Desktop package 0.17.3-beta.1.
@@ -375,6 +395,16 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.25-a] - 2026-11-11 — Agent scope and visible plan review
+
+Appling v0.17.4 beta. Desktop package 0.17.4-beta.1.
+
+- Added inherited runtime tool permissions for all Appling agents and explicit
+  one-off scope consent independent of ordinary command approvals.
+- Required a visible, current implementation plan before development dispatch.
+- Verified real delegated denial, approvals-off protection, and plan-to-development
+  gating with temporary daemons and local scripted model providers.
 
 ## [0.19.24-a] - 2026-11-11 — Clear command approval origins
 

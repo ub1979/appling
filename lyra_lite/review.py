@@ -13,7 +13,27 @@ from lyra_lite.project_map import read_map
 
 PROTOTYPE_CHOICES = ("Approve prototype", "Request changes")
 REQUIREMENTS_CHOICES = ("Approve requirements", "Request changes")
+PLAN_CHOICES = ("Approve implementation plan", "Request changes")
 _STATUS = re.compile(r"(?im)^\s*\*{0,2}status\*{0,2}:\*{0,2}[^\n]*\n?")
+
+
+def requests_plan_approval(question: str, choices) -> bool:
+    return any(re.search(r"\bapprove\s+(?:the\s+)?(?:implementation\s+|task\s+)?plan\b", str(c), re.I)
+               for c in choices or []) or bool(re.search(
+                   r"\b(?:do you|can you|would you|please)\s+(?:like to\s+)?approve\b[^?\n]{0,120}\bplan\b",
+                   str(question), re.I))
+
+
+def implementation_plan(root: Path) -> dict | None:
+    for name in (".sdlc/task-graph.md", ".sdlc/implementation-plan.md", "implementation-plan.md", "plan.md"):
+        try:
+            text = (root / name).read_text(encoding="utf-8")
+        except (OSError, UnicodeError):
+            continue
+        content = requirements_content(text)
+        if content:
+            return {"path": name, "text": text, "revision": hashlib.sha256(content.encode()).hexdigest()}
+    return None
 
 
 def visual_project(root: Path, state: dict) -> bool:

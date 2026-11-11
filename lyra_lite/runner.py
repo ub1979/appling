@@ -79,7 +79,7 @@ class _Hooks:
     def ask(self, kind: str, on_answer: Callable[[Any], None], **fields: Any) -> str:
         # Permission waits own their lifetime: a helper may ask during an
         # unrelated owner turn, or between turns entirely.
-        turn = None if kind == "approval" else self.turn_id
+        turn = None if kind in {"approval", "scope_permission"} else self.turn_id
         return self.runner._open_inbox(kind, on_answer, turn=turn, **fields)
 
     def expire(self, item_id: str) -> None:
@@ -146,7 +146,7 @@ class ProjectRunner:
             # and enqueueing the message.
             targets = [i for i in self.store.inbox(status="open")
                        if i["id"] in self._waiters
-                       and i.get("kind") in {"question", "prototype", "requirements"}]
+                       and i.get("kind") in {"question", "prototype", "requirements", "plan"}]
             target = targets[0] if (kind == "user" and len(targets) == 1
                                    and not self.store.state().get("paused")) else None
             if target is not None:
@@ -190,6 +190,8 @@ class ProjectRunner:
                 item = self.store.inbox_item(item_id) or {}
                 kind = item.get("kind")
                 state = self.store.state()
+                if kind == "scope_permission" and (not isinstance(value, str) or value not in {"Allow once", "Deny"}):
+                    raise ValueError("Choose Allow once or Deny for this exact action.")
                 feedback = value.get("feedback") if isinstance(value, dict) else None
                 if feedback is not None and not isinstance(feedback, str):
                     raise ValueError("Feedback must be text.")
@@ -204,6 +206,27 @@ class ProjectRunner:
                         self.store.update_state(prototype_approved=revision, prototype_needs_changes=None)
                     else:
                         self.store.update_state(prototype_approved=None, prototype_needs_changes=item.get("revision"))
+                    value = choice
+                elif kind == "plan":
+                    choice = value.get("choice") if isinstance(value, dict) else value
+                    if choice not in review.PLAN_CHOICES:
+                        raise ValueError("Choose an answer from the implementation plan review.")
+                    plan = review.implementation_plan(self.root)
+                    if choice == review.PLAN_CHOICES[0]:
+                        revision = value.get("revision") if isinstance(value, dict) else None
+                        if not plan or revision != item.get("revision") or revision != plan["revision"]:
+                            raise ValueError("Review the current implementation plan before approving it.")
+                        requirements = review.requirements_revision(self.root)
+                        if (requirements != item.get("requirements") or requirements != state.get("requirements_approved")
+                                or state.get("requirements_review")):
+                            raise ValueError("The requirements changed. Review the plan against the current approved requirements.")
+                        if review.visual_project(self.root, state) and review.prototype_revision(self.root) != state.get("prototype_approved"):
+                            raise ValueError("Review the current prototype before approving the implementation plan.")
+                        self.store.update_state(plan_approved=revision, plan_needs_changes=None,
+                                                plan_requirements=requirements,
+                                                approval_followup={"revision": requirements, "offset": self.store.events_size(), "after": "plan"})
+                    else:
+                        self.store.update_state(plan_approved=None, plan_needs_changes=item.get("revision"))
                     value = choice
                 elif kind == "requirements":
                     choice = value.get("choice") if isinstance(value, dict) else value
@@ -223,7 +246,7 @@ class ProjectRunner:
                     else:
                         self.store.update_state(requirements_approved=None)
                     value = choice
-                if kind in {"prototype", "requirements"} and value == "Request changes" and feedback:
+                if kind in {"prototype", "requirements", "plan"} and value == "Request changes" and feedback:
                     value += "\n\nOwner feedback:\n" + feedback.strip()
                 self._waiters.pop(item_id)
                 shown = "(hidden)" if kind == "secret" else value
@@ -278,7 +301,7 @@ class ProjectRunner:
     def recoverable_review(self) -> dict | None:
         """The most recent expired review, only while its exact draft is current."""
         state = self.store.state()
-        if not state.get("requirements_review"):
+        if not state.get("requirements_review") and not state.get("plan_review_required"):
             return None
         cards = self._chat_reviews()
         if not cards:
@@ -295,6 +318,13 @@ class ProjectRunner:
                     or revision in (state.get("prototype_approved"), state.get("prototype_needs_changes"),
                                     update.get("baseline_prototype_revision"))):
                 return None
+        elif kind == "plan":
+            plan = review.implementation_plan(self.root)
+            if (not plan or revision != plan["revision"]
+                    or revision in (state.get("plan_approved"), state.get("plan_needs_changes"))
+                    or item.get("requirements") != state.get("requirements_approved")
+                    or review.requirements_revision(self.root) != state.get("requirements_approved")):
+                return None
         else:
             if (revision != review.requirements_revision(self.root)
                     or revision in (state.get("requirements_approved"), update.get("baseline_requirements_revision"))):
@@ -307,7 +337,7 @@ class ProjectRunner:
 
     def _chat_reviews(self) -> list[dict]:
         state = self.store.state()
-        return [i for i in self.store.inbox() if i.get("kind") in {"prototype", "requirements"}
+        return [i for i in self.store.inbox() if i.get("kind") in {"prototype", "requirements", "plan"}
                 and (i.get("chat_id") == state.get("chat_id") if i.get("chat_id")
                      else not state.get("chat_started_at") or i.get("created", 0) > state["chat_started_at"])]
 
@@ -320,7 +350,7 @@ class ProjectRunner:
             if item is None or item["id"] != item_id:
                 raise RuntimeError("This review is no longer current. Ask Appling to share the latest draft.")
             self.store.update_state(paused=False)
-            fields = {k: item[k] for k in ("question", "choices", "revision", "prototype") if k in item}
+            fields = {k: item[k] for k in ("question", "choices", "revision", "prototype", "requirements", "path") if k in item}
             return self._open_review_decision(item["kind"], **fields)
 
     def _open_review_decision(self, kind: str, **fields) -> str:
@@ -366,6 +396,28 @@ class ProjectRunner:
         events, _ = self.store.read_events(offset)
         return any(e["type"] == "helper" and e.get("event") == "start" for e in events)
 
+    def _offer_plan_review(self) -> None:
+        with self._cond:
+            state = self.store.state()
+            if (self._stop or self._busy or state.get("paused") or state.get("queue") or self.helpers()
+                    or self.store.inbox(status="open") or not state.get("plan_review_required")
+                    or state.get("requirements_review")):
+                return
+            requirements = review.requirements_revision(self.root)
+            if not requirements or requirements != state.get("requirements_approved"):
+                return
+            if review.visual_project(self.root, state) and review.prototype_revision(self.root) != state.get("prototype_approved"):
+                return
+            plan = review.implementation_plan(self.root)
+            if (not plan or plan["revision"] in (state.get("plan_approved"), state.get("plan_needs_changes"))
+                    or any(i.get("kind") == "plan" and i.get("revision") == plan["revision"]
+                           and i.get("requirements") == requirements for i in self._chat_reviews())):
+                return
+            self._open_review_decision(
+                "plan", choices=list(review.PLAN_CHOICES), revision=plan["revision"], requirements=requirements,
+                path=plan["path"], question="Review this implementation plan before development starts.\n\n" + plan["text"],
+            )
+
     def _continue_approved_work(self, turn: dict) -> None:
         """One bounded handoff when the model acknowledges approval then stops."""
         with self._cond:
@@ -398,6 +450,12 @@ class ProjectRunner:
             update = review.active_update(self.root, state)
             needs_change_review = update and not review.change_review_ready(review.change_report(self.root, update, revision))
             step = "Change Management review before planning" if needs_change_review else "task planning"
+            if pending.get("after") == "plan":
+                plan = review.implementation_plan(self.root)
+                if not plan or plan["revision"] != state.get("plan_approved"):
+                    self.store.update_state(approval_followup=None)
+                    return
+                step = "the development agent's first approved implementation task"
             self.submit(
                 f"{agents.APPROVAL_CONTINUE}\nThe owner has approved the current requirements and any required "
                 f"prototype. Continue the authorized workflow now with {step}. Read requirements.md and the "
@@ -671,6 +729,11 @@ class ProjectRunner:
         if not self.store.has_transcript():
             self._rebuild_transcript()
         state = self.store.state()
+        if any(i.get("kind") == "question" and review.requests_plan_approval(i.get("question", ""), i.get("choices"))
+               and (i.get("chat_id") == state.get("chat_id") if i.get("chat_id")
+                    else i.get("created", 0) > (state.get("chat_started_at") or 0))
+               for i in self.store.inbox(status="open")):
+            self.store.update_state(plan_review_required=True)
         self._expire_turn_inbox(None)
         turn = state.get("turn")
         if state.get("running") and isinstance(turn, dict):
@@ -694,6 +757,7 @@ class ProjectRunner:
                        exit_reason="restart", goal=user_text[:200])
         self.store.update_state(running=False, turn=None)
         self._offer_requirements_review()
+        self._offer_plan_review()
 
     # -- worker ----------------------------------------------------------
 
@@ -809,6 +873,7 @@ class ProjectRunner:
             self.store.update_state(running=False, turn=None, last_completed_turn=turn_id)
             if not result.error and not result.interrupted and result.completed:
                 self._offer_requirements_review()
+                self._offer_plan_review()
                 self._continue_approved_work(turn)
             self._cond.notify_all()
         self.store.append_event(

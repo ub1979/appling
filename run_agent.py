@@ -6558,6 +6558,10 @@ class AIAgent:
         New DELEGATE_TASK_SCHEMA fields only need to be added here to reach all
         invocation paths (concurrent, sequential, inline).
         """
+        permission_guard = getattr(self, "__dict__", {}).get("tool_permission_guard")
+        scoped_dispatch = getattr(permission_guard, "dispatch_task", None)
+        if callable(scoped_dispatch):
+            return scoped_dispatch(self, function_args)
         from tools.delegate_tool import (
             _strip_model_hidden_task_fields,
             delegate_task as _delegate_task,
@@ -6711,13 +6715,18 @@ class AIAgent:
             getattr(self, "_session_db", None), getattr(self, "session_id", None)
         )
         from agent.auxiliary_client import scoped_runtime_main
+        from agent.delegation_context import tool_permission_context
 
         # The outer token restores the caller's Context even though turn setup
         # replaces the value with the live runtime after fallback restoration.
         # Keep the scope local instead of storing ContextVar tokens on the agent,
         # which may be observed from another thread.
-        with scoped_runtime_main({}):
+        permission_guard = getattr(self, "__dict__", {}).get("tool_permission_guard")
+        with scoped_runtime_main({}), tool_permission_context(permission_guard):
             try:
+                runtime_check = getattr(permission_guard, "check_runtime", None)
+                if callable(runtime_check):
+                    runtime_check(self.api_mode)
                 return run_conversation(
                     self,
                     user_message,
