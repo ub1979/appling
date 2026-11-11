@@ -76,6 +76,8 @@ FIRST_TURN_GATE = (
     "Recommend the smallest useful agent team later and ask permission before changing it."
 )
 REQUIREMENTS_GATE = (
+    "Ask requirements interview questions through clarify with concise suggested choices when useful. "
+    "The interface also supplies Skip, Decide for me, and Use smart defaults for the interview. "
     "Requirements is a permanent project capability, not the speaker for every turn. Activate it for the first "
     "meaningful product brief when no approved requirements exist, while its interview is active, when the user "
     "explicitly asks to revise requirements, or when a request materially changes product scope, user-visible "

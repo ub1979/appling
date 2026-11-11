@@ -239,7 +239,8 @@ export function Studio({ id }: { id: string }) {
   const openProposal =
     !busy && lastLyra && (lastLyra[0].proposal || teamProposalForText(lastLyra[0].text, agents, team)) && (!lastTeamNote || lastTeamNote[1] < lastLyra[1]) ? lastLyra[0].proposal || teamProposalForText(lastLyra[0].text, agents, team) : null;
   const lastText = lastLyra?.[0].text.trim() ?? "";
-  const asksQuestion = !busy && live.queued.length === 0 && /[?？]\s*$/.test(lastText) && !openProposal;
+  const asksQuestion = !busy && live.queued.length === 0 && live.inbox.length === 0
+    && asksForQuestion(lastText) && !openProposal;
   // Only when the reply actually asks for approval — not when it merely
   // says an approval was recorded (that showed the button after every turn).
   const asksApproval = !busy && live.queued.length === 0 && !openProposal && !detail?.review_pending && asksForApproval(lastText);
@@ -458,6 +459,7 @@ export function Studio({ id }: { id: string }) {
             ids={ids}
             agents={agents}
             team={team}
+            requirementsInterview={detail.review_pending}
             asksQuestion={asksQuestion}
             asksApproval={asksApproval}
             proposal={openProposal}
@@ -551,6 +553,18 @@ export function Studio({ id }: { id: string }) {
       )}
     </div>
   );
+}
+
+export function asksForQuestion(reply: string): boolean {
+  const lastParagraph = reply.trim().split(/\n\s*\n/).at(-1) ?? "";
+  const prose = lastParagraph.replace(/https?:\/\/[^\s)]+/g, "").replace(/`[^`]*`/g, "");
+  return /[?？]/.test(prose);
+}
+
+function QuestionShortcuts({ onAnswer }: { onAnswer: (answer: string) => void }) {
+  return ANSWERS.map((answer) => (
+    <button key={answer.label} className="chip" onClick={() => onAnswer(answer.text)}>{answer.label}</button>
+  ));
 }
 
 export function asksForApproval(reply: string): boolean {
@@ -712,6 +726,7 @@ function ChatScroll(props: {
   ids: string[];
   agents: Agent[];
   team: string[];
+  requirementsInterview: boolean;
   asksQuestion: boolean;
   asksApproval: boolean;
   proposal: string[] | null;
@@ -793,10 +808,7 @@ function ChatScroll(props: {
                 {props.asksApproval && (
                   <button className="btn primary small" onClick={() => props.onSend("approve")}>Approve and continue</button>
                 )}
-                {props.asksQuestion &&
-                  ANSWERS.map((a) => (
-                    <button key={a.label} className="chip" onClick={() => props.onSend(a.text)}>{a.label}</button>
-                  ))}
+                {props.asksQuestion && <QuestionShortcuts onAnswer={props.onSend} />}
                 {props.asksApproval && <span className="tiny muted" style={{ alignSelf: "center" }}>Or type what you'd like changed.</span>}
               </div>
             )}
@@ -828,7 +840,8 @@ function ChatScroll(props: {
         ))}
         {live.inbox.map((item) => (
           <NeedCard key={item.id} item={item} onAnswer={(a) => props.onAnswer(item.id, a)}
-            seenPrototype={props.seenPrototype} onOpenPrototype={props.onOpenPrototype} />
+            seenPrototype={props.seenPrototype} onOpenPrototype={props.onOpenPrototype}
+            requirementsInterview={props.requirementsInterview} />
         ))}
       </div>
     </div>
@@ -925,8 +938,9 @@ const APPROVAL_CHOICES = [
   { value: "deny", label: "Don't allow", tone: "danger" },
 ];
 
-function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype }: {
+export function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype, requirementsInterview = false }: {
   item: InboxItem;
+  requirementsInterview?: boolean;
   onAnswer: (a: ReviewAnswer) => void;
   seenPrototype: string | null;
   onOpenPrototype: () => void;
@@ -975,7 +989,12 @@ function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype }: {
       {!!item.choices?.length && (
         <div className="answer-row" style={{ borderTop: 0, paddingTop: 0, marginTop: 0 }}>
           {item.choices.map((c) => <button key={c} className="chip" onClick={() => onAnswer(c)}>{c}</button>)}
-          {!secret && <button className="chip" onClick={() => onAnswer("Decide for me using the safest sensible default.")}>Decide for me</button>}
+          {!secret && !requirementsInterview && <button className="chip" onClick={() => onAnswer("Decide for me using the safest sensible default.")}>Decide for me</button>}
+        </div>
+      )}
+      {!secret && requirementsInterview && (
+        <div className="answer-row">
+          <QuestionShortcuts onAnswer={onAnswer} />
         </div>
       )}
       <div style={{ display: "flex", gap: 8 }}>

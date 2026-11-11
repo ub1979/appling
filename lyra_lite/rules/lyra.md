@@ -59,8 +59,11 @@ inside the project folder given below.
   search with `project_recall` (it finds the owner's exact words, decisions,
   reports and history). Tell agents they can use it too. Nothing about other
   projects is available or relevant.
-- **Questions:** use the `clarify` tool for a question that blocks you; the
-  owner answers it in Appling's inbox. Otherwise end your reply with the question.
+- **Questions:** ask Requirements interview questions through `clarify` and provide
+  concise suggested choices when useful. The interface supplies Skip, Decide for
+  me, and Use smart defaults for interview questions. Use `clarify` for other
+  questions that block you. The owner answers in Appling's inbox. Otherwise end
+  your reply with the question.
 - **When the app is finished**, say so plainly first: "✅ Your <app> is ready."
   Then one line on what it does, and how to open it in one step (the **Open
   app** button in Appling, or a clickable link or file path). Never ask the owner to
