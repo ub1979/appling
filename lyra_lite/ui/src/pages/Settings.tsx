@@ -224,11 +224,12 @@ interface AgentModelProps {
   onSave: (selection: ModelSelection | null) => Promise<void>;
 }
 
-function AgentModel({ agent, options, onSave }: AgentModelProps) {
+export function AgentModel({ agent, options, onSave }: AgentModelProps) {
   const initial = agent.selection ?? agent.default;
   const [provider, setProvider] = useState(initial?.provider ?? "");
   const [model, setModel] = useState(initial?.model ?? "");
   const [effort, setEffort] = useState(initial?.effort ?? "");
+  const [customModel, setCustomModel] = useState(false);
   const [saving, setSaving] = useState(false);
   const [problem, setProblem] = useState<string | null>(null);
   const providers = options?.providers ?? [];
@@ -246,6 +247,7 @@ function AgentModel({ agent, options, onSave }: AgentModelProps) {
         setProvider(agent.default?.provider ?? "");
         setModel(agent.default?.model ?? "");
         setEffort(agent.default?.effort ?? "");
+        setCustomModel(false);
       }
     } catch (e) {
       setProblem(e instanceof Error ? e.message : String(e));
@@ -264,6 +266,7 @@ function AgentModel({ agent, options, onSave }: AgentModelProps) {
             const chosen = e.target.value;
             setProvider(chosen);
             setModel(providers.find((p) => p.slug === chosen)?.models[0] ?? "");
+            setCustomModel(false);
           }}>
             <option value="">Choose a provider</option>
             {provider && !providers.some((p) => p.slug === provider) && <option value={provider}>{provider}</option>}
@@ -272,10 +275,26 @@ function AgentModel({ agent, options, onSave }: AgentModelProps) {
         </label>
         <label>
           <span className="field-label">Model</span>
-          <input className="input" list={`models-${agent.id}`} value={model} onChange={(e) => setModel(e.target.value)}
-            placeholder="Choose or enter a model ID" />
-          <datalist id={`models-${agent.id}`}>{models.map((m) => <option key={m} value={m} />)}</datalist>
+          <select className="input" aria-label={`${agent.label} model`}
+            value={customModel ? ":custom-model:" : model}
+            onChange={(e) => {
+              const custom = e.target.value === ":custom-model:";
+              setCustomModel(custom);
+              setModel(custom ? "" : e.target.value);
+            }}>
+            <option value="">Choose a model</option>
+            {!customModel && model && !models.includes(model) && <option value={model}>{model} (saved)</option>}
+            {models.map((m) => <option key={m} value={m}>{m}</option>)}
+            <option value=":custom-model:">Enter a custom model ID…</option>
+          </select>
         </label>
+        {customModel && (
+          <label>
+            <span className="field-label">Custom model ID</span>
+            <input className="input" value={model} onChange={(e) => setModel(e.target.value)}
+              placeholder="Enter the provider’s model ID" autoFocus />
+          </label>
+        )}
         <label>
           <span className="field-label">Effort</span>
           <select className="input" value={effort} onChange={(e) => setEffort(e.target.value)}>
