@@ -7,6 +7,7 @@ from lyra_lite.review import PROTOTYPE_CHOICES, requirements_revision
 from tests.fakes.fake_openai_server import FakeOpenAIServer, text_step, tool_step
 from tests.lyra_lite.test_requirements_approval import DRAFT, APPROVED
 from tests.lyra_lite.test_lyrad_real_path import Daemon, _events, _new_project, _wait_event, _write_config, env  # noqa: F401
+from lyra_lite.store import ProjectStore
 
 
 @pytest.mark.parametrize("start_agent", [True, False])
@@ -58,5 +59,34 @@ def test_acknowledgement_only_model_cannot_strand_either_approval(env, start_age
             assert len(handoffs) == 1
             if start_agent:
                 assert not any(e['type'] == 'problem' and e.get('kind') == 'workflow_stalled' for e in _events(root))
+        finally:
+            daemon.stop()
+
+
+def test_model_opened_requirements_card_contains_the_actual_draft_and_reopens_after_restart(env):
+    from lyra_lite.review import REQUIREMENTS_CHOICES, prototype_revision
+
+    with FakeOpenAIServer([]) as llm:
+        _write_config(env['hermes_home'], llm.base_url, lyra_lite={'watchdog': {'enabled': False}})
+        daemon = Daemon(env).start()
+        try:
+            pid, root = _new_project(daemon, env, 'Visible requirements')
+            (root / 'prototypes').mkdir()
+            (root / 'prototypes/index.html').write_text('<button>Try task list</button>')
+            (root / 'requirements.md').write_text(DRAFT)
+            ProjectStore(root).update_state(project_kind='app', requirements_review=True,
+                                           prototype_approved=prototype_revision(root))
+            llm.script = [tool_step('clarify', {'question': 'Approve these requirements?',
+                                               'choices': list(REQUIREMENTS_CHOICES)})]
+            prefix = f'/api/projects/{pid}'
+            assert daemon.post(prefix + '/messages', {'text': 'Show requirements review'}).is_success
+            item = _wait_event(root, lambda e: e['type'] == 'inbox' and e['item']['kind'] == 'requirements')['item']
+            assert DRAFT in item['question']
+            assert DRAFT in daemon.get(prefix).json()['inbox'][0]['question']
+            daemon.stop()
+            daemon = Daemon(env).start()
+            assert daemon.get(prefix).json()['review_recovery']['id'] == item['id']
+            assert daemon.post(prefix + '/review/reopen', {'item_id': item['id']}).is_success
+            assert DRAFT in daemon.get(prefix).json()['inbox'][0]['question']
         finally:
             daemon.stop()

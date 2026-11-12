@@ -156,8 +156,8 @@ export function Studio({ id }: { id: string }) {
   }, [id, load]);
 
   useEffect(() => {
-    if (live.turnsEnded > 0 || live.helperChanges > 0 || live.answersChanged > 0) void load();
-  }, [live.turnsEnded, live.helperChanges, live.answersChanged, load]);
+    if (live.turnsEnded > 0 || live.helperChanges > 0 || live.answersChanged > 0 || live.conversationChanges > 0) void load();
+  }, [live.turnsEnded, live.helperChanges, live.answersChanged, live.conversationChanges, load]);
 
   useEffect(() => {
     const timer = window.setInterval(() => void load().catch(() => undefined), 3000);

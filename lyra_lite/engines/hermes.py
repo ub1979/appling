@@ -349,8 +349,13 @@ class HermesEngine:
                     if not prototype or prototype != state.get("prototype_approved"):
                         return "The owner must open and approve the current clickable prototype first."
                 self.store.update_state(requirements_review=True, requirements_started=True)
+                draft = (root / "requirements.md").read_text(encoding="utf-8")
+                question = str(question)
+                if draft not in question:
+                    question += "\n\n---\n\n" + draft
                 return self._ask_blocking(
-                    "requirements", question=str(question), choices=list(review.REQUIREMENTS_CHOICES),
+                    "requirements", question=question,
+                    choices=list(review.REQUIREMENTS_CHOICES),
                     revision=revision, prototype=prototype, timeout=None,
                     on_timeout="Requirements approval is still pending. Wait for the owner.",
                 )

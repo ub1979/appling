@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import time
+import threading
 from pathlib import Path
 
 from lyra_lite.engines.base import TurnResult
@@ -103,3 +104,33 @@ def test_agent_report_keeps_its_origin_in_the_saved_conversation():
 
     report = display_messages([{"role": "user", "kind": "helper_done", "content": "Discovery complete"}])
     assert report == [{"role": "user", "kind": "system", "content": "Discovery complete"}]
+
+
+def test_intermediate_explanation_is_durable_before_the_turn_finishes(tmp_path):
+    ready, release = threading.Event(), threading.Event()
+
+    class ExplainingEngine(CompressingEngine):
+        def run_turn(self, text, history, hooks):
+            hooks.emit("interim", text="Here is the draft for review.", already_streamed=True)
+            ready.set()
+            assert release.wait(10)
+            return TurnResult(reply="Now choose an option.", messages=history)
+
+    store = ProjectStore(tmp_path / "explanations")
+    runner = ProjectRunner(store, lambda s, key: ExplainingEngine())
+    try:
+        runner.submit("Build a task list")
+        assert ready.wait(10)
+        reopened = ProjectStore(store.root)
+        assert [m["content"] for m in reopened.conversation()] == [
+            "Build a task list", "Here is the draft for review."]
+        assert reopened.messages() == []  # UI persistence never mutates cached model context.
+        release.set()
+        deadline = time.monotonic() + 10
+        while runner.snapshot()["running"] and time.monotonic() < deadline:
+            time.sleep(.02)
+        assert [m["content"] for m in reopened.conversation()] == [
+            "Build a task list", "Here is the draft for review.", "Now choose an option."]
+    finally:
+        release.set()
+        runner.shutdown()

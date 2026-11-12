@@ -228,11 +228,33 @@ class ProjectStore:
     def transcript(self) -> list[dict]:
         return self._read_jsonl(self.transcript_path)
 
+    def record_turn_start(self, turn: dict) -> None:
+        """Save the owner's message before any intermediate replies can arrive."""
+        started = turn.get("started") or round(time.time(), 3)
+        with self._lock:
+            if any(e.get("role") == "user" and (
+                       e.get("turn") == turn["id"] or
+                       (not e.get("turn") and e.get("ts") == turn.get("started")
+                        and e.get("content") == turn["text"]))
+                   for e in self.transcript()):
+                return
+            self.append_transcript([{
+                "role": "user", "content": turn["text"], "ts": started,
+                "kind": turn.get("kind", "user"), "turn": turn["id"],
+            }])
+
     def conversation(self) -> list[dict]:
         """Project chat plus answered questions, including older saved interviews."""
         entries = self.transcript()
         state = self.state()
         turn = state.get("turn")
+        if turn:
+            for entry in entries:
+                if entry.get("role") == "user" and (
+                    entry.get("turn") == turn.get("id") if entry.get("turn")
+                    else entry.get("ts") == turn.get("started")
+                ):
+                    entry["active"] = True
         if turn and not any(e.get("ts") == turn.get("started") and e.get("role") == "user" for e in entries):
             entries.append({"role": "user", "content": turn["text"], "ts": turn.get("started"),
                             "kind": turn.get("kind"), "active": True})

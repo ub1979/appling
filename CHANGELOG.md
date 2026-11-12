@@ -9,6 +9,19 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.10 beta — 2026-11-12
+
+Desktop package 0.17.10-beta.1.
+
+- Allow the Design agent to prepare the clickable prototype before owner approval,
+  removing a circular approval gate. Keep implementation behind owner review.
+- Keep intermediate explanations in the durable conversation, in order with the
+  owner’s messages, without changing cached model context.
+- Show the actual requirements draft inside both new and recovered review cards.
+- Verify these paths through the real daemon, delegation and restart recovery.
+- Live-test a fresh Personal project through prototype, requirements, plan,
+  development, independent QA and final acceptance using Appling's own agents.
+
 ### Appling v0.17.9 beta — 2026-11-11
 
 Desktop package 0.17.9-beta.1.
@@ -442,6 +455,15 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.31-a] - 2026-11-12 — Visible reviews and reliable handoffs
+
+Appling v0.17.10 beta. Desktop package 0.17.10-beta.1.
+
+- Design can prepare the artifact required by the prototype review. Development
+  still waits for owner approval. No new command restrictions or tool changes.
+- Save intermediate explanations in the file-backed transcript and show the
+  actual requirements draft in its approval card, including after restart.
 
 ## [0.19.30-a] - 2026-11-11 — Restore agent workflow and visible reviews
 

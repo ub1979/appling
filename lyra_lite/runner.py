@@ -74,7 +74,14 @@ class _Hooks:
         self.turn_id: str | None = None
 
     def emit(self, type_: str, **data: Any) -> None:
-        self.runner.store.append_event(type_, turn=self.turn_id, **data)
+        event = self.runner.store.append_event(type_, turn=self.turn_id, **data)
+        if type_ == "interim" and str(data.get("text") or "").strip():
+            # Intermediate explanations are owner-facing conversation too.
+            # Persist them independently of the engine's cached message history.
+            self.runner.store.append_transcript([{
+                "role": "assistant", "content": str(data["text"]), "kind": "interim",
+                "turn": self.turn_id, "ts": event["ts"],
+            }])
 
     def ask(self, kind: str, on_answer: Callable[[Any], None], **fields: Any) -> str:
         # Permission waits own their lifetime: a helper may ask during an
@@ -349,6 +356,10 @@ class ProjectRunner:
                 raise RuntimeError("This review is no longer current. Ask Appling to share the latest draft.")
             self.store.update_state(paused=False)
             fields = {k: item[k] for k in ("question", "choices", "revision", "prototype", "requirements", "path") if k in item}
+            if item["kind"] == "requirements":
+                draft = (self.root / "requirements.md").read_text(encoding="utf-8")
+                if draft not in fields.get("question", ""):
+                    fields["question"] = fields.get("question", "Review these requirements.") + "\n\n---\n\n" + draft
             return self._open_review_decision(item["kind"], **fields)
 
     def _open_review_decision(self, kind: str, **fields) -> str:
@@ -745,9 +756,8 @@ class ProjectRunner:
             messages.append({"role": "assistant", "content": RESTART_NOTE})
             self.store.save_messages(messages)
             recovered_at = round(time.time(), 3)
+            self.store.record_turn_start(turn)
             self.store.append_transcript([
-                {"role": "user", "content": user_text, "ts": turn.get("started") or recovered_at,
-                 "kind": turn.get("kind", "user")},
                 {"role": "assistant", "content": RESTART_NOTE, "ts": recovered_at},
             ])
             self.store.append_event("turn_end", turn=turn.get("id"), status="lost_on_restart",
@@ -814,6 +824,7 @@ class ProjectRunner:
         turn_id = turn["id"]
         self.store.append_event("turn_start", turn=turn_id, kind=turn["kind"], text=turn["text"],
                                 display=turn.get("display"))
+        self.store.record_turn_start(turn)
         hooks = self._hooks
         hooks.turn_id = turn_id
         state = self.store.state()
@@ -839,8 +850,8 @@ class ProjectRunner:
         # context compression replaces old turns with a summary on purpose.
         # The owner's full chat lives in the append-only transcript.
         now = round(time.time(), 3)
-        entries = [{"role": "user", "content": turn["text"], "ts": turn.get("started") or now,
-                    "kind": turn.get("kind", "user")}]
+        self.store.record_turn_start(turn)
+        entries = []
         if result.reply:
             entries.append({"role": "assistant", "content": result.reply, "ts": now})
         self.store.append_transcript(entries)

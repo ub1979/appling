@@ -5,6 +5,16 @@ const feed = (events: Partial<LyraEvent>[]) =>
   events.reduce((s, e, i) => applyEvent(s, { ts: i, type: "", ...e } as LyraEvent), emptyLive());
 
 describe("applyEvent", () => {
+  it("moves completed commentary from streaming text to the saved conversation", () => {
+    const state = feed([
+      { type: "turn_start", turn: "t", text: "Build" },
+      { type: "delta", text: "Here is the draft." },
+      { type: "interim", text: "Here is the draft.", already_streamed: true },
+    ]);
+    expect(state.turn?.reply).toBe("");
+    expect(state.conversationChanges).toBe(1);
+    expect(applyEvent(state, { ts: 9, type: "delta", text: "Next step" }).turn?.reply).toBe("Next step");
+  });
   it("builds the streaming reply and clears it at turn end", () => {
     const mid = feed([
       { type: "queued", item: { id: "t1", text: "hi" } },

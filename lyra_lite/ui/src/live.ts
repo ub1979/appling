@@ -60,6 +60,7 @@ export interface LiveState {
   turn: LiveTurn | null;
   queued: { id: string; text: string; kind: string; display?: string }[];
   answersChanged: number;
+  conversationChanges: number;
   inbox: InboxItem[];
   activity: ActivityItem[];
   helpers: Record<string, Helper>;
@@ -86,6 +87,7 @@ export const emptyLive = (since = 0): LiveState => ({
   helpers: {},
   turnsEnded: 0,
   answersChanged: 0,
+  conversationChanges: 0,
   helperChanges: 0,
   paused: false,
   lastProblem: null,
@@ -143,6 +145,9 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
     case "delta":
       if (!state.turn) return state;
       return { ...state, turn: { ...state.turn, reply: state.turn.reply + str(evt.text) } };
+    case "interim":
+      return { ...state, conversationChanges: state.conversationChanges + 1,
+        turn: state.turn ? { ...state.turn, reply: "" } : null };
     case "tool": {
       if (evt.phase !== "start") return state;
       return {

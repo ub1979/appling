@@ -141,7 +141,9 @@ def dispatch_project_tasks(store, agent, args: dict) -> str:
     report = review.change_report(root, update, requirements) if update and requirements else None
     ready = report is not None and review.change_review_ready(report)
     for agent_id in identities:
-        if agent_id in {"req-engineer", "researcher"}:
+        # Design prepares the clickable prototype that the owner must review.
+        # Requiring that review before design can start creates a circular gate.
+        if agent_id in {"req-engineer", "researcher", "ui-designer"}:
             continue
         if approval_required and not approved:
             if requirements and state.get("requirements_approved") and requirements != state["requirements_approved"]:
