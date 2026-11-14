@@ -935,6 +935,9 @@ DEFAULT_CONFIG = {
     "lyra_lite": {
         # Appling's persistent provider/model/effort selection for each agent.
         "agent_models": {},
+        "status_updates": {"enabled": True, "interval_seconds": 300},
+        # One development lead may fan out to isolated coding workers.
+        "parallel_development": {"enabled": True, "max_workers": 3},
     },
     "providers": {},
     "fallback_providers": [],

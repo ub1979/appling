@@ -145,6 +145,8 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
     case "delta":
       if (!state.turn) return state;
       return { ...state, turn: { ...state.turn, reply: state.turn.reply + str(evt.text) } };
+    case "status_update":
+      return { ...state, conversationChanges: state.conversationChanges + 1 };
     case "interim":
       return { ...state, conversationChanges: state.conversationChanges + 1,
         turn: state.turn ? { ...state.turn, reply: "" } : null };

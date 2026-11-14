@@ -241,6 +241,15 @@ Rules: split anything larger than L into M/S tasks; each task completable in one
 - Right-size: the smallest unit with its own test cycle, one agent invocation. If you can't describe "done", it's too big or too vague.
 - Fit one helper (Reusable/Production): a task must be finishable by one developer helper within about 60 tool calls, including reading, testing, and committing — roughly one user-visible behavior touching at most ~5 files. Split anything bigger, but do not split below a coherent slice: every task costs a fresh agent start-up. For Personal projects prefer fewer, larger slices (see the profile section above).
 - Name file ownership: list the files each task creates or changes. Tasks in the same wave must not share files, so they can run as parallel helpers.
+- In Appling, group independent coding work under one development lead, which
+  can assign up to three isolated coding workers when the host enables it.
+  Establish shared schemas/interfaces and dependencies first; keep shared
+  configuration, manifests/lockfiles and project summaries with that lead.
+  A smaller task size is not itself a dependency: do not chain every slice to
+  its immediate predecessor just to fit an agent budget. State the real input
+  contract for every serial dependency and reserve combined validation after
+  each integration wave. Preserve ordinary serial execution when the host
+  cannot provide isolated workers.
 - UI tasks cite specific design-system values: "Input (40px height, 8px radius), Primary button (md), error color for validation"; "single column < 768px, two-column > 1024px".
 
 ### Task Interface Contracts (mandatory for every task)

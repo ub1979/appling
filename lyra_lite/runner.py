@@ -118,6 +118,9 @@ class ProjectRunner:
         # Problems from before this start belong to an earlier run of Appling.
         self.started_at = round(time.time(), 3)
         self._recover()
+        from lyra_lite.status_updates import StatusUpdates
+
+        self._status_updates = StatusUpdates(self.store)
         self._thread = threading.Thread(
             target=self._loop, name=f"lyra-runner-{store.root.name}", daemon=True
         )
@@ -604,6 +607,13 @@ class ProjectRunner:
                 raise RuntimeError("Appling is busy; try again when it's idle")
             self._drop_engine()
         self.store.append_event("rules_applied")
+
+    def status_tick(self, settings: dict | None = None, now: float | None = None) -> str | None:
+        # Coordinate with Stop/new-chat so an old note cannot land in a new chat.
+        with self._cond:
+            if self._stop:
+                return None
+            return self._status_updates.tick(self.snapshot(), settings, now)
 
     def watchdog_tick(self, settings: dict | None = None, now: float | None = None) -> str:
         """Nudge an idle project with unfinished work. Returns the reason."""

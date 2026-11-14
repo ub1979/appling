@@ -182,6 +182,23 @@ def dispatch_project_tasks(store, agent, args: dict) -> str:
         ]
         single = False
 
+    if getattr(agent, "_appling_development_leads", False):
+        if identities.count("sw-developer") > 1:
+            return json.dumps({"error": "Assign one development lead; it can delegate independent coding work in isolated worktrees."})
+        if "sw-developer" in identities:
+            from tools.async_delegation import list_async_delegations
+
+            if any(r.get("session_key") == agent.session_id and r.get("status") == "running"
+                   and any(agent_for_goal(g) == "sw-developer" for g in (r.get("goals") or [r.get("goal", "")]))
+                   for r in list_async_delegations()):
+                return json.dumps({"error": "The development lead is already running. Wait for its report."})
+        from lyra_lite.development import LEAD_CONTEXT
+
+        batch = [{**task, "role": "orchestrator" if identity == "sw-developer" else "leaf",
+                  "context": str(task.get("context") or "") + (LEAD_CONTEXT if identity == "sw-developer" else "")}
+                 for task, identity in zip(batch, identities)]
+        single = False
+
     preferences = settings.agent_model_overrides()
     runtimes = []
     legacy_models = state.get("models") or {}

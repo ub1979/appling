@@ -574,7 +574,7 @@ def _run_child_to_completion(child: Any, run_turn: Callable[..., Dict[str, Any]]
     return result
 
 
-def _get_max_spawn_depth() -> int:
+def _get_max_spawn_depth(parent_agent=None) -> int:
     """Read delegation.max_spawn_depth from config, floored at 1 (no ceiling).
 
     depth 0 = parent agent.  max_spawn_depth = N means agents at depths
@@ -588,7 +588,12 @@ def _get_max_spawn_depth() -> int:
     max_spawn_depth >= 2, enabling them to spawn their own workers.
     Like max_concurrent_children, there is no upper ceiling — but each
     extra level multiplies API cost, so raise it deliberately.
+    Trusted hosts can pin a ceiling on an individual agent without changing
+    the process-wide default or unrelated conversations.
     """
+    scoped = getattr(parent_agent, "_delegate_max_spawn_depth", None)
+    if isinstance(scoped, int) and not isinstance(scoped, bool) and scoped >= 1:
+        return scoped
     cfg = _load_config()
     val = cfg.get("max_spawn_depth")
     if val is None:
@@ -1224,6 +1229,7 @@ def _build_child_agent(
     # toolset subject to depth/kill-switch bounds applied below.
     role: str = "leaf",
     override_reasoning: Optional[Dict[str, Any]] = None,
+    override_workspace: Optional[str] = None,
 ):
     """
     Build a child AIAgent on the main thread (thread-safe construction).
@@ -1244,7 +1250,7 @@ def _build_child_agent(
     # the normalised role (_normalize_role ran in delegate_task) so
     # we only deal with 'leaf' or 'orchestrator' here.
     child_depth = getattr(parent_agent, "_delegate_depth", 0) + 1
-    max_spawn = _get_max_spawn_depth()
+    max_spawn = _get_max_spawn_depth(parent_agent)
     orchestrator_ok = _get_orchestrator_enabled() and child_depth < max_spawn
     effective_role = role if (role == "orchestrator" and orchestrator_ok) else "leaf"
 
@@ -1325,7 +1331,7 @@ def _build_child_agent(
     if effective_role == "orchestrator" and "delegation" not in child_toolsets:
         child_toolsets.append("delegation")
 
-    workspace_hint = _resolve_workspace_hint(parent_agent)
+    workspace_hint = override_workspace or _resolve_workspace_hint(parent_agent)
     child_prompt = _build_child_system_prompt(
         goal,
         context,
@@ -1511,7 +1517,9 @@ def _build_child_agent(
 
     from agent.delegation_context import delegated_child_context
 
-    with delegated_child_context():
+    from agent.runtime_cwd import working_directory
+
+    with delegated_child_context(), working_directory(override_workspace):
         child = AIAgent(
             base_url=effective_base_url,
             api_key=effective_api_key,
@@ -1558,11 +1566,22 @@ def _build_child_agent(
     # Now the child exists, its session id can ride on every relayed event
     # (including the spawn_requested below — first emit happens after this).
     child_session_ref["session_id"] = getattr(child, "session_id", "") or ""
-    # Set delegation depth so children can't spawn grandchildren
+    # Record this child's position and its inherited, conversation-scoped cap.
     child._delegate_depth = child_depth
+    child._delegate_max_spawn_depth = max_spawn
+    child._delegate_workspace = override_workspace
+    if override_workspace:
+        child.terminal_cwd = override_workspace
     # Stash the post-degrade role for introspection (leaf if the
     # kill switch or depth bounded the caller's requested role).
     child._delegate_role = effective_role
+    if effective_role == "orchestrator":
+        # Set descriptions once, before this child's first request. A host's
+        # scoped depth must not be contradicted by the global default schema.
+        for tool in child.tools:
+            function = tool.get("function", {})
+            if function.get("name") == "delegate_task":
+                function.update(_build_dynamic_schema_overrides(child))
     # Stash subagent identity for nested-delegation event propagation and
     # for _run_single_child / interrupt_subagent to look up by id.
     child._subagent_id = subagent_id
@@ -1584,6 +1603,12 @@ def _build_child_agent(
     )
     if child_pool is not None:
         child._credential_pool = child_pool
+
+    # A trusted host can configure its children before their first request.
+    # No model-facing schema or global configuration is changed.
+    configure = getattr(parent_agent, "_configure_delegate_child", None)
+    if callable(configure):
+        configure(child, goal=goal, role=effective_role)
 
     # Register child for interrupt propagation
     if hasattr(parent_agent, "_active_children"):
@@ -2135,9 +2160,12 @@ def _run_single_child(
         # isolated in its own record (a child's cd no longer bleeds back into
         # the parent once readers flip to the record store).
         try:
-            from tools.terminal_tool import get_session_cwd, record_session_cwd
+            from tools.terminal_tool import get_session_cwd, record_session_cwd, register_task_env_overrides
 
-            record_session_cwd(child_task_id, get_session_cwd(parent_task_id))
+            workspace = getattr(child, "_delegate_workspace", None)
+            record_session_cwd(child_task_id, workspace or get_session_cwd(parent_task_id))
+            if workspace:
+                register_task_env_overrides(child_task_id, {"cwd": workspace})
         except Exception as e:
             logger.debug("Child cwd seed failed: %s", e)
         wall_start = time.time()
@@ -2183,7 +2211,9 @@ def _run_single_child(
             _worker_thread_holder["t"] = threading.current_thread()
             from agent.delegation_context import delegated_child_context
 
-            with delegated_child_context(subagent_id=child_task_id, goal=goal, model=str(getattr(child, "model", "") or "")):
+            from agent.runtime_cwd import working_directory
+
+            with delegated_child_context(subagent_id=child_task_id, goal=goal, model=str(getattr(child, "model", "") or "")), working_directory(getattr(child, "_delegate_workspace", None)):
                 return _run_child_to_completion(
                     child,
                     lambda **turn: child.run_conversation(
@@ -2695,9 +2725,9 @@ def delegate_task(
     background = is_truthy_value(background, default=False) if background is not None else False
 
     # Depth limit — configurable via delegation.max_spawn_depth,
-    # default 2 for parity with the original MAX_DEPTH constant.
+    # default 1 (flat), unless a trusted host pins a scoped ceiling.
     depth = getattr(parent_agent, "_delegate_depth", 0)
-    max_spawn = _get_max_spawn_depth()
+    max_spawn = _get_max_spawn_depth(parent_agent)
     if depth >= max_spawn:
         return json.dumps(
             {
@@ -2879,6 +2909,7 @@ def delegate_task(
                 override_acp_args=runtime.get("args"),
                 role=effective_role,
                 override_reasoning=runtime.get("reasoning"),
+                override_workspace=runtime.get("workspace"),
             )
             # Override with correct parent tool names (before child construction mutated global)
             child._delegate_saved_tool_names = _parent_tool_names
@@ -3637,7 +3668,7 @@ def _load_config() -> dict:
 # ---------------------------------------------------------------------------
 
 
-def _build_top_level_description() -> str:
+def _build_top_level_description(parent_agent=None) -> str:
     """Compose the delegate_task tool description with current runtime limits.
 
     The model needs to know its actual ceilings (not the framework defaults),
@@ -3651,7 +3682,7 @@ def _build_top_level_description() -> str:
     except Exception:
         max_children = _DEFAULT_MAX_CONCURRENT_CHILDREN
     try:
-        max_depth = _get_max_spawn_depth()
+        max_depth = _get_max_spawn_depth(parent_agent)
     except Exception:
         max_depth = MAX_DEPTH
     try:
@@ -3761,10 +3792,10 @@ def _build_tasks_param_description() -> str:
     )
 
 
-def _build_role_param_description() -> str:
+def _build_role_param_description(parent_agent=None) -> str:
     """Compose the 'role' parameter description with current spawn-depth limit."""
     try:
-        max_depth = _get_max_spawn_depth()
+        max_depth = _get_max_spawn_depth(parent_agent)
     except Exception:
         max_depth = MAX_DEPTH
     try:
@@ -3798,7 +3829,7 @@ def _build_role_param_description() -> str:
     )
 
 
-def _build_dynamic_schema_overrides() -> dict:
+def _build_dynamic_schema_overrides(parent_agent=None) -> dict:
     """Return per-call schema overrides reflecting current config.
 
     Plugged into ToolEntry.dynamic_schema_overrides so every
@@ -3813,10 +3844,10 @@ def _build_dynamic_schema_overrides() -> dict:
         k: dict(v) for k, v in DELEGATE_TASK_SCHEMA["parameters"]["properties"].items()
     }
     overrides_params["properties"]["tasks"]["description"] = _build_tasks_param_description()
-    overrides_params["properties"]["role"]["description"] = _build_role_param_description()
+    overrides_params["properties"]["role"]["description"] = _build_role_param_description(parent_agent)
 
     return {
-        "description": _build_top_level_description(),
+        "description": _build_top_level_description(parent_agent),
         "parameters": overrides_params,
     }
 

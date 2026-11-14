@@ -164,7 +164,7 @@ def display_messages(messages: list[dict]) -> list[dict]:
         if m.get("kind") == "helper_done" or text.startswith("[ASYNC DELEGATION"):
             out.append({"role": "user", "content": text, "kind": "system", **active})
             continue
-        if m.get("kind") in {"question", "answer"}:
+        if m.get("kind") in {"question", "answer", "status"}:
             out.append({"role": role, "content": text, "kind": m["kind"]})
             continue
         internal = agents.describe_internal(text) if role == "user" else None
@@ -227,19 +227,22 @@ class Lyra:
 
     def _watchdog_loop(self) -> None:
         while True:
-            settings = lyra_settings().get("watchdog") or {}
+            config = lyra_settings()
+            settings = config.get("watchdog") or {}
             if self._stop.wait(float(settings.get("check_seconds") or 30)):
                 return
-            if settings.get("enabled") is False:
-                continue
             with self._lock:
                 runners = list(self.runners.values())
             for runner in runners:
                 try:
-                    runner.watchdog_tick(settings)
+                    runner.status_tick(config.get("status_updates"))
                 except Exception:
-                    logger.warning("lyra-lite: watchdog check failed for %s", runner.root,
-                                   exc_info=True)
+                    logger.warning("lyra-lite: status update failed for %s", runner.root, exc_info=True)
+                if settings.get("enabled") is not False:
+                    try:
+                        runner.watchdog_tick(settings)
+                    except Exception:
+                        logger.warning("lyra-lite: watchdog check failed for %s", runner.root, exc_info=True)
 
     def shutdown(self) -> None:
         self._stop.set()

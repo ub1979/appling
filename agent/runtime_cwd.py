@@ -12,6 +12,7 @@ contextvar; CLI/cron fall through to `TERMINAL_CWD`/launch cwd.
 
 import logging
 import os
+from contextlib import contextmanager
 from contextvars import ContextVar, Token
 from pathlib import Path
 from typing import Any
@@ -48,6 +49,17 @@ def set_session_cwd(cwd: str | None) -> Token:
 
 def clear_session_cwd() -> None:
     _SESSION_CWD.set("")
+
+
+@contextmanager
+def working_directory(cwd: str | None):
+    """Temporarily pin a worker's cwd without changing process-global state."""
+    token = set_session_cwd(cwd) if cwd else None
+    try:
+        yield
+    finally:
+        if token is not None:
+            _SESSION_CWD.reset(token)
 
 
 def _session_cwd_override() -> str:

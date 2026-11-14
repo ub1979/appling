@@ -405,6 +405,15 @@ whole project: the build profile; the task's id and text from `task-graph.md`
 to read the Project Brain first, then only the files its task needs, and to
 finish with tests run, its files committed, and the Project Brain refreshed.
 
+In Appling, assign one `sw-developer:` lead for an implementation wave. When
+the host grants that lead nested delegation, it may run independent coding
+tasks in separate Git worktrees using the host's ownership contract. Shared
+interfaces, manifests/lockfiles and Project Brain stay with the lead. Do not
+start competing development leads against the same primary worktree. Keep
+genuine dependencies serial; do not turn list order into a dependency. Treat
+integration as provisional until the lead runs the combined checks. If the
+host declines parallel work, continue serially without bypassing its guards.
+
 Work through the enabled team one phase at a time, in the umbrella's delivery
 order, and do not stop after a single phase: when one finishes, mark it done and
 start the next one in the same flow. Do not do a specialist's work yourself

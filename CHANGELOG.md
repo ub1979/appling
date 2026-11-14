@@ -9,6 +9,21 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.11 beta — 2026-11-14
+
+Desktop package 0.17.11-beta.1.
+
+- Add five-minute status notes from recorded activity, without model calls or
+  changes to cached conversation history. Stay quiet while idle, paused or
+  waiting for the owner; describe quiet AI waits without claiming a stall.
+- Let one development lead delegate up to three independent coding tasks into
+  separate Git worktrees. Reject overlapping ownership and integrate completed
+  work in a temporary worktree before advancing an unchanged, clean project.
+- Preserve failed/interrupted work for recovery and require combined validation
+  before completion. Keep existing approval gates and global delegation defaults.
+- Save the previous working version at the annotated Git tag
+  `appling-nice-working-one-2026-11-14` (`837289168`).
+
 ### Appling v0.17.10 beta — 2026-11-12
 
 Desktop package 0.17.10-beta.1.
@@ -455,6 +470,14 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.32-a] - 2026-11-14 — Status updates and isolated coding teams
+
+Appling v0.17.11 beta. Desktop package 0.17.11-beta.1.
+
+- Display periodic activity summaries without injecting model messages.
+- Scope development orchestration to Appling and isolate coding workers in
+  checked Git worktrees. Keep failed integrations away from the primary project.
 
 ## [0.19.31-a] - 2026-11-12 — Visible reviews and reliable handoffs
 

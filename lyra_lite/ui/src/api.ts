@@ -23,7 +23,7 @@ export interface ChatMessage {
   active?: boolean;
   role: "user" | "assistant";
   content: string;
-  kind: "chat" | "system" | "auto" | "question" | "answer";
+  kind: "chat" | "system" | "auto" | "question" | "answer" | "status";
 }
 
 export interface QueueItem {

@@ -90,7 +90,7 @@ function clean(raw: string, ids: string[]): { text: string; proposal: string[] |
 }
 
 function shownMessage(m: ChatMessage, ids: string[]): Shown {
-  if (m.kind === "auto") return { active: m.active, role: "note", text: m.content, proposal: null };
+  if (m.kind === "auto" || m.kind === "status") return { active: m.active, role: "note", text: m.content, proposal: null };
   if (m.kind === "system") return { active: m.active, role: "report", text: m.content, proposal: null };
   if (m.role === "user") return { active: m.active, role: "user", text: m.content, proposal: null };
   const c = clean(m.content, ids);

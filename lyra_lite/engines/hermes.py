@@ -221,6 +221,10 @@ class HermesEngine:
         from lyra_lite.coordinator import make_coordinator
 
         make_coordinator(agent)
+        if self.store is not None:
+            from lyra_lite.development import install_development_policy
+
+            install_development_policy(agent, self.store)
         return agent
 
     # -- callbacks (run on agent threads) --------------------------------

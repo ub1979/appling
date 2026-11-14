@@ -26,6 +26,19 @@ Website projects receive the site checker and a template reference when availabl
 
 The coordinator delegates implementation to agents. Each agent writes its report back to the project. The optional **Keep going on its own** control can resume unfinished work after an idle period; it does not bypass owner questions or approvals.
 
+While work is active, Appling adds a status note every five minutes using the
+existing activity record. These notes do not call the AI or change its cached
+conversation. Idle/paused projects and questions awaiting the owner stay quiet.
+
+On the local terminal backend, one development lead can delegate up to three
+independent coding tasks into separate Git worktrees. Workers declare disjoint
+file ownership; shared interfaces, dependencies and project summaries stay with
+the lead. Completed work is checked in a temporary integration worktree before
+advancing an unchanged, clean project. Conflicts or incomplete workers retain
+their work for recovery. The lead still validates the combined build and tests.
+Configuration and rollback details are in
+[`2026-11-14-status-and-parallel-development.md`](../docs/lyra/2026-11-14-status-and-parallel-development.md).
+
 ## Verification
 
 Use the [hands-on walkthrough](HOW-TO-TEST.md) for a real small project. Local checks:

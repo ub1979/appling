@@ -99,6 +99,16 @@ describe("asksForApproval", () => {
 import { teamProposalForText } from "./pages/Studio";
 
 describe("conversation feedback", () => {
+  it("refreshes display-only status without replacing an in-flight reply", () => {
+    const running = feed([
+      { type: "turn_start", turn: "t", text: "Build", kind: "user" },
+      { type: "delta", text: "Working" },
+    ]);
+    const next = applyEvent(running, { ts: 301, type: "status_update", text: "Latest activity" });
+    expect(next.conversationChanges).toBe(running.conversationChanges + 1);
+    expect(next.turn).toEqual(running.turn);
+    expect(next.queued).toEqual(running.queued);
+  });
   it("retains the source and display text of queued agent reports", () => {
     const s = feed([{ type: "queued", item: { id: "report", kind: "helper_done", text: "[ASYNC DELEGATION BATCH COMPLETE]", display: "Requirements report" } }]);
     expect(s.queued[0].kind).toBe("helper_done");

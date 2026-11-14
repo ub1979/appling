@@ -23,6 +23,20 @@ Inline args: `--task-graph`, `--plan`, `--requirements`, `--task`, `--path`, `--
 
 ---
 
+## Appling development leads and coding workers
+
+When Appling grants the development lead `delegate_task`, the host's bounded
+worktree contract applies. The lead can parallelize independent modules after
+freezing their interfaces; dependent work stays serial. Each coding worker
+owns its declared files in its assigned worktree only. The lead owns shared
+schemas, dependency manifests/lockfiles, tooling configuration, `.sdlc/`
+artifacts and combined integration. Coding workers report their test evidence
+to the lead; they do not refresh the shared Project Brain or stage other
+workers' files. A blocked merge is a recovery checkpoint, not permission to
+reset or overwrite the primary project. The lead runs combined tests/build
+after integration before reporting completion. Without this host contract,
+use ordinary serial development. This does not add owner approval checkpoints.
+
 ## Step 0.5 — Load the playbook for this stack (NEVER Skip)
 
 Before writing code, load the guide that matches what is being built. Reading
