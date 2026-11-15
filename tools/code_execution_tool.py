@@ -561,6 +561,14 @@ def _call(tool_name, args):
 _TERMINAL_BLOCKED_PARAMS = {"background", "pty", "notify_on_complete", "watch_patterns"}
 
 
+def _dispatch_programmatic_tool(dispatch, tool_name, tool_args, task_id):
+    """Keep RPC reads machine-readable even after the chat has read that file."""
+    from tools.file_tools import programmatic_file_reads
+
+    with programmatic_file_reads():
+        return dispatch(tool_name, tool_args, task_id=task_id)
+
+
 def _rpc_server_loop(
     server_sock: socket.socket,
     task_id: str,
@@ -665,8 +673,8 @@ def _rpc_server_loop(
                     try:
                         sys.stdout = devnull
                         sys.stderr = devnull
-                        result = handle_function_call(
-                            tool_name, tool_args, task_id=task_id
+                        result = _dispatch_programmatic_tool(
+                            handle_function_call, tool_name, tool_args, task_id
                         )
                     finally:
                         sys.stdout, sys.stderr = _real_stdout, _real_stderr
@@ -950,8 +958,8 @@ def _rpc_poll_loop(
                         try:
                             sys.stdout = devnull
                             sys.stderr = devnull
-                            tool_result = handle_function_call(
-                                tool_name, tool_args, task_id=task_id
+                            tool_result = _dispatch_programmatic_tool(
+                                handle_function_call, tool_name, tool_args, task_id
                             )
                         finally:
                             sys.stdout, sys.stderr = _real_stdout, _real_stderr

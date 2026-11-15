@@ -8,6 +8,8 @@ import os
 import posixpath
 import sys
 import threading
+from contextlib import contextmanager
+from contextvars import ContextVar
 from pathlib import Path, PurePosixPath
 
 from agent.file_safety import get_read_block_error
@@ -21,6 +23,20 @@ from tools import file_state
 from agent.redact import redact_sensitive_text
 
 logger = logging.getLogger(__name__)
+
+# Scripts cannot recover file contents from the model's earlier chat messages.
+# This host-only scope changes delivery, never path/access/redaction policy.
+_programmatic_read = ContextVar("hermes_programmatic_file_read", default=False)
+
+
+@contextmanager
+def programmatic_file_reads():
+    token = _programmatic_read.set(True)
+    try:
+        yield
+    finally:
+        _programmatic_read.reset(token)
+
 
 
 _EXPECTED_WRITE_ERRNOS = {errno.EACCES, errno.EPERM, errno.EROFS}
@@ -1227,7 +1243,7 @@ def read_file_tool(path: str, offset: int = 1, limit: int = 500, task_id: str = 
                 task_data["read_timestamps"] = {}
             cached_mtime = task_data.get("dedup", {}).get(dedup_key)
 
-        if cached_mtime is not None:
+        if cached_mtime is not None and not _programmatic_read.get():
             try:
                 current_mtime = os.path.getmtime(resolved_str)
                 if current_mtime == cached_mtime:
@@ -1338,17 +1354,19 @@ def read_file_tool(path: str, offset: int = 1, limit: int = 500, task_id: str = 
                 task_data["dedup"] = {}
             if "dedup_hits" not in task_data:
                 task_data["dedup_hits"] = {}
-            # Real read succeeded — this key is no longer in a stub-loop, so
-            # reset its hit counter.  (File either changed or stat failed
-            # earlier and we fell through.)
-            task_data["dedup_hits"].pop(dedup_key, None)
-            task_data["read_history"].add((path, offset, limit))
-            if task_data["last_key"] == read_key:
-                task_data["consecutive"] += 1
-            else:
-                task_data["last_key"] = read_key
-                task_data["consecutive"] = 1
-            count = task_data["consecutive"]
+            count = 0
+            if not _programmatic_read.get():
+                # Real read succeeded — this key is no longer in a stub-loop, so
+                # reset its hit counter.  (File either changed or stat failed
+                # earlier and we fell through.)
+                task_data["dedup_hits"].pop(dedup_key, None)
+                task_data["read_history"].add((path, offset, limit))
+                if task_data["last_key"] == read_key:
+                    task_data["consecutive"] += 1
+                else:
+                    task_data["last_key"] = read_key
+                    task_data["consecutive"] = 1
+                count = task_data["consecutive"]
 
             # Store mtime at read time for two purposes:
             # 1. Dedup: skip identical re-reads of unchanged files.
@@ -1356,7 +1374,10 @@ def read_file_tool(path: str, offset: int = 1, limit: int = 500, task_id: str = 
             #    the agent last read it (external edit, concurrent agent, etc.).
             try:
                 _mtime_now = os.path.getmtime(resolved_str)
-                task_data["dedup"][dedup_key] = _mtime_now
+                # Only chat delivery can justify telling a later model call
+                # to refer back to content it has already seen.
+                if not _programmatic_read.get():
+                    task_data["dedup"][dedup_key] = _mtime_now
                 task_data.setdefault("read_timestamps", {})[resolved_str] = _mtime_now
             except OSError:
                 pass  # Can't stat — skip tracking for this entry
