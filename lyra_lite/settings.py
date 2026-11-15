@@ -258,3 +258,19 @@ def resolve_agent_model(agent_id: str | None, preferences: dict, legacy: dict) -
         except ValueError:
             continue
     return None
+
+
+def parallel_work_settings() -> dict:
+    from lyra_lite.workers import DEFAULT_WORKERS, MAX_WORKERS, WORKERS, worker_limit
+    return {"max_workers": worker_limit(), "default": DEFAULT_WORKERS,
+            "maximum": MAX_WORKERS, "active": WORKERS.snapshot()["active"]}
+
+
+def validate_parallel_work(value) -> dict:
+    from lyra_lite.workers import MAX_WORKERS
+    if not isinstance(value, dict):
+        raise ValueError("Parallel work settings must include max_workers.")
+    limit = value.get("max_workers")
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= MAX_WORKERS:
+        raise ValueError(f"Choose a whole worker limit from 1 to {MAX_WORKERS}.")
+    return {"max_workers": limit}

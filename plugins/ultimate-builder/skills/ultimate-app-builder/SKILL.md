@@ -193,17 +193,26 @@ later phases until `requirements.md` exists and the user has approved it. Use a
 focused delta for an established project rather than restarting discovery from
 zero.
 
-Use the smallest profile that matches the request:
+Use the owner's approved Personal / Reusable / Production profile and team.
+Do not introduce a second profile choice or add unselected agents.
 
-- **Prototype:** requirements brief → architecture sketch → implementation →
-  smoke QA.
-- **Product:** requirements → architecture → task graph → iterative
-  implementation → review → QA → docs.
-- **Production:** Product plus security, deployment, operations, benchmarks,
-  backups, and health baselines.
+- **Personal:** a concise brief, an approved plan of 1–3 coherent tasks, one
+  development lead and focused acceptance QA when selected. No mandatory
+  competitive campaign, class inventory, separate security epic or per-edit report.
+- **Reusable:** explicit public contracts and focused regression coverage; add
+  specialist work only where the approved scope and team require it.
+- **Production:** additional security, deployment, operational and performance
+  assurance only where it traces to approved requirements.
 
-Default to Product for a new application. Ask once when the difference would
-materially change cost, permissions, infrastructure, or scope.
+For local single-user work with no profile, use Personal and state that assumption.
+Preserve prototype, requirements, change-impact and implementation-plan approvals.
+Reuse verified artifacts; an in-scope UI revision does not restart discovery or
+planning. Keep one role lead through implementation, its fixes and integration.
+Selected roles can fan out independent same-role work within the shared 10-worker
+budget (configurable to 15); workers use isolated worktrees, disjoint ownership or
+read-only snapshots. Explain the useful worker count. Focused checks during edits,
+one combined integration gate and selected final QA; repeat only for changed code,
+failures or unresolved risk. Keep handoffs concise and update memory at milestones.
 
 ## Step 2: plan with checkpoints
 

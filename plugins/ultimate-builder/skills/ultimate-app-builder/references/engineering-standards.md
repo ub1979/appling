@@ -6,6 +6,15 @@ truth, so a rule changes here and nowhere else.
 
 ---
 
+## Apply proportionally
+
+The approved profile and task scope govern these standards. Personal projects
+need clear modules and meaningful behavioral checks, not an exhaustive class map,
+a test per file, or a change record for every small edit. Do not split cohesive
+code merely to satisfy file counts. Use focused checks during edits and combined
+validation after integration. Preserve existing project conventions unless they
+cause a concrete problem. Production assurance follows approved requirements.
+
 ## 1. One unit per file
 
 A **unit** is a class, a UI component, or a module. Whichever it is:

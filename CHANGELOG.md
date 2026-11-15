@@ -9,6 +9,25 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.13 beta — 2026-11-15
+
+Desktop package 0.17.13-beta.1. Hermes engine; existing providers and agent models retained.
+
+- Share a default budget of 10 executing role agents/workers across projects,
+  configurable up to 15 in Settings. Selected coding, QA, research, review and
+  other suitable roles choose independent same-role workers and report the count.
+- Preserve disjoint worktree ownership, checked temporary integration, Stop and
+  recovery. Read-only QA/review workers validate a saved baseline without merging
+  source changes; checks must run again after later integration.
+- Keep a coherent lead through implementation and fixes. Scale planning and
+  assurance to the approved build profile, reuse approved artifacts, run focused
+  checks during edits and combined validation after integration.
+- Budget worker summaries from current context usage instead of lifetime billing;
+  preserve full reports on disk. Keep five-minute notes display-only and identify
+  queued workers without claiming that they have started.
+- Leave the Codex branch separate. The previous working Hermes release is saved
+  and pushed as `appling-hermes-working-before-workflow-speed-2026-11-15`.
+
 ### Appling v0.17.12 beta — 2026-11-15
 
 Desktop package 0.17.12-beta.1.
@@ -481,6 +500,13 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.34-a] - 2026-11-15 — Hermes workflow and adaptive parallel workers
+
+- Apply Appling-scoped concurrency and execution budgets without changing the
+  global Hermes CLI defaults or existing provider/authentication paths.
+- Add isolated read-only role workers, retain checked coding integration and
+  concise profile-aware workflows, and fix current-context summary budgeting.
 
 ## [0.19.33-a] - 2026-11-15 — Accurate worker status and completed review recovery
 

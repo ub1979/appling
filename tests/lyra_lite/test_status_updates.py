@@ -73,3 +73,15 @@ def test_status_failure_cannot_disable_the_existing_keep_going_watchdog(tmp_path
     monkeypatch.setattr("lyra_lite.server.lyra_settings", lambda: {"watchdog": {"check_seconds": 0.001}})
     app._watchdog_loop()
     assert checked == [True]
+
+
+def test_queued_worker_is_not_reported_as_executing_or_waiting_for_ai(tmp_path):
+    store = ProjectStore(tmp_path).init()
+    reporter = StatusUpdates(store)
+    snap = {'chat_id': store.state()['chat_id'], 'helpers': [{'goal': 'qa-engineer: Check', 'started': 10}]}
+    store.append_event('helper', event='queued', subagent_id='qa', status='queued', ts=10)
+    note = reporter.tick(snap, now=310)
+    assert 'waiting for a shared worker slot' in note
+    assert 'AI connection' not in note
+    store.append_event('helper', event='start', subagent_id='qa', ts=311)
+    assert 'waiting for a shared worker slot' not in reporter.tick(snap, now=610)

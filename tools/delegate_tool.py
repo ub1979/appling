@@ -378,7 +378,7 @@ def _normalize_role(r: Optional[str]) -> str:
     return "leaf"
 
 
-def _get_max_concurrent_children() -> int:
+def _get_max_concurrent_children(parent_agent=None) -> int:
     """Read delegation.max_concurrent_children from config, falling back to
     DELEGATION_MAX_CONCURRENT_CHILDREN env var, then the default (3).
 
@@ -387,6 +387,9 @@ def _get_max_concurrent_children() -> int:
     Uses the same ``_load_config()`` path that the rest of ``delegate_task``
     uses, keeping config priority consistent (config.yaml > env > default).
     """
+    scoped = getattr(parent_agent, "_delegate_max_concurrent_children", None)
+    if isinstance(scoped, int) and not isinstance(scoped, bool) and scoped > 0:
+        return scoped
     cfg = _load_config()
     val = cfg.get("max_concurrent_children")
     if val is not None:
@@ -422,7 +425,7 @@ def _get_max_concurrent_children() -> int:
 _LEGACY_MAX_ASYNC_WARNED = False
 
 
-def _get_max_async_children() -> int:
+def _get_max_async_children(parent_agent=None) -> int:
     """Concurrency cap for background (``background=true``) delegations.
 
     DEPRECATED KNOB: ``delegation.max_async_children`` has been unified into
@@ -446,7 +449,7 @@ def _get_max_async_children() -> int:
             "delegation.max_concurrent_children now caps background "
             "delegations too. Remove the stale key from config.yaml."
         )
-    return _get_max_concurrent_children()
+    return _get_max_concurrent_children(parent_agent)
 
 
 def _get_child_timeout() -> Optional[float]:
@@ -1583,13 +1586,6 @@ def _build_child_agent(
     # Stash the post-degrade role for introspection (leaf if the
     # kill switch or depth bounded the caller's requested role).
     child._delegate_role = effective_role
-    if effective_role == "orchestrator":
-        # Set descriptions once, before this child's first request. A host's
-        # scoped depth must not be contradicted by the global default schema.
-        for tool in child.tools:
-            function = tool.get("function", {})
-            if function.get("name") == "delegate_task":
-                function.update(_build_dynamic_schema_overrides(child))
     # Stash subagent identity for nested-delegation event propagation and
     # for _run_single_child / interrupt_subagent to look up by id.
     child._subagent_id = subagent_id
@@ -1617,6 +1613,14 @@ def _build_child_agent(
     configure = getattr(parent_agent, "_configure_delegate_child", None)
     if callable(configure):
         configure(child, goal=goal, role=effective_role)
+
+    if effective_role == "orchestrator":
+        # Set descriptions once, before this child's first request. A host's
+        # scoped depth must not be contradicted by the global default schema.
+        for tool in child.tools:
+            function = tool.get("function", {})
+            if function.get("name") == "delegate_task":
+                function.update(_build_dynamic_schema_overrides(child))
 
     # Register child for interrupt propagation
     if hasattr(parent_agent, "_active_children"):
@@ -1898,9 +1902,11 @@ def _parent_summary_char_budget(parent_agent, n_summaries: int) -> Optional[int]
         if not isinstance(context_length, int) or context_length <= 0:
             return None
 
-        used_tokens = getattr(parent_agent, "session_prompt_tokens", 0)
-        if not isinstance(used_tokens, (int, float)) or used_tokens < 0:
-            used_tokens = 0
+        # Session usage is cumulative billing, not the current prompt size.
+        used_tokens = getattr(compressor, "last_prompt_tokens", None)
+        if (getattr(compressor, "awaiting_real_usage_after_compression", False)
+                or not isinstance(used_tokens, (int, float)) or used_tokens <= 0):
+            return None
 
         # Reserve the compressor's output budget so we measure INPUT headroom.
         reserved = getattr(compressor, "max_tokens", 0) or 0
@@ -1973,7 +1979,32 @@ def _apply_summary_budget(results: List[Dict[str, Any]], parent_agent) -> None:
         )
 
 
-def _run_single_child(
+def _run_single_child(task_index, goal, child=None, parent_agent=None, **kwargs):
+    """Honor a trusted host's execution budget before announcing execution."""
+    execution_context = getattr(child, "_delegate_execution_context", None)
+    if not callable(execution_context):
+        return _run_single_child_unbounded(task_index, goal, child, parent_agent, **kwargs)
+    with execution_context() as admitted:
+        if admitted:
+            return _run_single_child_unbounded(task_index, goal, child, parent_agent, **kwargs)
+    # A stopped queued child never starts a model request or leases credentials.
+    callback = getattr(child, "tool_progress_callback", None)
+    if callable(callback):
+        callback("subagent.complete", status="interrupted", preview="Stopped before execution", summary="Stopped before execution")
+    lock = getattr(parent_agent, "_active_children_lock", None)
+    if lock:
+        with lock:
+            if child in parent_agent._active_children:
+                parent_agent._active_children.remove(child)
+    elif hasattr(parent_agent, "_active_children") and child in parent_agent._active_children:
+        parent_agent._active_children.remove(child)
+    child.close()
+    return {"task_index": task_index, "status": "interrupted", "exit_reason": "interrupted",
+            "summary": None, "api_calls": 0, "duration_seconds": 0,
+            "_child_role": getattr(child, "_delegate_role", None)}
+
+
+def _run_single_child_unbounded(
     task_index: int,
     goal: str,
     child=None,
@@ -2777,7 +2808,7 @@ def delegate_task(
         return tool_error(str(exc))
 
     # Normalize to task list
-    max_children = _get_max_concurrent_children()
+    max_children = _get_max_concurrent_children(parent_agent)
     recovered_tasks, tasks_error = _recover_tasks_from_json_string(tasks)
     if tasks_error:
         return tool_error(tasks_error)
@@ -3358,7 +3389,7 @@ def delegate_task(
             parent_session_id=_parent_session_id,
             runner=_batch_runner,
             interrupt_fn=_batch_interrupt,
-            max_async_children=_get_max_async_children(),
+            max_async_children=_get_max_async_children(parent_agent),
             # Reuse the live-transcript directory's id (when created) so the
             # returned delegation_id matches cache/delegation/live/<id>/.
             delegation_id=live_deleg_id,
@@ -3686,7 +3717,7 @@ def _build_top_level_description(parent_agent=None) -> str:
     get_definitions() call via dynamic_schema_overrides.
     """
     try:
-        max_children = _get_max_concurrent_children()
+        max_children = _get_max_concurrent_children(parent_agent)
     except Exception:
         max_children = _DEFAULT_MAX_CONCURRENT_CHILDREN
     try:
@@ -3786,10 +3817,10 @@ def _build_top_level_description(parent_agent=None) -> str:
     )
 
 
-def _build_tasks_param_description() -> str:
+def _build_tasks_param_description(parent_agent=None) -> str:
     """Compose the 'tasks' parameter description with current concurrency limit."""
     try:
-        max_children = _get_max_concurrent_children()
+        max_children = _get_max_concurrent_children(parent_agent)
     except Exception:
         max_children = _DEFAULT_MAX_CONCURRENT_CHILDREN
     return (
@@ -3851,7 +3882,7 @@ def _build_dynamic_schema_overrides(parent_agent=None) -> dict:
     overrides_params["properties"] = {
         k: dict(v) for k, v in DELEGATE_TASK_SCHEMA["parameters"]["properties"].items()
     }
-    overrides_params["properties"]["tasks"]["description"] = _build_tasks_param_description()
+    overrides_params["properties"]["tasks"]["description"] = _build_tasks_param_description(parent_agent)
     overrides_params["properties"]["role"]["description"] = _build_role_param_description(parent_agent)
 
     return {

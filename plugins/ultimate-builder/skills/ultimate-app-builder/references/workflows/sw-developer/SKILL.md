@@ -6,9 +6,9 @@ description: Implements tasks from a project plan one at a time with strict TDD,
 # Software Developer
 
 **⛔ ENFORCEMENT**: The orchestrator MUST spawn this as a dedicated Agent — it does not get to "write code itself" and call it development.
-The spawned agent follows every step below: tests first, run dev server/tests/lint/build, and prove completion with tool output — not unverified claims.
+The development lead completes its coherent assignment, fixes and integration, with tool evidence. Scale the steps below to the approved profile.
 
-Reads the full project plan, then implements one task/user story at a time with strict TDD (Red-Green-Refactor), production-grade modular code, and verified evidence for every completion claim.
+Read the approved plan and relevant code once, then implement coherent slices with appropriate regression checks and verified evidence.
 
 ---
 
@@ -84,12 +84,24 @@ Two artifacts are yours to maintain, both under `.sdlc/`:
 Mark every unit the change touches as `stale — touched by CR-xxx` in the class
 map, and clear it only when its tests actually run again.
 
+## Proportional execution
+
+Personal projects need a concise implementation report and meaningful affected
+checks, not a class map, separate report per edit or a test for each file.
+Reusable/Production add documentation and assurance only for approved scope.
+Keep shared contracts/manifests/lockfiles and progress with the lead. Use the
+host's isolated worktrees for independent leaf workers; QA/read-only leaves
+return findings without editing shared reports. Explain the worker count and
+reason; a shared default of 10 (maximum 15) includes role leads. Run combined
+validation after integration; checks on the baseline do not certify new code.
+These profile rules scope the detailed checklist below and its referenced skills.
+
 ## Step 1 — Understand Before Coding (NEVER Skip)
 
 1. **Read all provided documents** — `task-graph.md`, `plan.md`, `requirements.md`, and `design-brief.md` when the project has a UI, in that order.
 2. **Build a mental model**: system purpose, tech stack, all epics/stories and how they relate, data models, API contracts, architectural patterns from ADRs.
 3. **If existing codebase**: read directory structure and naming conventions, code style, test framework and assertion patterns, reusable utilities, config patterns.
-4. **Present the task list** — all stories/tasks grouped by epic as a numbered checklist. Ask which to start with, or suggest the first by dependencies.
+4. Follow the approved task list by real dependencies. Do not reopen its approval or ask which authorized task to start.
 5. **New project**: scaffold first —
    - Directory structure (see below), package manager config, linter/formatter, test framework
    - `git init` (if needed) and `.gitignore` BEFORE the first commit — secrets and artifacts never tracked
@@ -98,7 +110,7 @@ map, and clear it only when its tests actually run again.
 
 ---
 
-## Step 2 — Implement One Task at a Time (TDD)
+## Step 2 — Implement coherent slices; parallelize independent work
 
 ### 2a. Plan the Implementation
 
@@ -109,7 +121,7 @@ map, and clear it only when its tests actually run again.
 
 ### 2b. RED — Write Failing Tests FIRST
 
-**⛔ IRON LAW: NO PRODUCTION CODE WITHOUT A FAILING TEST FIRST.** Wrote code before the test? Delete it. Start over.
+For behavioral bugs, reproduce the failure and add meaningful regression coverage. Use test-first where useful. Reversible low-impact copy/style changes need relevant verification, not artificial tests that mirror the edit. Preserve useful work.
 
 For each behavior:
 1. Write one minimal test — one behavior per test, clear name (`test_user_cannot_login_with_expired_token`), real code not mocks (unless unavoidable)
@@ -139,7 +151,7 @@ Next failing test for the next behavior, until every acceptance criterion has a 
 
 **⛔ IRON LAW: NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE.** "Should work" / "I'm confident" is not evidence.
 
-- **Run ALL tests** — show pass/fail counts
+- During edits, run affected checks. After integrating a coherent change, run the combined relevant tests/typecheck/build and show results. Repeat broad checks only for new changes, failures or unresolved risk.
 - **Run linter** if configured
 - **Run the production build** (`npm run build` or equivalent) — must succeed. For an epic's final task, start the compiled artifact and smoke the feature against it. Code that only works under dev watch mode is not done.
 - **Config hygiene**: new env vars go in `.env.example` with a description. Secrets NEVER get dev-default fallbacks that survive into production. Validate required vars at startup — fail fast.
@@ -156,7 +168,7 @@ Next failing test for the next behavior, until every acceptance criterion has a 
 - Summarize implementation; list files created/modified
 - Show test results — ACTUAL OUTPUT, not claims
 - Map each acceptance criterion to evidence
-- State the next task by dependencies; ask "Ready for the next task?"
+- Continue the next authorized dependent task directly. Ask only when blocked by a real owner decision.
 
 ### 2h. Commit the Task
 

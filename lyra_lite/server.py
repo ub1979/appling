@@ -556,6 +556,7 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             "hermes_effort": st.hermes_effort(),
             "about_me": st.about_me(),
             "agent_models": st.agent_model_settings(),
+            "parallel_work": st.parallel_work_settings(),
         }
 
     def _apply_everywhere() -> None:
@@ -585,6 +586,11 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             changes["engine"] = body["engine"]
         if "claude" in body:
             raise HTTPException(status_code=400, detail="Claude Code settings are no longer supported.")
+        if "parallel_work" in body:
+            try:
+                changes["parallel_work"] = st.validate_parallel_work(body["parallel_work"])
+            except ValueError as exc:
+                raise HTTPException(status_code=400, detail=str(exc)) from exc
         if "about_me" in body:
             changes["about_me"] = str(body.get("about_me") or "").strip()[:st.ABOUT_ME_LIMIT]
         if changes:

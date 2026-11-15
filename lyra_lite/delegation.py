@@ -192,10 +192,10 @@ def dispatch_project_tasks(store, agent, args: dict) -> str:
                    and any(agent_for_goal(g) == "sw-developer" for g in (r.get("goals") or [r.get("goal", "")]))
                    for r in list_async_delegations()):
                 return json.dumps({"error": "The development lead is already running. Wait for its report."})
-        from lyra_lite.development import LEAD_CONTEXT
+        from lyra_lite.development import ROLE_CONTEXT, PARALLEL_ROLES
 
-        batch = [{**task, "role": "orchestrator" if identity == "sw-developer" else "leaf",
-                  "context": str(task.get("context") or "") + (LEAD_CONTEXT if identity == "sw-developer" else "")}
+        batch = [{**task, "role": "orchestrator" if identity in PARALLEL_ROLES else "leaf",
+                  "context": str(task.get("context") or "") + (ROLE_CONTEXT if identity in PARALLEL_ROLES else "")}
                  for task, identity in zip(batch, identities)]
         single = False
 

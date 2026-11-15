@@ -24,7 +24,8 @@ class _FakeCompressor:
 class _FakeParent:
     def __init__(self, context_length, used_tokens, max_tokens):
         self.context_compressor = _FakeCompressor(context_length, max_tokens)
-        self.session_prompt_tokens = used_tokens
+        self.session_prompt_tokens = used_tokens * 100
+        self.context_compressor.last_prompt_tokens = used_tokens
 
 
 def test_small_summaries_pass_through_untouched():
@@ -124,3 +125,19 @@ def test_empty_results_is_noop():
         [{"task_index": 0, "status": "failed", "summary": None}],
         _FakeParent(131_000, 1_000, 8_000),
     )
+
+
+def test_lifetime_billing_does_not_shrink_current_context_budget():
+    parent = _FakeParent(131_000, 30_000, 8_000)
+    before = dt._parent_summary_char_budget(parent, 5)
+    parent.session_prompt_tokens += 10_000_000
+    assert dt._parent_summary_char_budget(parent, 5) == before
+    parent.context_compressor.last_prompt_tokens = 120_000
+    assert dt._parent_summary_char_budget(parent, 5) < before
+
+
+@pytest.mark.parametrize("usage,pending", [(0, False), (-1, True), (120_000, True)])
+def test_unknown_or_post_compression_usage_uses_static_ceiling(usage, pending):
+    parent = _FakeParent(131_000, usage, 8_000)
+    parent.context_compressor.awaiting_real_usage_after_compression = pending
+    assert dt._parent_summary_char_budget(parent, 5) is None

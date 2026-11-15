@@ -16,6 +16,18 @@ journeys, relevant failure paths, a reload check and a narrow-screen check —
 not a multi-browser campaign. The sections below apply only when no profile is
 given.
 
+## Parallel evidence and bounded debugging
+
+For independent journeys, use same-role read-only workers on the same saved
+baseline with separate test data, ports, browser sessions and artifact folders.
+Explain the chosen count within the shared 10-worker budget (configurable to 15).
+The QA lead consolidates findings; workers do not edit product code or shared
+reports. Recheck affected journeys after merged fixes; baseline results do not
+certify later code. Reproduce defects against the actual app and distinguish
+harness/setup failures from product failures. After two failed attempts with the
+same hypothesis, collect new evidence and revise the hypothesis or report a
+specific blocker. Do not repeat unchanged full campaigns after every small fix.
+
 ## Start from the change record
 
 Read `.sdlc/changes/CR-*.md` for this cycle before planning anything. Its

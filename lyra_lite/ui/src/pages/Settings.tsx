@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type AgentModelSetting, type AiSettings, type ModelOptions, type ModelSelection, type ProjectDetail } from "../api";
+import { WorkerSettings } from "../components/WorkerSettings";
 import { Brand, PrefButtons } from "../components/common";
 import { DEFAULT_EFFORT_LABEL, HERMES_EFFORT_LEVELS, effortName } from "../effort";
 import { go } from "../router";
@@ -111,6 +112,9 @@ export function Settings({ projectId }: { projectId: string | null }) {
                 }} />
             ))}
           </section>
+
+          <WorkerSettings value={settings.parallel_work.max_workers}
+            onSave={(max_workers) => run(async () => setSettings(await api.settingsSave({ parallel_work: { max_workers } })), "Worker limit saved. Active work continues safely.")} />
 
           <AboutMe
             initial={settings.about_me}

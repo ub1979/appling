@@ -154,3 +154,13 @@ it("removes only messages delivered to a waiting question from the queue", () =>
   const answered = applyEvent(queued, { type: "queue_consumed", ts: 4, ids: ["feedback"] });
   expect(answered.queued.map((q) => q.id)).toEqual(["report"]);
 });
+
+it("shows the worker choice and distinguishes assignment from execution", () => {
+  const plan = applyEvent(emptyLive(), { type: "worker_plan", ts: 1, workers: 9, reason: "Independent modules with frozen contracts" });
+  expect(plan.activity.at(-1)?.text).toBe("Using 9 workers");
+  const queued = applyEvent(plan, { type: "helper", event: "queued", subagent_id: "lead", goal: "Development", ts: 2 });
+  expect(queued.helpers.lead.status).toBe("queued");
+  expect(queued.activity.at(-1)?.text).toContain("waiting for a worker slot");
+  const started = applyEvent(queued, { type: "helper", event: "start", subagent_id: "lead", ts: 3 });
+  expect(started.helpers.lead.status).toBe("running");
+});

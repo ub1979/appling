@@ -180,6 +180,11 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
         }),
       };
     }
+    case "worker_plan":
+      return { ...state, activity: addActivity(state, {
+        key: `workers-${evt.ts}`, ts: evt.ts, tone: "helper",
+        text: `Using ${Number(evt.workers)} workers`, detail: str(evt.reason),
+      }) };
     case "helper":
       return applyHelper(state, evt);
     case "inbox": {
@@ -244,10 +249,14 @@ function applyHelper(state: LiveState, evt: LyraEvent): LiveState {
     };
   }
   if (kind === "start" || kind === "spawn_requested") {
-    helper = { ...helper, goal, running: true };
-    if (!prev) {
-      activity = addActivity(state, { key: `h-${id}-${evt.ts}`, ts: evt.ts, text: "An agent started", detail: goal, tone: "helper" });
+    helper = { ...helper, goal, running: true, status: kind === "start" ? "running" : "assigned" };
+    if (!prev || (kind === "start" && prev.status !== "running")) {
+      activity = addActivity(state, { key: `h-${id}-${evt.ts}`, ts: evt.ts, text: kind === "start" ? "An agent started" : "An agent was assigned", detail: goal, tone: "helper" });
     }
+  } else if (kind === "queued") {
+    helper = { ...helper, running: true, status: "queued" };
+    activity = addActivity(state, { key: `h-queue-${id}-${evt.ts}`, ts: evt.ts,
+      text: "An agent is waiting for a worker slot", detail: goal, tone: "helper" });
   } else if (kind === "tool") {
     helper = { ...helper, lastTool: toolWords(str(evt.tool)) };
   } else if (kind === "complete") {

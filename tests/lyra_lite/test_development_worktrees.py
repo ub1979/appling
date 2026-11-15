@@ -123,3 +123,34 @@ def test_incomplete_wave_keeps_primary_unchanged(project, monkeypatch, outcome):
     assert not (project / "a.txt").exists()
     assert git(project, "rev-parse", "HEAD") == base
     assert (Path(result["recovery"]) / "worker-0/a.txt").read_text() == "partial implementation"
+
+
+@pytest.mark.parametrize('changed', [False, True])
+def test_read_only_worker_cannot_integrate_source_edits(project, changed):
+    wave, meta = _wave(project, ownership=([],))
+    record = meta['workers'][0]
+    record['read_only'] = True
+    if changed:
+        (Path(record['workspace']) / 'shared.txt').write_text('unexpected edit\n')
+        with pytest.raises(ValueError, match='read-only worker modified'):
+            DevelopmentWave(project).integrate(wave, meta)
+        assert Path(record['workspace']).exists()
+    else:
+        DevelopmentWave(project).integrate(wave, meta)
+        assert meta['validated_baseline'] == meta['base']
+        assert not Path(record['workspace']).exists()
+    assert git(project, 'rev-parse', 'HEAD') == meta['base']
+    assert (project / 'shared.txt').read_text() == 'contract\n'
+
+
+def test_mixed_wave_requires_checks_after_integration(project):
+    def execute(prepared, records):
+        (Path(records[0]['workspace']) / 'feature.txt').write_text('new behavior\n')
+        return json.dumps({'results': [{'status': 'completed', 'exit_reason': 'completed'} for _ in records]})
+    tasks = [{'goal': 'Implement', 'context': json.dumps({'owned_paths': ['feature.txt']})},
+             {'goal': 'Review baseline', 'context': json.dumps({'read_only': True})}]
+    result = json.loads(DevelopmentWave(project).dispatch(SimpleNamespace(), {'tasks': tasks}, executor=execute))
+    assert 'error' not in result
+    assert result['checks_require_rerun'] is True
+    assert result['baseline'] != git(project, 'rev-parse', 'HEAD')
+    assert (project / 'feature.txt').read_text() == 'new behavior\n'

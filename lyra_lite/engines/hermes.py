@@ -291,7 +291,7 @@ class HermesEngine:
             for old_id, old in list((self.store.state().get("provider_statuses") or {}).items()):
                 if old.get("goal") == kwargs.get("goal"):
                     self._provider_status({"state": "recovered"}, subagent_id=old_id)
-        if preview and event_type in {"subagent.tool", "subagent.start", "subagent.spawn_requested"}:
+        if preview and event_type in {"subagent.tool", "subagent.start", "subagent.spawn_requested", "subagent.queued"}:
             fields["preview"] = _preview(preview, 200)
         if name and event_type == "subagent.tool":
             fields["tool"] = str(name)

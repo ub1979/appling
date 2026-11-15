@@ -36,8 +36,9 @@ class StatusUpdates:
             if event["type"] == "helper":
                 sid = event.get("subagent_id")
                 kind = event.get("event")
-                if kind == "start" and sid:
-                    self.workers[sid] = {"parent_id": event.get("parent_id"), "returned": False}
+                if kind in {"start", "queued"} and sid:
+                    self.workers[sid] = {"parent_id": event.get("parent_id"), "returned": False,
+                                         "queued": kind == "queued"}
                 elif kind == "complete" and sid in self.workers:
                     self.workers[sid]["returned"] = True
                 elif kind == "progress":
@@ -68,6 +69,9 @@ class StatusUpdates:
         who = ", ".join(names) + (" agents" if len(names) > 1 else " agent") if names else "Appling"
         verb = "are" if len(names) > 1 else "is"
         text = f"Status update: {who} {verb} still assigned to the work."
+        queued = sum(row.get("queued", False) and not row["returned"] for row in self.workers.values())
+        if queued:
+            text += f" {queued} agent{'s' if queued != 1 else ''} waiting for a shared worker slot."
         # Count the current lead's descendants, not finished waves from earlier
         # leads. Returned results are not a claim of successful integration.
         parents = {sid for sid, row in self.workers.items() if not row["returned"]}

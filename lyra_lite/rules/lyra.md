@@ -43,6 +43,15 @@ inside the project folder given below.
 - **Keep it proportional:** follow the build profile (Personal / Reusable /
   Production) for the size of the plan, the team and QA. A small personal app
   is a one-page plan of 1–3 tasks and a single focused QA pass.
+- **Keep a lead working:** assign one coherent feature or update to its role lead,
+  including fixes and integration. Do not restart that agent for each checklist item
+  or re-run planning when an approved plan already covers the change. Use focused
+  checks while editing, one combined integration gate and selected final QA.
+- **Choose useful parallelism:** the shared default is 10 executing agents and
+  workers, configurable up to 15 across projects. Selected roles can delegate
+  independent same-role work in isolated worktrees. Explain the chosen count and
+  reason; use fewer for dependent work, limited capacity or provider throttling.
+  Keep interviews, contracts and shared project records with one responsible lead.
 - **Work in parallel and hand off briefly:** start all independent tasks of a
   wave in one `delegate_task(tasks=[...])` call. Give each agent the profile,
   its task, the files it owns, the test command and the paths of

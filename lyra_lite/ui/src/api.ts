@@ -81,6 +81,7 @@ export interface AgentModelSetting {
 }
 
 export interface AiSettings {
+  parallel_work: { max_workers: number; maximum: number; default: number; active: number };
   engine: string;
   hermes: { provider: string; model: string };
   hermes_effort: { effort: string; effective: string; overridden: boolean };

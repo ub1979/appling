@@ -44,6 +44,14 @@ so in the plan's first line. Never infer Production from "complete", "whole" or
 
 ---
 
+The approved profile scopes every checklist below: Personal uses 1–3 coherent
+tasks; do not expand it into mandatory security epics, competitive campaigns,
+class maps, per-component tests or multiple review rounds. Reuse approved design
+and contracts. Plan independent file ownership and a combined integration gate;
+use real dependencies rather than serializing tasks by list order. Keep one lead
+through a feature and its fixes. Selected agents may use same-role leaf workers;
+explain a useful count within the shared 10-worker budget, configurable to 15.
+
 ## Step 1 — Extract & Organize Work
 
 - Parse the plan's components, phases, roadmap, and ADRs.
@@ -57,7 +65,7 @@ so in the plan's first line. Never infer Production from "complete", "whole" or
 
 ### Step 2.1 — Competitive Research (mandatory before any design decisions)
 
-Run 6-10 targeted `web_search` queries:
+Reuse approved prototype/design and verified research. For Personal projects use only focused research needed to resolve an actual uncertainty; skip this campaign for in-scope UI revisions. For larger projects with unresolved design choices, run targeted `web_search` queries as needed:
 
 1. Direct competitors — "[domain] best [app type] 2025/2026", study 3-5 competitors
 2. Design award winners — "Awwwards [domain]", "CSS Design Awards [app type]"
@@ -190,7 +198,7 @@ Test and document every foreground/background combination; all must pass WCAG AA
 
 ---
 
-## Step 2.5 — Security Work Breakdown (mandatory — all projects)
+## Step 2.5 — Security work required by approved scope
 
 `plan.md` Section 8 (Security Architecture) is work that must appear in the plan, not background reading. If no `plan.md`, derive baseline security from the requirements' NFRs (auth, data sensitivity, compliance).
 
