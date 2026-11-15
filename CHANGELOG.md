@@ -9,6 +9,12 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.14c beta — 2026-11-15
+
+Desktop package 0.17.14-c.beta.1.
+
+- Add the requested c suffix to identify the Codex edition in the visible version.
+
 ### Appling v0.17.14 beta — 2026-11-15
 
 Desktop package 0.17.14-beta.1.
@@ -519,6 +525,12 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.36-a] - 2026-11-15 — Codex edition version label
+
+Appling v0.17.14c beta. Desktop package 0.17.14-c.beta.1.
+
+- Identify the Codex edition with the requested v0.17.14c label.
 
 ## [0.19.35-a] - 2026-11-15 — Adaptive parallel workers across selected roles
 

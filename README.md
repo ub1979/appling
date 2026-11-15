@@ -4,7 +4,7 @@ Appling is a local project studio for building apps, websites, slide decks and
 short videos. This branch runs its coding and agent workflow directly through
 [Codex app-server](https://learn.chatgpt.com/docs/app-server).
 
-Current source: **v0.17.14 beta**, branch `codex/appling-codex-base`.
+Current source: **v0.17.14c beta**, branch `codex/appling-codex-base`.
 
 Appling keeps its project UI, previews, owner approvals, project memory and
 five-minute status notes. Codex owns execution, native file/terminal tools,
