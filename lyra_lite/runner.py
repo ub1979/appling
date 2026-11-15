@@ -247,8 +247,14 @@ class ProjectRunner:
                         if item.get("prototype") and (item["prototype"] != state.get("prototype_approved")
                                                       or item["prototype"] != review.prototype_revision(self.root)):
                             raise ValueError("Review the current prototype before approving the requirements.")
+                        # Both in-chat revisions and explicit update cycles must
+                        # invalidate a plan tied to a different approved scope.
+                        if state.get("plan_requirements") != revision:
+                            self.store.update_state(plan_approved=None, plan_requirements=None,
+                                                    plan_execution=None, plan_needs_changes=None,
+                                                    plan_review_required=False)
                         self.store.update_state(requirements_approved=revision, requirements_review=False,
-                                                requirements_revision_format=2,
+                                                requirements_revision_format=3,
                                                 approval_followup={"revision": revision,
                                                                    "offset": self.store.events_size()})
                     else:

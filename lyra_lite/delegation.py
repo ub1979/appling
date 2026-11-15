@@ -67,12 +67,18 @@ class DelegationGuard:
     def reminder(self) -> str:
         running = self._running()
         if not running:
-            return ""
+            return ("\n\n[Appling live helper snapshot: no background helpers are running for this conversation.]\n"
+                    "Historical chat and project notes are not evidence of active work. Do not say an agent "
+                    "is still running without a live task. No active helper does not mean unfinished work "
+                    "is complete; use its actual result or dispatch authorized work.\n")
         jobs = [{"id": r["delegation_id"], "goals": r.get("goals") or [r.get("goal", "")]}
                 for r in running]
-        return ("\n\n[Appling: these helpers are already running for this conversation]\n"
+        return ("\n\n[Appling live helper snapshot: complete list of background jobs already running for this conversation]\n"
                 + json.dumps(jobs, ensure_ascii=False)
-                + "\nAn earlier coordinator error does not stop them. Do not restart or duplicate "
+                + "\nOnly the listed jobs are currently running. Historical mentions of other agents, including "
+                  "launcher work, do not establish that they are still active. This snapshot is taken before "
+                  "this turn; account for new dispatches/results during the turn. "
+                  "An earlier coordinator error does not stop them. Do not restart or duplicate "
                   "their work. Their results will arrive automatically; you can answer the owner "
                   "or continue unrelated work.\n")
 
@@ -157,6 +163,11 @@ def dispatch_project_tasks(store, agent, args: dict) -> str:
         if update and agent_id != "change-manager" and not ready:
             return json.dumps({"error": "Change management must finish its impact review and resolve any "
                                         "owner decisions before planning or implementation."})
+        if (approval_required and agent_id in {None, "sw-developer", "website-builder", "oop-restructurer",
+                                              "debugger", "qa-engineer"}
+                and not review.implementation_authorized(root, state)):
+            return json.dumps({"error": "Review and approve the current implementation plan for the approved "
+                                        "requirements before starting development or implementation QA."})
 
     if update and "change-manager" in identities:
         if len(batch) != 1:

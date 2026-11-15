@@ -9,6 +9,20 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.14 beta — 2026-11-15
+
+Hermes desktop package 0.17.14-beta.1. The separate Codex version remains v0.17.14c.
+
+- Include nested requirements beneath approval notes when calculating scope
+  revisions. Migrate old approvals only from matching saved owner-review text;
+  stale plan execution cannot authorize a newly reviewed scope.
+- Return full guarded file reads to programmatic callers even when chat already
+  read the same region. Preserve chat caching, file safety checks and RPC limits.
+- Supply an exhaustive live helper snapshot so historical launcher tasks are
+  not described as running. Keep status notes separate from model history.
+- Add separate Hermes start/stop and Codex c_start/c_stop scripts, with process
+  identity checks and independent ports/homes.
+
 ### Appling v0.17.13 beta — 2026-11-15
 
 Desktop package 0.17.13-beta.1. Hermes engine; existing providers and agent models retained.
@@ -500,6 +514,12 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.35-a] - 2026-11-15 — Reliable tool reads and scope approvals
+
+- Preserve programmatic file-read contracts across both RPC transports.
+- Bind approvals to nested scope and verify legacy approval evidence.
+- Keep engine launchers and live helper status separate and accurate.
 
 ## [0.19.34-a] - 2026-11-15 — Hermes workflow and adaptive parallel workers
 

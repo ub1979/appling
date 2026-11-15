@@ -1,21 +1,5 @@
 #!/usr/bin/env bash
-# Stop the Appling started from this folder (and only that one).
-set -Eeuo pipefail
-
-PROJECT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
-PATTERN="$PROJECT_DIR/.venv/bin/python -m lyra_lite"
-
-PIDS="$(pgrep -f -- "$PATTERN" || true)"
-if [[ -z "$PIDS" ]]; then
-  echo "Appling is not running from this folder."
-  exit 0
-fi
-
-echo "Stopping Appling..."
-kill $PIDS 2>/dev/null || true
-for _ in {1..20}; do
-  pgrep -f -- "$PATTERN" >/dev/null || { echo "Stopped."; exit 0; }
-  sleep 0.5
-done
-kill -9 $(pgrep -f -- "$PATTERN") 2>/dev/null || true
-echo "Stopped."
+# Stop Hermes Appling only (port 9200).
+set -euo pipefail
+APPLING_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+exec python3 "$APPLING_DIR/scripts/appling-launch.py" hermes stop

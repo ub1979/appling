@@ -43,7 +43,12 @@ def visual_project(root: Path, state: dict) -> bool:
 
 
 def requirements_content(text: str) -> str:
-    """Approval bookkeeping is metadata; product and verification sections are not."""
+    """Exclude direct approval bookkeeping, never nested requirement sections."""
+    return _requirements_content(text, include_nested=True)
+
+
+def _requirements_content(text: str, *, include_nested: bool) -> str:
+    """The old format excluded descendants too; retained only to verify migration."""
     text = _STATUS.sub("", text, count=1)
     lines = []
     skip_level = None
@@ -56,7 +61,7 @@ def requirements_content(text: str) -> str:
         heading = re.match(r"^(#{1,6})\s+(.+?)\s*#*\s*$", line) if fence is None else None
         if heading:
             level = len(heading[1])
-            if skip_level is not None and level <= skip_level:
+            if skip_level is not None and (include_nested or level <= skip_level):
                 skip_level = None
             if heading[2].strip().casefold() == "approval gates and current state":
                 skip_level = level
@@ -81,6 +86,21 @@ def plan_execution_started(state: dict) -> bool:
                 and execution.get("plan") == state["plan_approved"]
                 and execution.get("requirements") == state.get("requirements_approved")
                 == state.get("plan_requirements"))
+
+
+def implementation_authorized(root: Path, state: dict) -> bool:
+    """Authorize a matching approved plan or its already-started baseline."""
+    requirements = requirements_revision(root)
+    if (not requirements or state.get("requirements_review")
+            or requirements != state.get("requirements_approved")):
+        return False
+    if visual_project(root, state) and prototype_revision(root) != state.get("prototype_approved"):
+        return False
+    if plan_execution_started(state):
+        return True  # Engineering progress may legitimately edit the plan later.
+    plan = implementation_plan(root)
+    return bool(plan and plan["revision"] == state.get("plan_approved")
+                and state.get("plan_requirements") == requirements)
 
 
 def record_plan_execution(store, goal: str) -> None:
@@ -138,10 +158,30 @@ def reconcile_requirements_approval(store) -> bool:
     current = requirements_revision(store.root)
     if not approved or not current or approved == current:
         return False
-    if state.get("requirements_revision_format") == 2:
+    revision_format = state.get("requirements_revision_format")
+    if isinstance(revision_format, int) and revision_format >= 3:
         return False
     try:
         text = (store.root / "requirements.md").read_text(encoding="utf-8")
+        # Format 2 omitted nested scope. Its digest alone cannot prove that
+        # today's nested text was approved: require the actual review draft.
+        if state.get("requirements_revision_format") == 2:
+            for item in store.inbox():
+                if (item.get("kind") != "requirements" or item.get("status") != "answered"
+                        or item.get("answer") != REQUIREMENTS_CHOICES[0]
+                        or item.get("revision") != approved
+                        or item.get("chat_id") != state.get("chat_id")):
+                    continue
+                _, separator, draft = str(item.get("question") or "").partition("\n\n---\n\n")
+                if not separator or not draft:
+                    continue
+                legacy = hashlib.sha256(_requirements_content(draft, include_nested=False).encode()).hexdigest()
+                if legacy == approved and requirements_content(draft) == requirements_content(text):
+                    store.update_state(requirements_approved=current, requirements_revision_format=3)
+                    store.append_event("approval_reconciled", kind="requirements", evidence=item["id"],
+                                       previous_revision=approved, revision=current)
+                    return True
+            return False
         candidates = [text]
         history = subprocess.run(["git", "log", "-40", "--format=%H", "--", "requirements.md"],
                                  cwd=store.root, capture_output=True, text=True, timeout=3)
@@ -158,7 +198,7 @@ def reconcile_requirements_approval(store) -> bool:
     for candidate in candidates:
         legacy = hashlib.sha256(_STATUS.sub("", candidate, count=1).strip().encode()).hexdigest()
         if legacy == approved and requirements_content(candidate) == requirements_content(text):
-            store.update_state(requirements_approved=current, requirements_revision_format=2)
+            store.update_state(requirements_approved=current, requirements_revision_format=3)
             store.append_event("approval_reconciled", kind="requirements")
             return True
     return False

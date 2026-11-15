@@ -54,7 +54,7 @@ def test_finished_work_can_be_dispatched_again(running, status):
     task = {"goal": "QA"}
     guard.dispatch(task, lambda args: _record(running, args))
     running[0]["status"] = status
-    assert guard.reminder() == ""
+    assert "no background helpers are running" in guard.reminder()
     result = guard.dispatch(task, lambda args: _record(running, args, key="retest"))
     assert json.loads(result)["delegation_id"] == "retest"
 
@@ -74,7 +74,7 @@ def test_rebuild_restores_batch_and_only_considers_its_own_live_jobs(running):
 
     other = DelegationGuard("other-project")
     other.restore(history)
-    assert other.reminder() == ""
+    assert "no background helpers are running" in other.reminder()
     result = other.dispatch(task, lambda args: _record(running, args, key="other", session="other-project"))
     assert json.loads(result)["status"] == "dispatched"
 
@@ -111,3 +111,16 @@ def test_reloading_requirements_holds_planning_even_when_the_previous_draft_matc
     store.update_state(requirements_review=True, requirements_approved=requirements_revision(tmp_path))
     result = json.loads(dispatch_project_tasks(store, None, {"goal": "task-planner: Schedule new work"}))
     assert "Finish the owner review" in result["error"]
+
+
+def test_live_snapshot_excludes_old_launcher_and_other_projects(running):
+    running.extend([
+        {"delegation_id": "launcher-old", "session_key": "project", "status": "interrupted", "goal": "Launcher"},
+        {"delegation_id": "design-live", "session_key": "project", "status": "running", "goal": "Design"},
+        {"delegation_id": "foreign", "session_key": "other", "status": "running", "goal": "Launcher"},
+    ])
+    note = DelegationGuard("project").reminder()
+    assert "design-live" in note and "Only the listed jobs" in note
+    assert "launcher-old" not in note and '"foreign"' not in note
+    running[1]["status"] = "completed"
+    assert "no background helpers are running" in DelegationGuard("project").reminder()

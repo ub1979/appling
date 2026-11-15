@@ -78,3 +78,35 @@ def test_legacy_start_before_approval_is_not_execution_evidence(tmp_path):
         assert runner.snapshot()["inbox"][0]["kind"] == "plan"
     finally:
         runner.shutdown()
+
+
+def test_new_reviewed_nested_scope_cannot_reuse_old_execution(tmp_path):
+    import hashlib
+    old_requirements = '# Requirements\nEdit documents.\n\n## Approval gates and current state\nBaseline approved.\n'
+    (tmp_path / 'requirements.md').write_text(old_requirements)
+    (tmp_path / 'plan.md').write_text('# Plan\nImplement baseline.\n')
+    store = ProjectStore(tmp_path).init()
+    legacy = hashlib.sha256(review._requirements_content(old_requirements, include_nested=False).encode()).hexdigest()
+    old_plan = review.implementation_plan(tmp_path)['revision']
+    store.update_state(requirements_approved=legacy, requirements_revision_format=2,
+                       plan_approved=old_plan, plan_requirements=legacy, plan_review_required=True,
+                       plan_execution={'plan': old_plan, 'requirements': legacy})
+    # The old format produces the SAME digest despite the material new scope.
+    new_requirements = old_requirements + '\n### New menu requirements\nOpen recent local projects.\n'
+    assert hashlib.sha256(review._requirements_content(new_requirements, include_nested=False).encode()).hexdigest() == legacy
+    (tmp_path / 'requirements.md').write_text(new_requirements)
+    card = store.add_inbox('requirements', revision=legacy,
+                          question='Approve requirements?\n\n---\n\n' + new_requirements)
+    store.close_inbox(card['id'], 'answered', answer='Approve requirements')
+    (tmp_path / 'plan.md').write_text('# Plan\nImplement recent projects, then focused QA.\n')
+    runner = ProjectRunner(store, lambda *_: None)
+    try:
+        assert store.state()['requirements_approved'] == review.requirements_revision(tmp_path)
+        assert not review.plan_execution_started(store.state())
+        review_card, = runner.snapshot()['inbox']
+        assert review_card['kind'] == 'plan'
+        assert review_card['revision'] == review.implementation_plan(tmp_path)['revision']
+        assert review_card['requirements'] != legacy
+        assert store.state()['plan_approved'] == old_plan  # historical evidence is retained
+    finally:
+        runner.shutdown()

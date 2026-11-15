@@ -735,7 +735,7 @@ def test_focus_note_rides_along_only_when_the_state_changes(env):
 
             sent = [latest_user(r) for r in llm.main_requests()]
             assert "[Project focus" in sent[0] and "CSV export left" in sent[0]
-            assert sent[1] == "second"  # unchanged state: no repeat
+            assert sent[1].startswith("second") and "[Project focus" not in sent[1]  # unchanged focus: no repeat
             assert "[Project focus" in sent[2] and "QA" in sent[2]
             assert "Not done: QA — running" in sent[2]
             for closed in ("Access decision", "Old development", "Post-send corrections"):

@@ -138,6 +138,14 @@ browser research and disclose the fallback in the research coverage note.
 
 Competitive analysis (1-2 of the searches): find 2-3 existing products; note features the user didn't mention and what users complain about; report back: "Competitors [X, Y] offer [Z] — needed, or deliberately out of scope?" Cite findings inline in the doc as "[per industry standard]", "[common pitfall]", "[competitor X offers this]".
 
+## Requirements records and approvals
+
+Keep functional revisions and acceptance criteria in requirement sections above
+"Approval gates and current state". That section holds direct approval
+bookkeeping only. Do not place changed scope beneath it as version-history notes;
+new scope must remain visible to revision checks. Preserve the owner's recorded
+approvals, and obtain a separate implementation-plan approval for a new scope.
+
 ## Step 5 — Generate requirements.md
 
 Redaction check first: replace API keys/tokens/passwords, internal URLs, PII, and connection strings with `[REDACTED-*]` / `[INTERNAL-URL]` placeholders. Flag to the user if the doc will be shared externally or committed publicly.
