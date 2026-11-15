@@ -1,72 +1,96 @@
-# Appling
+# Appling — Codex edition
 
-> Describe what you want to make. Work with an AI team to build it in a folder on your own machine.
+Appling is a local project studio for building apps, websites, slide decks and
+short videos. This branch runs its coding and agent workflow directly through
+[Codex app-server](https://learn.chatgpt.com/docs/app-server).
 
-Appling is a local-first product studio for apps, websites, slide decks, and short videos. It helps you clarify an idea, choose a starting design, build, and review the result. The app and project files run on your computer; you choose the AI model it uses through [Hermes Agent](https://github.com/NousResearch/hermes-agent). A connected cloud model can send prompts to its provider and may incur a subscription or API cost. [Ollama](https://ollama.com/) can run a model locally.
+Current source: **v0.17.13 beta**, branch `codex/appling-codex-base`.
 
-Appling is in beta. Review generated work and test it for your own use before publishing it.
+Appling keeps its project UI, previews, owner approvals, project memory and
+five-minute status notes. Codex owns execution, native file/terminal tools,
+conversation persistence and compaction. Browser QA uses a pinned Playwright CLI and the local preview, with a private
+browser session per agent. The shipped Appling runtime does not load Hermes. Historical upstream source remains in this repository for lineage
+and rollback; it is excluded from the Appling desktop package.
 
-The current source version is **v0.17.12 beta**, with accurate nested-worker status,
-isolated coding teams, visible reviews, project updates, and saved agent models.
+## Run this branch
 
-Agent execution and delegation use the original Hermes workflow and its normal
-command approval controls. Prototype and implementation-plan reviews show the
-actual preview or document before approval.
+Install Python 3.11+, [uv](https://docs.astral.sh/uv/) and Node.js. Install the
+pinned Codex CLI and connect the account appropriate for your deployment:
 
-Project state stays file-first under `.lyra`: `state.json` holds workflow state,
-`inbox/*.json` holds questions and answers, and `events.jsonl` records ordered
-communication. Existing project files and history are preserved across restarts.
-
-## Desktop installers (beta)
-
-The downloadable installers below are the v0.15 beta packages.
-
-Download the [installer preview](https://github.com/ub1979/appling/releases/tag/appling-v0.15.0-beta.1) for [macOS Apple Silicon](https://github.com/ub1979/appling/releases/download/appling-v0.15.0-beta.1/Appling-0.15.0-beta.1-mac-arm64.dmg), [Windows x64](https://github.com/ub1979/appling/releases/download/appling-v0.15.0-beta.1/Appling-0.15.0-beta.1-win-x64.exe), or [Linux x86_64](https://github.com/ub1979/appling/releases/download/appling-v0.15.0-beta.1/Appling-0.15.0-beta.1-linux-x86_64.AppImage). The first launch downloads Python and its locked dependencies, so it needs internet. Node.js and npm are included.
-
-These beta installers are unsigned. macOS or Windows may interrupt the install with a security warning; the [release notes](https://github.com/ub1979/appling/releases/tag/appling-v0.15.0-beta.1) include checksums and test results. If you prefer not to override an operating-system warning, use the source setup below. Windows and Linux graphical installation still need tester feedback.
-
-## Quick start
-
-The `start.sh` launcher is for macOS and Linux. It needs Bash, [uv](https://docs.astral.sh/uv/), Node.js 20.19+ or 22.12+, `lsof`, and `pgrep`. The Python project supports Python 3.11 through 3.13; `uv` selects a compatible version. The first start installs Python and UI dependencies and can take several minutes.
-
-```bash
-git clone https://github.com/ub1979/appling.git
-cd appling
-./start.sh
+```sh
+npm install --global @openai/codex@0.164.0
+codex login
+npm --prefix apps/appling-browser ci --ignore-scripts
+node apps/appling-browser/node_modules/playwright/cli.js install chromium
+uv sync --project apps/appling-runtime --locked
+apps/appling-runtime/.venv/bin/python -m lyra_lite --no-open --port 9201
 ```
 
-Open **<http://127.0.0.1:9200/>** in your browser if it does not open automatically. The launcher prints the address when Appling is ready. Stop it later with `./stop.sh` from the same folder.
+On Windows, use `apps/appling-runtime/.venv/Scripts/python.exe` for the last
+command. Open [Appling Codex](http://127.0.0.1:9201/). To rebuild the UI:
 
-Before your first build, connect a model:
-
-```bash
-./.venv/bin/hermes setup
+```sh
+npm --prefix lyra_lite/ui ci
+npm --prefix lyra_lite/ui run build
 ```
 
-Follow the provider prompts, then use **Settings → Model** in Appling to choose a linked model. You can use a supported subscription login, an API provider, or a local Ollama model. Provider availability and charges depend on what you connect. Keep API keys in `~/.hermes/.env`; ordinary settings belong in `~/.hermes/config.yaml`.
+Configuration, the token and project registry live in `~/.appling-codex/`.
+`APPLING_HOME` can select an isolated home. Codex owns its credentials and native
+sessions; Appling never copies credentials from Hermes. Per-project `.lyra/`
+files retain the existing review/history format, with native thread mappings
+under `.lyra/codex/`.
 
-In Appling, select **Create a new project**, choose a folder and what you are making, pick a template or start from scratch, and describe the result you want. Appling asks questions and brings in building and review agents. It saves each project's work and conversation in that project folder. Use **Open a project** to continue existing work.
+## Coding workflow
 
-For a first try, ask for a small website or web app with a clear outcome. For example: “Build a one-page site for a neighborhood bakery with opening hours, a menu, and a contact link.” Check the result in the browser and ask Appling to revise anything that is wrong.
+The selected team and Personal / Reusable / Production profile control scope.
+Personal projects use a short plan and coherent feature assignments. Developers
+run affected checks during editing, combined checks after integration, then an
+independent final QA journey. Existing data integrity and acceptance checks stay
+required. Approved requirements remain authoritative; engineering bookkeeping
+does not reopen a plan after development starts.
 
-## What is included
+A development lead may launch up to **three** independent coding agents. Each
+gets disjoint owned paths in a separate Git worktree. The host checks all touched
+files, integrates in a temporary worktree and advances only an unchanged, clean
+primary project. Failed or interrupted work is preserved. Shared contracts,
+manifests and lockfiles belong to the lead. Native unmanaged subagents are disabled.
+Stop interrupts Codex and its child sessions and releases pending owner waits.
 
-- **Apps:** choose web, phone, or desktop as a target in project setup.
-- **Websites:** 19 built-in starting templates with preview designs. The website workflow includes build, browser, and QA checks.
-- **Slides and videos:** 6 slide templates and 10 short-video templates.
-- **Local project history:** project files, conversations, progress, and approvals are stored with the project; the internal `.lyra/` folder name is retained for compatibility.
-- **Model choice:** Appling uses Hermes to connect to supported models. Your model choice and provider determine where inference runs and what it costs.
+## Keep the working version safe
 
-Templates are starting designs, not finished customer projects. The output still needs your review before it is shared or deployed.
+The previous working source is pushed at
+[`appling-nice-working-before-codex-2026-11-15`](https://github.com/ub1979/appling/tree/appling-nice-working-before-codex-2026-11-15)
+(commit `88fc0f4b3`, “Nice working one”). The original checkout and its service on
+port 9200 remain separate. This branch defaults to port 9201 and an empty registry.
 
-## Development and support
+Use a **separate project copy** when comparing engines. Never open one project in
+two running apps. A legacy project still marked running is rejected. An idle
+legacy project gets a private state backup under `.lyra/migrations/before-codex/`
+and stays paused until explicit owner input. Messages, queued feedback and approval
+hashes are retained. Source rollback alone does not undo project-state migration;
+restore the saved state only while both apps are stopped, preserving newer work.
 
-See [Contributing](CONTRIBUTING.md) for a development setup and pull request guide. For an Appling bug or setup problem, use the [Appling issue tracker](https://github.com/ub1979/appling/issues/new/choose). Include steps to reproduce and a redacted error message; do not publish API keys, private project files, or raw diagnostic archives.
+To use the working version again, stop the Codex service and return to the original
+checkout. No reset or changes to the original checkout are needed.
 
-The [architecture overview](APPLING.md) and [technical guide](lyra_lite/README.md) explain the current workflow, with a [hands-on test walkthrough](lyra_lite/HOW-TO-TEST.md).
+## Authentication and distribution
 
-## History and credits
+Codex's code is Apache-2.0; the bundle includes its license and notices. Retained
+Hermes-derived UI/project utilities keep the repository's MIT attribution.
+Model access is governed separately. Existing local/open-source app-server login
+is supported for local use. Commercial or hosted distribution must use suitable
+API-key access or approved Sign in with ChatGPT; built-in app-server subscription
+authentication is not permitted for those services. See the
+[official authentication documentation](https://learn.chatgpt.com/docs/app-server#auth-endpoints).
+Set `"require_api_key": true` in Appling's `settings.json` to enforce API-key mode.
 
-Appling grew out of a project previously called Lyra. Some internal paths, Python packages, and older changelog entries retain that name so existing installations and projects continue to work. The user-facing product and this repository are **Appling**.
+Optional `.lyra/kit/imagine` uses the OpenAI Images API with `OPENAI_API_KEY` and
+paid API credits, only after the owner's agreement. It does not reuse subscription
+credentials. Coding, previews and existing templates do not require image generation.
 
-Appling builds on [Hermes Agent](https://github.com/NousResearch/hermes-agent) by Nous Research. Hermes provides the agent runtime and model connections; Appling adds the project studio and guided building workflow. See the repository [license](LICENSE).
+## Validation
+
+See [migration evidence and the regression command](docs/lyra/2026-11-15-codex-migration.md).
+Desktop staging uses `apps/appling-runtime/pyproject.toml` and its lockfile rather
+than the upstream Hermes Python package. Build with `npm run pack` from
+`apps/appling-desktop`; installer CI installs the pinned Codex executable first.

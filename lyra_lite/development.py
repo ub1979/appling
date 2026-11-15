@@ -86,19 +86,22 @@ class DevelopmentWave:
         self.max_workers = max_workers
         self.lock = threading.Lock()
 
-    def dispatch(self, parent, args: dict) -> str:
+    def dispatch(self, parent, args: dict, executor=None) -> str:
         if not self.lock.acquire(blocking=False):
             return json.dumps({"error": "A development wave is already running for this lead."})
         wave = None
         try:
-            from tools.delegate_tool import delegate_task, _get_max_concurrent_children
+            if executor is None:
+                from tools.delegate_tool import delegate_task, _get_max_concurrent_children
+                limit = min(self.max_workers, _get_max_concurrent_children())
+            else:
+                limit = self.max_workers
 
             tasks = args.get("tasks")
             if isinstance(tasks, str):
                 tasks = json.loads(tasks)
             if not tasks:
                 tasks = [{"goal": args.get("goal"), "context": args.get("context")}]
-            limit = min(self.max_workers, _get_max_concurrent_children())
             if not isinstance(tasks, list) or not 1 <= len(tasks) <= limit:
                 raise ValueError(f"Use 1–{limit} independent coding tasks per wave.")
             owned = []
@@ -144,8 +147,11 @@ class DevelopmentWave:
                 )})
             metadata = {"base": base, "branch": branch, "workers": records}
             (wave / "wave.json").write_text(json.dumps(metadata, indent=2) + "\n")
-            raw = delegate_task(tasks=prepared, parent_agent=parent, background=False,
-                                task_runtimes=[{"workspace": r["workspace"]} for r in records])
+            if executor is None:
+                raw = delegate_task(tasks=prepared, parent_agent=parent, background=False,
+                                    task_runtimes=[{"workspace": r["workspace"]} for r in records])
+            else:
+                raw = executor(prepared, records)
             result = json.loads(raw)
             (wave / "result.json").write_text(json.dumps(result, indent=2) + "\n")
             results = result.get("results") or []

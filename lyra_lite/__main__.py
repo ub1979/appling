@@ -10,9 +10,9 @@ import webbrowser
 
 def _stable_token() -> str:
     """One private token per Appling home, so open tabs survive a restart."""
-    from hermes_constants import get_hermes_home
+    from lyra_lite.config import app_home
 
-    path = get_hermes_home() / "lyra-lite" / "token"
+    path = app_home() / "token"
     try:
         value = path.read_text(encoding="utf-8").strip()
         if value:
@@ -30,37 +30,23 @@ def _stable_token() -> str:
 def main() -> None:
     parser = argparse.ArgumentParser(prog="lyra_lite")
     parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=9200)
+    parser.add_argument("--port", type=int, default=9201)
     parser.add_argument("--no-open", action="store_true")
     parser.add_argument("--token", default=None, help=argparse.SUPPRESS)
     args = parser.parse_args()
 
-    from hermes_cli.env_loader import load_hermes_dotenv
-
-    load_hermes_dotenv()
-    try:
-        from hermes_logging import setup_logging
-
-        setup_logging(mode="gateway")
-    except Exception:
-        pass
-
-    from lyra_lite.engines.hermes import enable_gateway_approvals
+    import logging
+    from lyra_lite.config import app_home
     from lyra_lite.server import create_app, projects_root
 
-    enable_gateway_approvals()
+    home = app_home()
+    (home / "logs").mkdir(parents=True, exist_ok=True, mode=0o700)
+    logging.basicConfig(filename=home / "logs" / "appling.log", level=logging.INFO)
 
     # Never let a tool fall back to Lyra's own folder as its working directory.
     root = projects_root()
     root.mkdir(parents=True, exist_ok=True)
     os.chdir(root)
-
-    try:
-        from tools.approval import load_permanent_allowlist
-
-        load_permanent_allowlist()
-    except Exception:
-        pass
 
     import uvicorn
 

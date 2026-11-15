@@ -367,7 +367,7 @@ export function Studio({ id }: { id: string }) {
               });
             }}>{deletingProject ? "Moving to archive…" : "Delete project"}</button>
           <PrefButtons onAi={() => go(`/settings?project=${id}`)} />
-          <span className="engine-tag" title="Engine used by this project">Hermes</span>
+          <span className="engine-tag" title="Engine used by this project">Codex</span>
         </div>
       </header>
 

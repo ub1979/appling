@@ -1,16 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type AgentModelSetting, type AiSettings, type ModelOptions, type ModelSelection, type ProjectDetail } from "../api";
 import { Brand, PrefButtons } from "../components/common";
-import { DEFAULT_EFFORT_LABEL, HERMES_EFFORT_LEVELS, effortName } from "../effort";
+import { DEFAULT_EFFORT_LABEL, CODEX_EFFORT_LEVELS, effortName } from "../effort";
 import { go } from "../router";
 
 // Plain-language billing hints for the providers people mix up.
-const PROVIDER_HINTS: Record<string, string> = {
-  "claude-cli": "your Claude subscription",
-  "openai-codex": "your ChatGPT/Codex subscription",
-  anthropic: "Anthropic API key, pay per use",
-  "ollama-local": "models on this computer",
-};
+const PROVIDER_HINTS: Record<string, string> = { codex: "Codex CLI account" };
 
 export function Settings({ projectId }: { projectId: string | null }) {
   const [settings, setSettings] = useState<AiSettings | null>(null);
@@ -60,7 +55,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
       <div className="setup-head">
         <p className="kicker">AI settings</p>
         <h1>Model and effort</h1>
-        <p>Every project runs on Hermes. Model and effort changes apply from the next message.</p>
+        <p>Every project runs on Codex. Model and effort changes apply from the next message.</p>
       </div>
 
       {(note || problem) && (
@@ -73,7 +68,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
         <p className="muted">Loading…</p>
       ) : (
         <div className="settings-grid">
-          <HermesModel
+          <CodexModel
             settings={settings}
             options={options}
             loading={loadingModels}
@@ -102,7 +97,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
 
           <section className="card card-pad">
             <h2 style={{ fontSize: 20 }}>Agent models</h2>
-            <p className="muted small">Choose a provider, model and effort for each agent. Saved choices apply to future tasks in all projects. Appling leads the Requirements interview and uses the Requirements model for its draft review.</p>
+            <p className="muted small">Choose a Codex model and effort for each agent. Saved choices apply to future tasks. Appling handles Requirements using its own model.</p>
             {settings.agent_models.map((agent) => (
               <AgentModel key={agent.id} agent={agent} options={options}
                 onSave={async (selection) => {
@@ -120,7 +115,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
           {project && (
             <section className="card card-pad">
               <h2 style={{ fontSize: 20 }}>This project: {project.name}</h2>
-              <p style={{ margin: "14px 0 4px" }}><b>Hermes</b> · Locked to this project</p>
+              <p style={{ margin: "14px 0 4px" }}><b>Codex</b> · Locked to this project</p>
               <p className="muted small">Uses the saved model and effort for each agent.</p>
             </section>
           )}
@@ -130,7 +125,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
   );
 }
 
-function HermesModel({
+function CodexModel({
   settings,
   options,
   loading,
@@ -146,18 +141,18 @@ function HermesModel({
   onSaveEffort: (effort: string) => Promise<void>;
 }) {
   const providers = options?.providers ?? [];
-  const [effort, setEffort] = useState(settings.hermes_effort.effort);
+  const [effort, setEffort] = useState(settings.codex_effort.effort);
   useEffect(() => {
-    setEffort(settings.hermes_effort.effort);
-  }, [settings.hermes_effort.effort]);
-  const [provider, setProvider] = useState(settings.hermes.provider);
-  const [model, setModel] = useState(settings.hermes.model);
+    setEffort(settings.codex_effort.effort);
+  }, [settings.codex_effort.effort]);
+  const [provider, setProvider] = useState(settings.codex.provider);
+  const [model, setModel] = useState(settings.codex.model);
   useEffect(() => {
-    setProvider(settings.hermes.provider);
-    setModel(settings.hermes.model);
-  }, [settings.hermes.provider, settings.hermes.model]);
+    setProvider(settings.codex.provider);
+    setModel(settings.codex.model);
+  }, [settings.codex.provider, settings.codex.model]);
   const models = useMemo(() => providers.find((p) => p.slug === provider)?.models ?? [], [providers, provider]);
-  const changed = provider !== settings.hermes.provider || model !== settings.hermes.model;
+  const changed = provider !== settings.codex.provider || model !== settings.codex.model;
 
   return (
     <section className="card card-pad">
@@ -165,14 +160,14 @@ function HermesModel({
         <div>
           <h2 style={{ fontSize: 20 }}>Appling’s model</h2>
           <p className="muted small" style={{ margin: "4px 0 0" }}>
-            Now: <b>{settings.hermes.model || "GPT-6.1 Sol via Codex when linked"}</b>
-            {settings.hermes.provider ? ` · ${providers.find((p) => p.slug === settings.hermes.provider)?.name ?? settings.hermes.provider}` : ""}
+            Now: <b>{settings.codex.model || "GPT-6.1 Sol via Codex"}</b>
+            {settings.codex.provider ? ` · ${providers.find((p) => p.slug === settings.codex.provider)?.name ?? settings.codex.provider}` : ""}
           </p>
         </div>
         <button className="btn ghost small" onClick={onRefresh} disabled={loading}>{loading ? "Checking…" : "↻ Refresh list"}</button>
       </div>
       {providers.length === 0 ? (
-        <p className="muted small">{loading ? "Looking for your linked models…" : "No linked models found. Link a provider in the old Studio or with `hermes setup`."}</p>
+        <p className="muted small">{loading ? "Looking for your linked models…" : "Codex is not connected. Install Codex CLI and sign in, then refresh this list."}</p>
       ) : (
         <div className="folder-row" style={{ marginTop: 16, gridTemplateColumns: "minmax(0,1fr) minmax(0,1.4fr) auto" }}>
           <label>
@@ -202,16 +197,16 @@ function HermesModel({
           <span className="field-label">Effort</span>
           <select className="input" value={effort} onChange={(e) => setEffort(e.target.value)}>
             <option value="">{DEFAULT_EFFORT_LABEL}</option>
-            {HERMES_EFFORT_LEVELS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
+            {CODEX_EFFORT_LEVELS.map((l) => <option key={l.id} value={l.id}>{l.label}</option>)}
           </select>
         </label>
-        <button className="btn primary" disabled={effort === settings.hermes_effort.effort} onClick={() => void onSaveEffort(effort)}>
+        <button className="btn primary" disabled={effort === settings.codex_effort.effort} onClick={() => void onSaveEffort(effort)}>
           Save
         </button>
       </div>
-      {settings.hermes_effort.overridden && (
+      {settings.codex_effort.overridden && (
         <p className="small muted" style={{ margin: "8px 0 0" }}>
-          A per-model setting in config.yaml gives {settings.hermes.model} effort “{effortName(settings.hermes_effort.effective)}”, and it wins over this one.
+          The saved model uses {settings.codex.model} effort “{effortName(settings.codex_effort.effective)}”, and it wins over this one.
         </p>
       )}
     </section>
@@ -299,7 +294,7 @@ export function AgentModel({ agent, options, onSave }: AgentModelProps) {
           <span className="field-label">Effort</span>
           <select className="input" value={effort} onChange={(e) => setEffort(e.target.value)}>
             <option value="">Appling’s effort</option>
-            {HERMES_EFFORT_LEVELS.map((l) => <option key={l.id} value={l.id}>{effortName(l.id)}</option>)}
+            {CODEX_EFFORT_LEVELS.map((l) => <option key={l.id} value={l.id}>{effortName(l.id)}</option>)}
           </select>
         </label>
       </div>

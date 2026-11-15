@@ -1,6 +1,6 @@
 """Summarise a project's run from its files, for comparing engines fairly.
 
-    .venv/bin/python -m lyra_lite.report "~/Appling Projects/pocket-tasks-hermes" [...more]
+    .venv/bin/python -m lyra_lite.report "~/Appling Projects/pocket-tasks-codex" [...more]
 """
 
 from __future__ import annotations
@@ -34,7 +34,7 @@ def summarise(root: Path) -> dict:
         commits = 0
     return {
         "project": root.name,
-        "engine": store.state().get("engine") or "hermes",
+        "engine": store.state().get("engine") or "codex",
         "wall_hours": round((events[-1]["ts"] - events[0]["ts"]) / 3600, 2) if events else 0,
         "working_hours": round(busy / 3600, 2),
         "owner_messages": kinds.get("user", 0),

@@ -1,4 +1,4 @@
-"""Appling: a small, file-first shell around the Hermes engine.
+"""Appling: a small, file-first shell around the native Codex engine.
 
 The product is called Appling; the package, the per-project ``.lyra/`` folder
 and other internal names keep their original "lyra" spelling so existing
@@ -7,5 +7,5 @@ projects keep working.
 
 # Appling's own version, separate from LYRA_VERSION (the Studio/Hermes line).
 PRODUCT_NAME = "Appling"
-__version__ = "0.17.12-beta"
-VERSION_LABEL = "v0.17.12 beta"
+__version__ = "0.17.13-beta"
+VERSION_LABEL = "v0.17.13 beta"

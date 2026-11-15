@@ -8,7 +8,6 @@ drive Appling without touching a live connection.
 from __future__ import annotations
 
 import hashlib
-import importlib.util
 import logging
 import threading
 import time
@@ -38,16 +37,8 @@ def project_key(root: Path) -> str:
 
 
 def _load_checkpoint():
-    path = REPO_ROOT / "plugins" / "ultimate-builder" / "project_checkpoint.py"
-    try:
-        spec = importlib.util.spec_from_file_location("lyra_lite_project_checkpoint", path)
-        module = importlib.util.module_from_spec(spec)
-        assert spec.loader is not None
-        spec.loader.exec_module(module)
-        return module.checkpoint_project
-    except Exception:
-        logger.warning("lyra-lite: checkpoint module unavailable", exc_info=True)
-        return None
+    from lyra_lite.checkpoint import checkpoint_project
+    return checkpoint_project
 
 
 _checkpoint_project = None
@@ -872,11 +863,10 @@ class ProjectRunner:
         if result.reply:
             entries.append({"role": "assistant", "content": result.reply, "ts": now})
         self.store.append_transcript(entries)
-        # Hermes can fail after a tool has already started a background job.
-        # Its returned conversation includes that dispatch and must survive
-        # the error so the next turn can continue it.
-        keep_hermes_progress = getattr(self._engine, "name", None) == "hermes"
-        if result.messages and (not result.error or keep_hermes_progress):
+        # Preserve submitted text after failures; native tool history remains
+        # in the durable Codex thread.
+        keep_engine_progress = getattr(self._engine, "name", None) == "codex"
+        if result.messages and (not result.error or keep_engine_progress):
             try:
                 self.store.save_messages(result.messages)
             except Exception as exc:

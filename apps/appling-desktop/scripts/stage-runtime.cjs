@@ -20,16 +20,46 @@ fs.rmSync(npmArchive, { force: true });
 fs.mkdirSync(target, { recursive: true });
 fs.mkdirSync(bin, { recursive: true });
 
-const tracked = execFileSync('git', ['ls-files', '-z'], { cwd: repo, maxBuffer: 8 * 1024 * 1024 })
-  .toString('utf8').split('\0').filter(Boolean);
-for (const relative of tracked) {
-  if (relative.startsWith('apps/appling-desktop/')) continue;
-  const source = path.join(repo, relative);
-  if (!fs.existsSync(source) || !fs.statSync(source).isFile()) continue;
-  const destination = path.join(target, relative);
-  fs.mkdirSync(path.dirname(destination), { recursive: true });
-  fs.copyFileSync(source, destination);
+// Package only Appling and its local asset helpers, never the Hermes runtime.
+const excluded = new Set(['coordinator.py', 'delegation.py', 'recall_tool.py', 'hermes.py']);
+function copyTree(source, destination) {
+  if (!fs.existsSync(source)) return;
+  for (const entry of fs.readdirSync(source, { withFileTypes: true })) {
+    if (['node_modules', '__pycache__', 'ui', '.venv'].includes(entry.name) || excluded.has(entry.name)) continue;
+    const from = path.join(source, entry.name);
+    const to = path.join(destination, entry.name);
+    if (entry.isDirectory()) copyTree(from, to);
+    else if (entry.isFile()) {
+      fs.mkdirSync(path.dirname(to), { recursive: true });
+      fs.copyFileSync(from, to);
+    }
+  }
 }
+copyTree(path.join(repo, 'lyra_lite'), path.join(target, 'lyra_lite'));
+for (const relative of [
+  'plugins/ultimate-builder/skills/ultimate-app-builder/references/workflows/web-cinematic/scripts',
+  'plugins/ultimate-builder/skills/ultimate-app-builder/references/workflows/deck-builder/scripts',
+  'web/public/skill-avatars',
+]) copyTree(path.join(repo, relative), path.join(target, relative));
+for (const name of ['pyproject.toml', 'uv.lock']) {
+  fs.copyFileSync(path.join(repo, 'apps/appling-runtime', name), path.join(target, name));
+}
+for (const name of ['LICENSE', 'NOTICE']) {
+  if (fs.existsSync(path.join(repo, name))) fs.copyFileSync(path.join(repo, name), path.join(target, name));
+}
+const codexPath = require('./codex-binary.cjs').resolveCodex();
+const codexName = os.platform() === 'win32' ? 'codex.exe' : 'codex';
+fs.copyFileSync(fs.realpathSync(codexPath), path.join(bin, codexName));
+fs.chmodSync(path.join(bin, codexName), 0o755);
+execFileSync(path.join(bin, codexName), ['--version'], { stdio: 'ignore' });
+// The distributed Codex binary's Apache license must accompany the package.
+for (const name of ['CODEX-LICENSE', 'CODEX-NOTICE']) fs.copyFileSync(path.join(repo, 'apps/appling-runtime', name), path.join(target, name));
+
+const browserSource = path.join(repo, 'apps/appling-browser');
+if (!fs.existsSync(path.join(browserSource, 'node_modules/@playwright/cli/playwright-cli.js'))) {
+  throw new Error('Install browser tools first: npm --prefix apps/appling-browser ci');
+}
+fs.cpSync(browserSource, path.join(target, 'apps/appling-browser'), { recursive: true, dereference: true });
 
 const ui = path.join(repo, 'lyra_lite', 'ui', 'dist');
 if (!fs.existsSync(path.join(ui, 'index.html'))) {
@@ -44,7 +74,7 @@ const uvPath = process.env.APPLING_UV_PATH || execFileSync(
 fs.copyFileSync(uvPath, path.join(bin, uvName));
 fs.chmodSync(path.join(bin, uvName), 0o755);
 
-// Hermes and the apps it builds invoke node/npm. Carry a portable Node binary.
+// Codex and the apps it builds invoke node/npm. Carry a portable Node binary.
 // A Homebrew node executable is a tiny shim linked to libnode.dylib, so copy
 // that library too when present; never copy an entire /usr/local prefix.
 const nodeRoot = path.dirname(path.dirname(fs.realpathSync(process.execPath)));
@@ -93,4 +123,4 @@ if (os.platform() === 'win32') {
     fs.chmodSync(shim, 0o755);
   }
 }
-console.log(`Staged ${tracked.length} tracked files, UI, uv, Node and npm`);
+console.log(`Staged Codex-only Appling runtime, UI, Codex, uv, Node and npm`);

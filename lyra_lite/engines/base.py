@@ -1,7 +1,7 @@
 """The pipe between Appling and an agent engine.
 
 An engine runs one turn at a time and reports everything through
-:class:`TurnHooks`. The Hermes adapter translates these hooks into
+:class:`TurnHooks`. The Codex adapter translates these hooks into
 runner events and approval requests, independently of the UI.
 """
 

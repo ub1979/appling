@@ -1,6 +1,6 @@
 """Pre-development plan approval cannot loop back after approved execution."""
 from lyra_lite import review
-from lyra_lite.engines.hermes import HermesEngine
+from lyra_lite.engines.codex import CodexEngine
 from lyra_lite.runner import ProjectRunner
 from lyra_lite.store import ProjectStore
 
@@ -20,8 +20,8 @@ def _approved(root):
 
 def test_development_start_latches_approved_execution_and_stops_plan_loop(tmp_path):
     store = _approved(tmp_path)
-    engine = HermesEngine(workspace=str(tmp_path), session_key="execution-test", store=store)
-    engine._on_progress("subagent.start", goal="sw-developer: Implement the approved editor", subagent_id="lead")
+    engine = CodexEngine(workspace=str(tmp_path), session_key="execution-test", store=store)
+    review.record_plan_execution(store, "sw-developer: Implement the approved editor")
     (tmp_path / "plan.md").write_text("# Plan\nImplement editor in independent waves.\n")
     runner = ProjectRunner(store, lambda *_: None)
     try:
@@ -63,8 +63,8 @@ def test_plan_edits_before_execution_still_require_review(tmp_path):
 def test_changed_plan_is_not_latched_as_approved_execution(tmp_path):
     store = _approved(tmp_path)
     (tmp_path / "plan.md").write_text("# Plan\nDifferent approach before execution.\n")
-    engine = HermesEngine(workspace=str(tmp_path), session_key="execution-test", store=store)
-    engine._on_progress("subagent.start", goal="sw-developer: Unapproved start", subagent_id="lead")
+    engine = CodexEngine(workspace=str(tmp_path), session_key="execution-test", store=store)
+    review.record_plan_execution(store, "sw-developer: Unapproved start")
     assert not review.plan_execution_started(store.state())
 
 

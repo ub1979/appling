@@ -9,6 +9,26 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.13 beta — 2026-11-15
+
+Desktop package 0.17.13-beta.1. Codex migration branch.
+
+- Replace Appling's execution, role sessions, settings and model discovery with
+  native Codex app-server. Persist/resume thread IDs instead of replaying history.
+- Keep owner reviews, explicit permission decisions, Stop and five-minute display
+  status. Close withdrawn requests; fail closed on unsupported permissions.
+- Keep three isolated coding leaves, ownership validation, clean-baseline checks
+  and temporary Git integration. Preserve failed work and full reports on disk.
+- Use coherent feature assignments, affected tests during editing, combined gates
+  at integration and independent final QA. Respect Personal/Reusable/Production.
+- Separate configuration under ~/.appling-codex, leave ~/.hermes untouched, and
+  back up/pause legacy project state. Refuse to migrate a running legacy project.
+- Package a small standalone runtime and the Codex executable with its license.
+  Real browser QA uses the pinned Playwright CLI and existing local preview host.
+  Optional image generation uses the OpenAI Images API and explicit API credentials.
+- Save the working Hermes version at the pushed rollback tag
+  `appling-nice-working-before-codex-2026-11-15` (`88fc0f4b3`).
+
 ### Appling v0.17.12 beta — 2026-11-15
 
 Desktop package 0.17.12-beta.1.
@@ -481,6 +501,14 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.34-a] - 2026-11-15 — Native Codex engine and proportional workflows
+
+Appling v0.17.13 beta. Desktop package 0.17.13-beta.1.
+
+- Codex-only Appling runtime, durable sessions and bounded worktree integration.
+- Separate settings/home, preserved reviews and explicit rollback checkpoint.
+- Proportional coding and QA workflow with combined validation before delivery.
 
 ## [0.19.33-a] - 2026-11-15 — Accurate worker status and completed review recovery
 

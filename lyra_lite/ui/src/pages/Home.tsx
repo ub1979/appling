@@ -123,7 +123,7 @@ export function Home() {
                 <span className="path"><bdi>{p.root}</bdi></span>
                 <div className="recent-row">
                   <AvatarStack ids={["app-it", ...p.team]} />
-                  <span className="tiny muted">Hermes</span>
+                  <span className="tiny muted">Codex</span>
                 </div>
               </button>
               <button className="btn small danger" disabled={p.running || deleting !== null}

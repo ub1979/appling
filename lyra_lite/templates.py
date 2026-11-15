@@ -3,7 +3,7 @@
 Built-in templates live in ``lyra_lite/templates/<id>/`` (``template.json``,
 ``spec.md``, optional ``demo/index.html``). The owner's own templates — for
 example prompts they bought — live only in
-``<HERMES_HOME>/lyra-lite/templates/<id>/`` on their machine and are never
+``<APPLING_HOME>/templates/<id>/`` on their machine and are never
 copied into Appling's source.
 """
 
@@ -28,9 +28,9 @@ MAX_SPEC_CHARS = 20_000
 
 
 def user_root() -> Path:
-    from hermes_constants import get_hermes_home
+    from lyra_lite.config import app_home
 
-    return get_hermes_home() / "lyra-lite" / "templates"
+    return app_home() / "templates"
 
 
 def _load(folder: Path, own: bool) -> dict | None:
@@ -174,11 +174,11 @@ def _write_tools(kit: Path) -> None:
     import os
     import sys
 
-    from hermes_constants import get_hermes_home
+    from lyra_lite.config import app_home
 
-    py, repo, home = sys.executable, str(REPO_ROOT), str(get_hermes_home())
+    py, repo, home = sys.executable, str(REPO_ROOT), str(app_home())
     tools = {
-        "imagine": f'exec env PYTHONPATH="{repo}" HERMES_HOME="${{HERMES_HOME:-{home}}}" "{py}" -m lyra_lite.imagine "$@"',
+        "imagine": f'exec env PYTHONPATH="{repo}" APPLING_HOME="${{APPLING_HOME:-{home}}}" "{py}" -m lyra_lite.imagine "$@"',
         "cutout": f'exec "{py}" "{SKILL_SCRIPTS / "cutout.py"}" "$@"',
         "frames": f'exec "{py}" "{SKILL_SCRIPTS / "frames.py"}" "$@"',
     }

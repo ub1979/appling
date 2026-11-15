@@ -99,29 +99,15 @@ class ProjectStore:
         return self
 
     def _migrate_engine(self) -> None:
-        from lyra_lite.settings import _section
-
         state = self.state()
-        settings = _section()
-        inherited = not (state.get("engine_locked") or state.get("engine_override"))
-        legacy_default = settings.get("legacy_engine_default") or settings.get("engine")
-        was_claude = (state.get("engine") == "claude" or bool(state.get("claude_session"))
-                      or bool(state.get("claude_chat"))
-                      or (inherited and legacy_default == "claude"))
-        obsolete = any(k in state for k in ("claude", "claude_session", "claude_chat"))
-        if was_claude or obsolete:
-            _backup_once(self.dir / "migrations" / "claude-to-hermes" / "state.json",
-                         self.state_path.read_bytes())
-            for key in ("claude", "claude_session", "claude_chat", "engine_override"):
-                state.pop(key, None)
-        if was_claude:
-            # Leave the old turn for normal restart recovery. Queued work and
-            # watchdog continuation stay held until an explicit user message.
-            state.update(paused=True, rules_hash="", focus_hash=None, focus_turns=0,
-                         engine_migration={"from": "claude", "to": "hermes",
-                                           "at": round(time.time(), 3)})
-        if was_claude or obsolete or state.get("engine") != "hermes" or not state.get("engine_locked"):
-            state.update(engine="hermes", engine_locked=True)
+        previous = state.get("engine")
+        if previous != "codex":
+            if state.get("running"):
+                raise ValueError("This project is still running in the previous Appling engine. Stop it there or use a separate project copy before opening it in Codex.")
+            _backup_once(self.dir / "migrations" / "before-codex" / "state.json", self.state_path.read_bytes())
+            # Never resume old work automatically under a different engine.
+            state.update(engine="codex", engine_locked=True, paused=True, rules_hash="",
+                         engine_migration={"from": previous, "to": "codex", "at": round(time.time(), 3)})
             _atomic_write_json(self.state_path, state)
 
     @staticmethod
@@ -132,7 +118,7 @@ class ProjectStore:
             "queue": [],
             "turn": None,
             "turn_start_offset": 0,
-            "engine": "hermes",
+            "engine": "codex",
             "engine_locked": True,
             "rules_hash": "",
         }

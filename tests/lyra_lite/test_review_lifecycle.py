@@ -6,7 +6,7 @@ import pytest
 
 from lyra_lite import review
 from lyra_lite.engines.base import TurnResult
-from lyra_lite.engines.hermes import HermesEngine
+from lyra_lite.engines.codex import CodexEngine
 from lyra_lite.runner import ProjectRunner
 from lyra_lite.store import ProjectStore
 
@@ -51,11 +51,11 @@ def _open(runner):
 @pytest.mark.parametrize("kind", ["prototype", "requirements"])
 def test_review_does_not_use_ordinary_question_timeout(project, monkeypatch, kind):
     runner, _ = project
-    monkeypatch.setattr("lyra_lite.engines.hermes.CLARIFY_TIMEOUT_S", 0.01)
+    monkeypatch.setattr("lyra_lite.engines.review_requests.CLARIFY_TIMEOUT_S", 0.01)
     revision = review.prototype_revision(runner.root)
     if kind == "requirements":
         runner.store.update_state(prototype_approved=revision)
-    engine = HermesEngine(workspace=str(runner.root), session_key=runner.session_key(), store=runner.store)
+    engine = CodexEngine(workspace=str(runner.root), session_key=runner.session_key(), store=runner.store)
     engine._hooks = runner._hooks
     choices = review.PROTOTYPE_CHOICES if kind == "prototype" else review.REQUIREMENTS_CHOICES
     with ThreadPoolExecutor(max_workers=1) as pool:

@@ -1,53 +1,48 @@
-"""Make a picture with AI from the command line, on the owner's ChatGPT plan.
+"""Generate or edit a project image through the OpenAI Images API.
 
-    python -m lyra_lite.imagine "prompt" --out assets/hero.png
-        [--aspect landscape|square|portrait] [--ref picture.png ...]
-
-It uses Hermes' ``openai-codex`` image provider, so it needs only the Codex /
-ChatGPT sign-in Appling already has — no API key. ``--ref`` sends existing
-pictures to edit or to keep a scene consistent ("same car, sheet removed").
-Every picture uses the owner's plan allowance: only run it when the owner
-agreed to AI pictures for this project.
-
-Website projects get a wrapper at ``.lyra/kit/imagine`` so agents on any
-engine can call it from a terminal.
+Only run after the owner agrees to AI images and their API cost. Credentials
+come from OPENAI_API_KEY; no Hermes auth or subscription credential extraction.
 """
 
 from __future__ import annotations
 
 import argparse
-import importlib.util
+import base64
 import json
-import shutil
+import os
 import sys
+from contextlib import ExitStack
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent
-PROVIDER = REPO / "plugins" / "image_gen" / "openai-codex" / "__init__.py"
-
-
-def _provider():
-    spec = importlib.util.spec_from_file_location("lyra_codex_image", PROVIDER)
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    for value in vars(module).values():
-        if isinstance(value, type) and value.__module__ == module.__name__ and hasattr(value, "generate"):
-            return value()
-    raise RuntimeError("The Codex image provider could not be loaded.")
+import httpx
 
 
 def imagine(prompt: str, out: Path, aspect: str = "landscape", refs: list[str] | None = None) -> dict:
-    provider = _provider()
-    if not provider.is_available():
-        return {"success": False, "error": "Not signed in to Codex/ChatGPT. Sign in once with `hermes auth codex`."}
-    refs = [str(Path(r).expanduser().resolve()) for r in refs or []]
-    result = provider.generate(prompt, aspect_ratio=aspect, image_url=refs[0] if refs else None,
-                               reference_image_urls=refs[1:] or None)
-    if not result.get("success"):
-        return {"success": False, "error": result.get("error") or "image generation failed"}
-    out.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(result["image"], out)
-    return {"success": True, "path": str(out), "size": result.get("size")}
+    key = os.environ.get("OPENAI_API_KEY")
+    if not key:
+        return {"success": False, "error": "Image generation requires OPENAI_API_KEY and uses paid API credits. Ask the owner before generating."}
+    from lyra_lite.settings import _section
+    model = str(_section().get("image_model") or "gpt-image-1.5")
+    size = {"landscape": "1536x1024", "square": "1024x1024", "portrait": "1024x1536"}[aspect]
+    data = {"model": model, "prompt": prompt, "size": size, "n": 1}
+    try:
+        with ExitStack() as stack:
+            client = stack.enter_context(httpx.Client(timeout=180))
+            headers = {"Authorization": "Bearer " + key}
+            if refs:
+                files = [("image[]", (Path(r).name, stack.enter_context(open(Path(r).expanduser(), "rb")))) for r in refs]
+                response = client.post("https://api.openai.com/v1/images/edits", headers=headers,
+                                       data={k: str(v) for k, v in data.items()}, files=files)
+            else:
+                response = client.post("https://api.openai.com/v1/images/generations", headers=headers, json=data)
+            if response.status_code != 200:
+                return {"success": False, "error": f"OpenAI Images API returned HTTP {response.status_code}; no image was saved."}
+            image = base64.b64decode(response.json()["data"][0]["b64_json"], validate=True)
+            out.parent.mkdir(parents=True, exist_ok=True)
+            out.write_bytes(image)
+            return {"success": True, "path": str(out), "size": size}
+    except (OSError, ValueError, KeyError, IndexError, httpx.HTTPError) as exc:
+        return {"success": False, "error": f"Image generation failed ({type(exc).__name__}); no credentials were logged."}
 
 
 def main(argv: list[str] | None = None) -> int:

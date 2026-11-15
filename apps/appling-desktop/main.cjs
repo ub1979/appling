@@ -102,14 +102,16 @@ async function start() {
       await run('tar', ['-xzf', path.join(resources, 'npm.tar.gz'), '-C', support], runtime, log);
       setStatus('Installing Python. This can take a few minutes on first launch…');
       await run(uv, ['python', 'install', '3.11', '--no-bin'], runtime, log);
+      process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(data, 'browsers');
+      setStatus('Installing the browser for app checks…');
+      await run(path.join(resources, 'node', process.platform === 'win32' ? 'node.exe' : 'bin/node'),
+        [path.join(runtime, 'apps/appling-browser/node_modules/playwright/cli.js'), 'install', 'chromium'], runtime, log);
       setStatus('Installing Appling dependencies…');
       await run(uv, ['sync', '--locked', '--no-dev', '--python', '3.11'], runtime, log);
-      const hermes = path.join(runtime, '.venv', process.platform === 'win32' ? 'Scripts/hermes.exe' : 'bin/hermes');
-      setStatus('Enabling the building tools…');
-      await run(hermes, ['plugins', 'enable', 'ultimate-builder'], runtime, log);
       fs.writeFileSync(marker, app.getVersion());
     }
 
+    process.env.PLAYWRIGHT_BROWSERS_PATH = path.join(data, 'browsers');
     process.env.APPLING_NPM_DIR = path.join(runtime, '.appling-support', 'npm');
 
     const python = path.join(runtime, '.venv', process.platform === 'win32' ? 'Scripts/python.exe' : 'bin/python');
@@ -118,7 +120,7 @@ async function start() {
     setStatus('Starting Appling…');
     server = spawn(python, ['-m', 'lyra_lite', '--no-open', '--port', String(port), '--token', token], {
       cwd: runtime,
-      env: { ...process.env, PYTHONPATH: runtime },
+      env: { ...process.env, PYTHONPATH: runtime, APPLING_HOME: path.join(data, "codex-home") },
       windowsHide: true,
       detached: process.platform !== 'win32',
     });

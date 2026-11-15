@@ -6,13 +6,13 @@ __all__ = ["Engine", "TurnHooks", "TurnResult", "make_engine"]
 
 
 ENGINES = {
-    "hermes": "Hermes — any linked subscription (Codex, Ollama, Copilot, Claude, …)",
+    "codex": "Codex — native coding engine",
 }
 
 
 def make_engine(name: str, **kwargs) -> Engine:
-    if name == "hermes":
-        from lyra_lite.engines.hermes import HermesEngine
+    if name == "codex":
+        from lyra_lite.engines.codex import CodexEngine
 
-        return HermesEngine(**kwargs)
+        return CodexEngine(**kwargs)
     raise ValueError(f"unknown engine: {name}")

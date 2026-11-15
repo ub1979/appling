@@ -1,0 +1,6 @@
+{
+  "name": "appling-browser-tools",
+  "private": true,
+  "version": "0.17.13-beta.1",
+  "dependencies": { "@playwright/cli": "0.1.24" }
+}

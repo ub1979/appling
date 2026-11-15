@@ -82,8 +82,8 @@ export interface AgentModelSetting {
 
 export interface AiSettings {
   engine: string;
-  hermes: { provider: string; model: string };
-  hermes_effort: { effort: string; effective: string; overridden: boolean };
+  codex: { provider: string; model: string };
+  codex_effort: { effort: string; effective: string; overridden: boolean };
   about_me: string;
   agent_models: AgentModelSetting[];
 }
@@ -220,7 +220,7 @@ export const api = {
   settingsSave: (body: Record<string, unknown>) => call<AiSettings>("POST", "/api/settings", body),
   agentModelSave: (id: string, selection: ModelSelection | null) =>
     call<AiSettings>("POST", `/api/settings/agents/${id}`, { selection }),
-  effortSave: (effort: string) => call<AiSettings["hermes_effort"]>("POST", "/api/settings/effort", { effort }),
+  effortSave: (effort: string) => call<AiSettings["codex_effort"]>("POST", "/api/settings/effort", { effort }),
   modelOptions: (refresh = false) => call<ModelOptions>("GET", `/api/settings/models${refresh ? "?refresh=true" : ""}`),
   modelSave: (provider: string, model: string, confirm: boolean) =>
     call<{ ok: boolean; confirm_required?: boolean; message?: string }>("POST", "/api/settings/model", { provider, model, confirm }),

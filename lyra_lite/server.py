@@ -37,7 +37,7 @@ from lyra_lite.watchdog import NUDGE
 
 logger = logging.getLogger(__name__)
 
-RULES_PATH = Path(__file__).resolve().parent / "rules" / "lyra.md"
+RULES_PATH = Path(__file__).resolve().parent / "rules" / "codex.md"
 UI_DIST = Path(__file__).resolve().parent / "ui" / "dist"
 AVATARS = REPO_ROOT / "web" / "public" / "skill-avatars"
 DEFAULT_SKILLS = ["ultimate-builder:app-it"]
@@ -49,9 +49,9 @@ def projects_root() -> Path:
 
 
 def _registry_path() -> Path:
-    from hermes_constants import get_hermes_home
+    from lyra_lite.config import app_home
 
-    return get_hermes_home() / "lyra-lite" / "projects.json"
+    return app_home() / "projects.json"
 
 
 def trusted_host(header: str) -> bool:
@@ -83,7 +83,7 @@ def rules_text() -> str:
         return ""
 
 
-APP_IT_SKILL = REPO_ROOT / "plugins" / "ultimate-builder" / "skills" / "app-it" / "SKILL.md"
+APP_IT_SKILL = Path(__file__).resolve().parent / "rules" / "codex-roles.md"
 
 
 def current_rules_hash() -> str:
@@ -99,14 +99,10 @@ def current_rules_hash() -> str:
 
 
 def lyra_settings() -> dict:
-    """The ``lyra_lite:`` section of config.yaml (optional)."""
-    try:
-        from hermes_cli.config import load_config
+    """Private Appling runtime settings (optional)."""
+    from lyra_lite.settings import _section
 
-        section = (load_config() or {}).get("lyra_lite") or {}
-        return section if isinstance(section, dict) else {}
-    except Exception:
-        return {}
+    return _section()
 
 
 def default_engine_factory(store: ProjectStore, session_key: str):
@@ -119,7 +115,7 @@ def default_engine_factory(store: ProjectStore, session_key: str):
     prompt = f"{text}\n\nProject folder: {store.root}\n"
     if about_me():
         prompt += f"\nAbout the owner (written by them; applies to every project):\n{about_me()}\n"
-    return make_engine("hermes", workspace=str(store.root), session_key=session_key,
+    return make_engine("codex", workspace=str(store.root), session_key=session_key,
                        system_prompt=prompt, skills=DEFAULT_SKILLS, store=store)
 
 
@@ -220,9 +216,6 @@ class Lyra:
                     self._attach(Path(root))
                 except Exception:
                     logger.warning("lyra-lite: could not open %s", root, exc_info=True)
-        self._poller = threading.Thread(target=self._poll_completions,
-                                        name="lyra-completions", daemon=True)
-        self._poller.start()
         threading.Thread(target=self._watchdog_loop, name="lyra-watchdog", daemon=True).start()
 
     def _watchdog_loop(self) -> None:
@@ -256,7 +249,10 @@ class Lyra:
         with self._lock:
             runner = self.runners.get(pid)
             if runner is None:
-                runner = ProjectRunner(ProjectStore(root), self.engine_factory)
+                try:
+                    runner = ProjectRunner(ProjectStore(root), self.engine_factory)
+                except ValueError as exc:
+                    raise HTTPException(status_code=409, detail=str(exc)) from exc
                 self.runners[pid] = runner
         return runner
 
@@ -375,51 +371,6 @@ class Lyra:
                     return runner
         return None
 
-    def _poll_completions(self) -> None:
-        from tools.async_delegation import (
-            claim_event_delivery,
-            complete_event_delivery,
-            release_event_delivery,
-            restore_undelivered_completions,
-        )
-        from tools.process_registry import format_process_notification, process_registry
-
-        queue = process_registry.completion_queue
-        try:
-            # Helpers that finished (or died) while Lyra was down report now.
-            restored = restore_undelivered_completions(queue)
-            if restored:
-                logger.info("lyra-lite: restored %d undelivered helper result(s)", restored)
-        except Exception:
-            logger.warning("lyra-lite: could not restore helper results", exc_info=True)
-
-        while not self._stop.is_set():
-            try:
-                evt = queue.get(timeout=1)
-            except Exception:
-                continue
-            runner = self._owner(str(evt.get("session_key") or ""))
-            if runner is None:
-                # Another app's (or an old chat's) result: leave it pending in
-                # the durable store for its own owner instead of adopting it.
-                logger.info("lyra-lite: ignoring helper result for %r",
-                            evt.get("session_key"))
-                continue
-            claim = claim_event_delivery(evt, "lyra-lite")
-            if claim is None:
-                continue
-            try:
-                text = format_process_notification(evt)
-                if text:
-                    runner.store.append_event(
-                        "helper", event="reported", subagent_id=str(evt.get("delegation_id") or ""),
-                        goal=str(evt.get("goal") or "")[:300], status=str(evt.get("status") or ""),
-                    )
-                    runner.submit(text, kind="helper_done")
-                complete_event_delivery(evt, claim)
-            except Exception:
-                release_event_delivery(evt, claim)
-                logger.warning("lyra-lite: helper result delivery failed", exc_info=True)
 
 
 def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
@@ -539,8 +490,8 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     @app.post("/api/projects/{pid}/settings")
     def settings(pid: str, body: dict = Body(...)):
         runner = lyra.get(pid)
-        if "claude" in body or body.get("engine", "hermes") != "hermes":
-            raise HTTPException(status_code=400, detail="Appling uses Hermes. Claude Code settings are no longer supported.")
+        if "claude" in body or body.get("engine", "codex") != "codex":
+            raise HTTPException(status_code=400, detail="Appling uses Codex.")
         if "keep_going" in body:
             runner.set_keep_going(bool(body["keep_going"]))
         return {"ok": True, **runner.snapshot()}
@@ -552,8 +503,8 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
 
         return {
             "engine": st.default_engine(),
-            "hermes": st.hermes_model(),
-            "hermes_effort": st.hermes_effort(),
+            "codex": st.codex_model(),
+            "codex_effort": st.codex_effort(),
             "about_me": st.about_me(),
             "agent_models": st.agent_model_settings(),
         }
@@ -572,7 +523,10 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     async def settings_models(refresh: bool = False):
         from lyra_lite.settings import model_options
 
-        return await asyncio.to_thread(model_options, refresh)
+        try:
+            return await asyncio.to_thread(model_options, refresh)
+        except RuntimeError as exc:
+            raise HTTPException(status_code=503, detail=str(exc)) from exc
 
     @app.post("/api/settings")
     def save_settings(body: dict = Body(...)):
@@ -589,20 +543,23 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             changes["about_me"] = str(body.get("about_me") or "").strip()[:st.ABOUT_ME_LIMIT]
         if changes:
             st.save_section(changes)
-            # Reaffirming Hermes must not close an engine with live helpers.
+            # Reaffirming Codex must not close an engine with live helpers.
             if changes.keys() - {"engine"}:
                 _apply_everywhere()
         return _settings_view()
 
     @app.post("/api/settings/model")
     async def save_model(body: dict = Body(...)):
-        from lyra_lite.settings import set_hermes_model
+        from lyra_lite.settings import set_codex_model
 
         provider = str(body.get("provider") or "").strip()
         model = str(body.get("model") or "").strip()
         if not provider or not model:
             raise HTTPException(status_code=400, detail="Choose a provider and a model")
-        result = await asyncio.to_thread(set_hermes_model, provider, model, bool(body.get("confirm")))
+        try:
+            result = await asyncio.to_thread(set_codex_model, provider, model, bool(body.get("confirm")))
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         if result.get("ok"):
             _apply_everywhere()
         return result
@@ -621,10 +578,10 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
 
     @app.post("/api/settings/effort")
     async def save_effort(body: dict = Body(...)):
-        from lyra_lite.settings import set_hermes_effort
+        from lyra_lite.settings import set_codex_effort
 
         try:
-            result = await asyncio.to_thread(set_hermes_effort, str(body.get("effort") or "").strip())
+            result = await asyncio.to_thread(set_codex_effort, str(body.get("effort") or "").strip())
         except ValueError:
             raise HTTPException(status_code=400, detail="Unknown effort level")
         _apply_everywhere()
