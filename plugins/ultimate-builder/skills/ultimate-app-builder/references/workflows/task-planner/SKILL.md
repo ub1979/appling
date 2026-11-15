@@ -27,8 +27,8 @@ Accept inline args: `--plan`, `--requirements`.
 The delegation context and `requirements.md` carry the approved build profile.
 
 - **`personal`** — write a one-page `task-graph.md` and stop: 1–3 tasks, each a
-  whole user-visible slice (code, its tests and its commit) that one developer
-  agent finishes; a single line of acceptance criteria per task; the test
+  whole user-visible slice (code, its tests and its commit) with one accountable
+  lead and useful independent workers; a single line of acceptance criteria; the test
   command; which tasks can run in parallel. Skip epics, waves analysis,
   critical path, risk register, design scoring and multi-perspective review.
   A small app (a calculator, a to-do list) is one or two tasks, not nine.
@@ -51,6 +51,22 @@ and contracts. Plan independent file ownership and a combined integration gate;
 use real dependencies rather than serializing tasks by list order. Keep one lead
 through a feature and its fixes. Selected agents may use same-role leaf workers;
 explain a useful count within the shared 10-worker budget, configurable to 15.
+
+## Execution split — required for every profile
+
+Keep top-level tasks proportional, but distinguish the accountable lead from
+worker packages inside a task. In a compact table give each package's exact
+owned paths or read-only scope, input/output contract, real dependencies,
+acceptance command, and the lead's combined integration gate. Evaluate a lead
+plus 2–3 workers; use more when useful independent work exists and capacity
+allows it. If serial execution wins, name the actual shared dependency or
+startup cost. Personal profile, one lead, and shared App integration alone do
+not justify serializing independent modules or checks.
+
+Plan QA journey groups against one saved build with isolated data, ports and
+artifact directories. Keep shared fixtures serial, rather than serializing
+all checks. Workers are execution details within approved scope, not extra
+owner approvals, product requirements, team roles or top-level epics.
 
 ## Step 1 — Extract & Organize Work
 
@@ -250,7 +266,9 @@ Rules: split anything larger than L into M/S tasks; each task completable in one
 - Fit one helper (Reusable/Production): a task must be finishable by one developer helper within about 60 tool calls, including reading, testing, and committing — roughly one user-visible behavior touching at most ~5 files. Split anything bigger, but do not split below a coherent slice: every task costs a fresh agent start-up. For Personal projects prefer fewer, larger slices (see the profile section above).
 - Name file ownership: list the files each task creates or changes. Tasks in the same wave must not share files, so they can run as parallel helpers.
 - In Appling, group independent coding work under one development lead, which
-  can assign up to three isolated coding workers when the host enables it.
+  must identify useful isolated worker packages, normally evaluating a lead
+  plus 2–3 workers first and scaling within the host budget (default 10 total
+  executing leads/workers, configurable to 15).
   Establish shared schemas/interfaces and dependencies first; keep shared
   configuration, manifests/lockfiles and project summaries with that lead.
   A smaller task size is not itself a dependency: do not chain every slice to

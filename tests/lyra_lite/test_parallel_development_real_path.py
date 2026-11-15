@@ -12,7 +12,7 @@ from tests.lyra_lite.test_lyrad_real_path import (  # noqa: F401
 )
 
 
-@pytest.mark.parametrize("workers,limit", [(2, 10), (9, 10), (14, 15)])
+@pytest.mark.parametrize("workers,limit", [(2, 10), (3, 10), (9, 10), (14, 15)])
 def test_developer_fans_out_and_integrates_relative_file_and_terminal_work(env, workers, limit):
     letters = [chr(ord("A") + i) for i in range(workers)]
     lead = "sw-developer: DEV-LEAD implement independent modules"
@@ -194,12 +194,14 @@ def test_stop_reaches_nested_workers_and_prevents_integration(env):
 def test_qa_read_only_workers_keep_the_selected_role_provider_and_model(env):
     tasks = [{"goal": f"READ-{n}", "context": json.dumps({
         "read_only": True, "instructions": "Read the contract and return findings without editing files."
-    })} for n in range(2)]
-    barrier = threading.Barrier(2, timeout=30)
+    })} for n in range(3)]
+    barrier = threading.Barrier(3, timeout=30)
     with FakeOpenAIServer([]) as coordinator, FakeOpenAIServer([], side_scripts={
-        "QA-LEAD": [tool_step("delegate_task", {"tasks": tasks}), text_step("QA findings consolidated.")],
+        "QA-LEAD": [tool_step("delegate_task", {"tasks": tasks,
+            "context": "One QA lead plus three independent read-only contract checks."}),
+            text_step("QA findings consolidated.")],
         **{f"READ-{n}": [{**tool_step("read_file", {"path": "contract.txt"}), "worker_barrier": True},
-                         text_step("Contract checked; no modifications.")] for n in range(2)},
+                         text_step("Contract checked; no modifications.")] for n in range(3)},
     }) as role_provider:
         next_step = role_provider.next_step
         def simultaneous(body):
@@ -239,6 +241,39 @@ def test_qa_read_only_workers_keep_the_selected_role_provider_and_model(env):
             assert all(r["model"] == "selected-qa-model" for r in role_provider.main_requests())
             assert all(r["model"] == "fake-model" for r in coordinator.main_requests())
             assert len([e for e in _events(root) if e["type"] == "helper" and e.get("event") == "start"
-                        and e.get("goal", "").startswith("READ-")]) == 2
+                        and e.get("goal", "").startswith("READ-")]) == 3
+        finally:
+            daemon.stop()
+
+
+def test_planner_receives_worker_contract_without_implementation_permission(env):
+    from lyra_lite.development import PLANNING_CONTEXT
+
+    with FakeOpenAIServer([], side_scripts={
+        'PACKAGE-PLAN': [text_step('Worker packages planned; no implementation started.')],
+    }) as llm:
+        _write_config(env['hermes_home'], llm.base_url,
+                      lyra_lite={'watchdog': {'enabled': False}})
+        daemon = Daemon(env).start()
+        try:
+            pid, root = _new_project(daemon, env, 'Worker package planning')
+            llm.script = [tool_step('delegate_task', {
+                'goal': 'task-planner: PACKAGE-PLAN',
+                'context': 'Preserve this approved boundary: local files only.',
+            }), text_step('Planning is running.'), text_step('Plan received.')]
+            assert daemon.post(f'/api/projects/{pid}/messages', {'text': 'Plan worker packages'}).is_success
+            _wait_event(root, lambda e: e['type'] == 'turn_end' and e.get('reply') == 'Plan received.', 60)
+            requests = [r for r in llm.main_requests() if any(
+                m.get('role') == 'user' and str(m.get('content', '')).startswith('task-planner:')
+                for m in r['messages'])]
+            assert requests
+            for request in requests:
+                context = '\n'.join(str(m.get('content', '')) for m in request['messages'])
+                # A transport assertion, not a snapshot of the policy wording:
+                # the complete current contract and owner scope reach the planner.
+                assert PLANNING_CONTEXT in context
+                assert 'Preserve this approved boundary: local files only.' in context
+                assert 'delegate_task' not in {t['function']['name'] for t in request['tools']}
+            assert not [e for e in _events(root) if e['type'] == 'worker_plan']
         finally:
             daemon.stop()

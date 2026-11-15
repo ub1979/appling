@@ -9,6 +9,16 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.15 beta — 2026-11-15
+
+Hermes desktop package 0.17.15-beta.1. Codex remains separate and unchanged.
+
+- Require a compact worker-package plan for every profile; Personal task counts
+  no longer imply serial execution. Evaluate a lead plus 2–3 workers first.
+- Carry ownership, contracts and integration checks into developer/QA handoffs;
+  require useful parallel batches or a concrete reason for fewer workers.
+- Retain all approval, worktree, merge, provider and shared capacity guards.
+
 ### Appling v0.17.14 beta — 2026-11-15
 
 Hermes desktop package 0.17.14-beta.1. The separate Codex version remains v0.17.14c.
@@ -514,6 +524,13 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.36-a] - 2026-11-15 — Explicit parallel execution handoffs
+
+- Plan worker packages independently of top-level task counts and require
+  developer and QA leads to use useful parallel batches or explain serial work.
+- Exercise a lead with three simultaneous coding and read-only QA workers,
+  preserving checked integration, selected providers and conversation caching.
 
 ## [0.19.35-a] - 2026-11-15 — Reliable tool reads and scope approvals
 

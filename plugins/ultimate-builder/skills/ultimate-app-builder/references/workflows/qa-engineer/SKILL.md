@@ -18,7 +18,11 @@ given.
 
 ## Parallel evidence and bounded debugging
 
-For independent journeys, use same-role read-only workers on the same saved
+Before substantial QA, announce the count INCLUDING the lead and journey split.
+For a multi-journey change, evaluate one QA lead plus 2–3 workers and dispatch
+the useful independent groups together; Personal means one focused QA pass,
+which can use multiple workers. If serial, state the concrete fixture/resource
+constraint or startup cost. For independent journeys, use same-role read-only workers on the same saved
 baseline with separate test data, ports, browser sessions and artifact folders.
 Explain the chosen count within the shared 10-worker budget (configurable to 15).
 The QA lead consolidates findings; workers do not edit product code or shared

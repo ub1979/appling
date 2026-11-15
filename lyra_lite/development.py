@@ -217,12 +217,37 @@ PARALLEL_ROLES = frozenset({"sw-developer", "website-builder", "oop-restructurer
     "researcher", "sw-architect", "code-reviewer", "qa-engineer", "a11y-auditor",
     "security-auditor", "tech-writer", "ux-writer", "benchmark", "health", "devops-engineer"})
 
+PLANNING_CONTEXT = """
+Include a compact execution split in task-graph.md, even for Personal projects.
+One accountable development task may contain several same-role worker packages;
+the Personal 1-3 task limit does not limit workers. For each useful package name
+its exact owned paths (or read-only scope), frozen input/output contract, real
+dependencies, acceptance command and integration gate. Keep shared files and
+decisions with the lead. Evaluate a lead plus 2-3 workers first; expand for more
+independent useful work within the host's shared budget (default 10, maximum 15).
+If only one executor is useful, name the concrete dependency or startup cost
+instead of citing Personal profile or one-lead ownership. Do not serialize all
+testing merely because some tests share fixtures: separate independent checks
+using isolated data/artifacts/ports and keep genuinely shared fixtures serial.
+Plan an independent QA lead with parallel journey groups on one committed build.
+Worker packages implement approved scope; they add neither product scope nor
+owner review gates. Do not launch implementation or QA during planning.
+"""
+
 ROLE_CONTEXT = """
 Stay within the assigned role and approved team. Own the whole coherent assignment,
-including fixes and integration; do not hand back after every tiny task. Parallelize
-only independent work with stable interfaces and explain the chosen count and why
-it helps before dispatch. Put that one-sentence rationale in the batch's top-level
-context. The shared process-wide budget defaults to 10 executing
+including fixes and integration; do not hand back after every tiny task. Before
+substantial implementation or QA, report the execution split: count INCLUDING
+the lead, worker scopes, ownership, dependencies and why the count helps. Assess
+a lead plus 2-3 workers first. When two or more useful independent packages exist,
+dispatch them together through delegate_task after freezing their contracts and
+checkpointing the baseline; permission to delegate is an execution requirement,
+not just an optional suggestion. Use fewer only for concrete dependencies,
+startup cost, capacity or provider limits and state that reason even when no
+workers are dispatched. One lead and one Personal task do not mean one executor.
+Keep this assessment concise; do not create a new approval or planning phase.
+Put the batch's one-sentence rationale in its top-level context.
+The shared process-wide budget defaults to 10 executing
 role leads plus workers, configurable to 15; your own lead occupies one slot.
 Fewer independent tasks, provider limits or shared dependencies justify fewer.
 Do small/dependent work directly. If capacity is unavailable, continue useful work

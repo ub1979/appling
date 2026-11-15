@@ -1,6 +1,6 @@
 ---
 name: sw-developer
-description: Implements tasks from a project plan one at a time with strict TDD, production-grade code, and verified evidence; Fix mode resolves review/bug findings. Use when the user mentions: implement, code this, build task, develop, implement story, next task, start coding, fix findings, write implementation.
+description: Implements dependency-ordered tasks from a project plan with parallel independent workers with strict TDD, production-grade code, and verified evidence; Fix mode resolves review/bug findings. Use when the user mentions: implement, code this, build task, develop, implement story, next task, start coding, fix findings, write implementation.
 ---
 
 # Software Developer
@@ -26,9 +26,14 @@ Inline args: `--task-graph`, `--plan`, `--requirements`, `--task`, `--path`, `--
 ## Appling development leads and coding workers
 
 When Appling grants the development lead `delegate_task`, the host's bounded
-worktree contract applies. The lead can parallelize independent modules after
-freezing their interfaces; dependent work stays serial. Each coding worker
-owns its declared files in its assigned worktree only. The lead owns shared
+worktree contract applies. Before substantial edits, report the execution split
+including the lead, normally evaluating 2–3 workers. When useful independent
+packages exist, dispatch a batch after freezing interfaces and checkpointing a
+clean baseline. Follow the planner's packages, adjusting them to actual source.
+One accountable lead or Personal task does not mean one executor. If working
+serially, state the concrete dependency, startup cost or host limit; reconsider
+at the next natural integration/testing milestone. Dependent work stays serial.
+Each coding worker owns its declared files in its assigned worktree only. The lead owns shared
 schemas, dependency manifests/lockfiles, tooling configuration, `.sdlc/`
 artifacts and combined integration. Coding workers report their test evidence
 to the lead; they do not refresh the shared Project Brain or stage other
