@@ -90,6 +90,7 @@ class DevelopmentWave:
         if not self.lock.acquire(blocking=False):
             return json.dumps({"error": "A development wave is already running for this lead."})
         wave = None
+        result = {}
         try:
             if executor is None:
                 from tools.delegate_tool import delegate_task, _get_max_concurrent_children
@@ -113,7 +114,8 @@ class DevelopmentWave:
                 context = json.loads(context) if isinstance(context, str) else context
                 if not isinstance(context, dict):
                     raise ValueError("Task context must be JSON with owned_paths and instructions.")
-                paths = _paths(context.get("owned_paths"))
+                read_only = context.get("read_only") is True
+                paths = [] if read_only else _paths(context.get("owned_paths"))
                 if any(_overlap(a, b) for previous in owned for a in paths for b in previous):
                     raise ValueError("Coding tasks have overlapping file ownership; combine them or run serially.")
                 if any(not (self.root / path).resolve().is_relative_to(self.root) for path in paths):
@@ -135,14 +137,16 @@ class DevelopmentWave:
                 name = f"appling/dev-{wave.name}-{index}"
                 path = wave / f"worker-{index}"
                 git(self.root, "worktree", "add", "-b", name, str(path), base)
-                records.append({"workspace": str(path), "branch": name, "owned_paths": owned[index]})
+                records.append({"workspace": str(path), "branch": name, "owned_paths": owned[index],
+                                "read_only": not bool(owned[index])})
                 prepared.append({"goal": task["goal"], "role": "leaf", "context": (
-                    f"Coding workspace: {path}. Use this directory for ALL file and terminal operations. "
+                    f"Assigned workspace: {path}; baseline commit: {base}. Use this directory for ALL file and terminal operations. "
                     f"The primary project at {self.root} is read-only to you. "
-                    f"Exclusive writable paths: {json.dumps(owned[index])}. "
+                    f"Exclusive writable paths: {json.dumps(owned[index])}; an empty list means read-only analysis/QA. "
                     "Do not edit any other paths or shared contracts/config/lockfiles/Project Brain. "
                     "Do not switch branches, merge, push, reset or touch other worktrees. "
-                    "Implement and test your assignment, then report exact tests/results and remaining work. "
+                    "Perform only your assigned role's work. Read-only workers must not edit source or shared reports; "
+                    "use temporary directories for test data and artifacts. Report exact checks/results and remaining work. "
                     "The host will save and integrate the work after every worker finishes.\n" + instructions[index]
                 )})
             metadata = {"base": base, "branch": branch, "workers": records}
@@ -160,10 +164,12 @@ class DevelopmentWave:
                     or getattr(parent, "_interrupt_requested", False)):
                 raise ValueError("A worker did not finish successfully. The primary project was not integrated.")
             self.integrate(wave, metadata)
-            return json.dumps({**result, "integration": "merged; combined validation is still required",
-                               "recovery": str(wave), "workers": records})
+            return json.dumps({**result, "integration": ("read-only results validated against the saved baseline" if all(r.get("read_only") for r in records)
+                                               else "merged; combined validation is still required"),
+                               "recovery": str(wave), "workers": records, "baseline": base,
+                               "checks_require_rerun": any(r.get("read_only") for r in records) and any(not r.get("read_only") for r in records)})
         except (ValueError, OSError, subprocess.SubprocessError) as exc:
-            return json.dumps({"error": str(exc), "recovery": str(wave) if wave else None,
+            return json.dumps({**result, "error": str(exc), "recovery": str(wave) if wave else None,
                                "next": "Inspect preserved work and resolve serially; do not bypass the integration guard."})
         finally:
             self.lock.release()
@@ -182,6 +188,8 @@ class DevelopmentWave:
             # an unowned file (or secret) into the integrated Git history.
             historical = set(filter(None, git(path, "log", "--format=", "--name-only", "--no-renames", "-z", f"{base}..HEAD").split("\x00")))
             touched = changed | {p.lstrip("\n") for p in historical}
+            if record.get("read_only") and touched:
+                raise ValueError("A read-only worker modified source; its result was rejected and work preserved.")
             if any(not _owns(p, record["owned_paths"]) for p in touched):
                 raise ValueError("A worker changed files outside its ownership; integration blocked.")
             if touched:
@@ -198,6 +206,16 @@ class DevelopmentWave:
                 git(path, "add", "-A", "--", *sorted(dirty))
                 git(path, "commit", "-m", "Implement isolated Appling coding task")
             record["commit"] = git(path, "rev-parse", "HEAD")
+        if all(record.get("read_only") for record in metadata["workers"]):
+            if (git(self.root, "rev-parse", "HEAD") != base
+                    or git(self.root, "symbolic-ref", "--short", "HEAD") != metadata["branch"]
+                    or git(self.root, "status", "--porcelain")):
+                raise ValueError("The primary project changed; these checks apply only to the saved baseline, not the current app.")
+            metadata["validated_baseline"] = base
+            (wave / "wave.json").write_text(json.dumps(metadata, indent=2) + "\n")
+            for record in metadata["workers"]:
+                git(self.root, "worktree", "remove", record["workspace"])
+            return
         integration = wave / "integration"
         name = f"appling/integrate-{wave.name}"
         git(self.root, "worktree", "add", "-b", name, str(integration), base)

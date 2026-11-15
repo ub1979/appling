@@ -81,6 +81,7 @@ export interface AgentModelSetting {
 }
 
 export interface AiSettings {
+  parallel_work: { active: number; limit: number; peak: number };
   engine: string;
   codex: { provider: string; model: string };
   codex_effort: { effort: string; effective: string; overridden: boolean };

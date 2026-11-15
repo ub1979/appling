@@ -6,6 +6,7 @@ import json
 import os
 import queue
 import threading
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 from lyra_lite.engines.base import TurnResult
@@ -27,10 +28,13 @@ TOOLS = [
           {"name": {"type": "string"}}, ("name",)),
     _tool("project_recall", "Search only this project's earlier owner decisions and reports.",
           {"query": {"type": "string"}}, ("query",)),
-    _tool("delegate_task", "Assign a selected role. Development leads may launch up to three isolated coding leaves with disjoint owned_paths.",
+    _tool("delegate_task", "Assign selected roles or independent same-role helpers. Explain worker count and independence; shared pool defaults to 10, maximum 15. Parallel tasks require disjoint owned_paths or read_only=true.",
           {"goal": {"type": "string"}, "context": {"type": "string"}, "agent": {"type": "string"},
+           "parallel": {"type": "boolean"}, "workers": {"type": "integer"}, "reason": {"type": "string"},
+           "read_only": {"type": "boolean"}, "owned_paths": {"type": "array", "items": {"type": "string"}},
            "tasks": {"type": "array", "items": {"type": "object", "properties": {
-               "goal": {"type": "string"}, "context": {"type": "string"}, "agent": {"type": "string"}},
+               "goal": {"type": "string"}, "context": {"type": "string"}, "agent": {"type": "string"},
+               "read_only": {"type": "boolean"}, "owned_paths": {"type": "array", "items": {"type": "string"}}},
                "required": ["goal"], "additionalProperties": False}}}),
 ]
 
@@ -56,12 +60,15 @@ class CodexEngine(ReviewRequests):
     name = "codex"
 
     def __init__(self, *, workspace, session_key, system_prompt="", skills=None, store=None,
-                 role="coordinator", parent=None, command=None):
+                 role="coordinator", parent=None, command=None, worker=False, read_only=False):
         self.workspace = str(Path(workspace).resolve())
         self.session_key = session_key
         self.system_prompt = system_prompt
         self.store = store
         self.role = role
+        self.is_worker = worker or role == "coding-leaf"
+        self.read_only = read_only
+        self.can_delegate = not self.is_worker and role != "req-engineer"
         self.parent = parent
         self.command = command
         self._rpc = None
@@ -103,14 +110,23 @@ class CodexEngine(ReviewRequests):
             account = self._rpc.request("account/read", {}).get("account") or {}
             if account.get("type") != "apiKey":
                 raise RuntimeError("This Appling deployment requires Codex API-key authentication. Run codex login --with-api-key.")
-        tools = TOOLS if self.role in {"coordinator", "sw-developer"} else TOOLS[:3]
+        tools = TOOLS if self.can_delegate else TOOLS[:3]
         # Disable unmanaged subagents. All leaves must use our worktree/Stop guards.
         config = {"features.multi_agent": False, "features.collab": False,
                   "model_reasoning_effort": self.selection["effort"]}
         prompt = self.system_prompt + self._browser.instructions
-        if self.role != "coordinator":
+        if self.role == "req-engineer" and self.is_worker:
+            prompt += "\nAnalyse the given brief/source and report ambiguities, options and questions to Appling. Do not conduct an owner interview or edit requirements."
+        elif self.role != "coordinator":
             prompt += "\n\n" + role_instructions(self.role)
-        fingerprint = hashlib.sha256(json.dumps([prompt, tools, config, self.selection], sort_keys=True).encode()).hexdigest()
+        if self.is_worker:
+            prompt += (f"\nYou are a leaf worker, not the project coordinator. Your assigned workspace is {self.workspace}. "
+                       "Follow the task's owned paths and role. Do not delegate or change shared requirements, plans or progress. "
+                       "Return findings to the lead; it owns owner interviews and final decisions.")
+        if self.read_only:
+            prompt += "\nThis is read-only analysis/QA. Do not modify source. Keep artifacts and test data in temporary directories."
+
+        fingerprint = hashlib.sha256(json.dumps([prompt, tools, config, self.selection, self.read_only], sort_keys=True).encode()).hexdigest()
         previous = self._session.get("thread_id")
         if previous and self._session.get("fingerprint") == fingerprint:
             result = self._rpc.request("thread/resume", {"threadId": previous, "excludeTurns": True})
@@ -126,7 +142,7 @@ class CodexEngine(ReviewRequests):
         result = self._rpc.request("thread/start", {
             "cwd": self.workspace, "model": self.selection["model"],
             "developerInstructions": prompt, "approvalPolicy": "on-request", "approvalsReviewer": "user",
-            "sandbox": "workspace-write", "config": config, "dynamicTools": tools,
+            "sandbox": "read-only" if self.read_only else "workspace-write", "config": config, "dynamicTools": tools,
         })
         self._save(thread_id=result["thread"]["id"], previous_thread_id=previous, turn_id=None, fingerprint=fingerprint, usage={})
         return True
@@ -148,13 +164,13 @@ class CodexEngine(ReviewRequests):
                 brief = [{"role": m["role"], "content": m.get("content", "")} for m in history
                          if m.get("role") in {"user", "assistant"} and m.get("content")][-12:]
                 text = "Previous conversation for continuity; project files are authoritative:\n" + json.dumps(brief, ensure_ascii=False)[-32000:] + "\n\nCurrent message:\n" + text
-            if self._stopped.is_set():
+            if self._stopped.is_set() or (self.parent is not None and self.parent._stopped.is_set()):
                 return TurnResult("", messages, completed=False, interrupted=True)
             result = self._rpc.request("turn/start", {"threadId": self._session["thread_id"],
                 "input": [{"type": "text", "text": text}], "effort": self.selection["effort"]})
             self._turn = result["turn"]["id"]
             self._save(turn_id=self._turn)
-            if self._stopped.is_set():
+            if self._stopped.is_set() or (self.parent is not None and self.parent._stopped.is_set()):
                 self.interrupt()
             while True:
                 try:
@@ -289,9 +305,13 @@ class CodexEngine(ReviewRequests):
         if self._stopped.is_set():
             raise RuntimeError("Work stopped by the owner")
         if name == "clarify":
+            if self.is_worker:
+                return "Return this question to your lead. Leaf workers do not open owner interviews or reviews."
             return self._on_clarify(str(args.get("question") or ""), args.get("choices") or [])
         if name == "skill_view":
             role = str(args.get("name") or "").split(":")[-1]
+            if role == "req-engineer" and self.role != "coordinator":
+                raise ValueError("The owner interview stays in Appling's main conversation.")
             if role == "req-engineer" and self.store is not None:
                 self.store.update_state(requirements_review=True, requirements_started=True)
             return role_instructions(role)
@@ -301,27 +321,37 @@ class CodexEngine(ReviewRequests):
             if not query:
                 raise ValueError("Give a few words to search for")
             return format_results(query, ProjectMemory(self.store.root).search(query, limit=6))
-        if name == "delegate_task" and self.role in {"coordinator", "sw-developer"}:
+        if name == "delegate_task" and self.can_delegate:
             from lyra_lite.engines.codex_jobs import dispatch
             return dispatch(self, args)
         raise ValueError("Unknown or unavailable host tool")
 
     def interrupt(self):
         self._stopped.set()
+        rpc, turn = self._rpc, self._turn
+        if rpc and turn:
+            try:
+                rpc.request("turn/interrupt", {"threadId": self._session["thread_id"], "turnId": turn}, timeout=5)
+            except RuntimeError:
+                rpc.close()
+                if self._rpc is rpc:
+                    self._rpc = None
         self.stop_helpers()
         self._browser.close(self.workspace)
-        if self._rpc and self._turn:
-            try:
-                self._rpc.request("turn/interrupt", {"threadId": self._session["thread_id"], "turnId": self._turn}, timeout=5)
-            except RuntimeError:
-                self._rpc.close()
-                self._rpc = None
 
     def stop_helpers(self):
         with self._children_lock:
             children = list(self._children.values())
-        for child in children:
-            child.interrupt()
+        # Signal siblings together: a slow/broken child must not delay Stop
+        # reaching the other fourteen workers.
+        def stop(child):
+            try:
+                child.interrupt()
+            except Exception:
+                pass  # Continue interrupting the remaining owned workers.
+        if children:
+            with ThreadPoolExecutor(max_workers=len(children), thread_name_prefix="appling-stop") as pool:
+                list(pool.map(stop, children))
         return len(children)
 
     def helpers(self):

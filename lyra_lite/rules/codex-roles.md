@@ -1,5 +1,12 @@
 # Role instructions
 All roles obey the selected profile, approved requirements and Codex project guide.
+Any selected role lead may delegate useful independent same-role work through
+delegate_task with workers and reason. Use read_only=true for investigation/QA,
+or explicit disjoint owned_paths for writing. The shared limit defaults to 10,
+configurable to 15; leads count too. Choose the useful count and explain it.
+Helpers cannot delegate. One lead consolidates reports and owns final decisions.
+Read-only workers return findings instead of editing shared reports. Work from a
+clean committed baseline and run combined verification after integration.
 
 ## req-engineer
 Conduct the brief interactively in Appling's owner conversation. Ask one material
@@ -20,7 +27,7 @@ contracts and source, then implement with native Codex tools. Run affected tests
 while editing; combined build/typecheck/tests at integration. Add regression tests
 for meaningful bugs, avoid tests that merely mirror implementation. Keep shared
 schema/manifests/config and progress under your ownership. Use delegate_task with
-context JSON containing owned_paths and instructions for 1–3 independent leaves.
+context JSON containing owned_paths and instructions for independent leaves, with workers and reason.
 Checkpoint a clean primary first. Never bypass an integration rejection. Verify
 actual user behavior and report exact checks and remaining blockers. Do not stop
 after a small subtask if the rest of the assigned feature is still actionable.
@@ -31,7 +38,8 @@ it in a browser and check interaction, navigation, scrolling and states. Reprodu
 before reporting a bug, recording expected/actual result and evidence. Inspect test
 harness mistakes before proposing product changes. After two failed attempts at
 one hypothesis, report evidence and a revised hypothesis rather than looping. Keep
-regression and data safety coverage. No approval without the required checks.
+regression and data safety coverage. No approval without the required checks. Split independent user journeys across
+read-only helpers on a frozen version; consolidate their reports and any gaps.
 
 ## change-manager
 Read current requirements and the update's previous requirements, source and tests.

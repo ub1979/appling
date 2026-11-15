@@ -43,15 +43,33 @@ class maps, research quotas or change reports for ordinary code edits. Refresh
 .sdlc/progress.md and project-brain.md at meaningful milestones, not every command.
 Do not announce completion before combined checks and real user-journey QA pass.
 
-Use delegate_task for selected roles. Only the development lead may fan out coding
-work, at most three independent leaves in separate host-managed Git worktrees.
-The lead freezes shared schemas/config/lockfiles before launch and checkpoints a
-clean baseline. Each leaf gets explicit disjoint owned_paths. The host validates
-all touched files and integrates in a temporary worktree; never bypass a rejected
-merge or reset another person's changes. During a wave the lead waits, then runs
-combined validation. Leaves cannot delegate. Native spawn_agent is disabled so
-all work goes through these ownership and Stop controls. Work serially when tasks
-share files or interfaces are unsettled.
+Use delegate_task for selected roles. All selected role leads may use independent
+same-role helpers: coding, QA, research, review, design exploration, documentation,
+and planning investigation. The owner interview and final scope/design/plan/QA
+verdict remain with one lead. Helpers do not introduce unselected team members.
+The shared budget defaults to 10 executing workers across all projects, including
+role leads and helpers; the owner can configure up to 15. You choose the useful
+count, never fill slots for their own sake. Pass workers and reason explaining
+independence, genuine dependencies, shared files, test resources and expected benefit.
+Use fewer workers for small work or when integration, rate limits or local resources
+are the bottleneck. After a failed/conflicting wave, reassess the task boundaries
+and reduce fan-out instead of repeating the same failed split. Consult the returned
+pool state and wave metrics. Do not claim faster results without measurements.
+
+The coordinator defaults to serial role handoffs. For independent role tasks use
+parallel=true; every parallel task needs owned_paths or read_only=true. Role leads'
+helper batches are isolated automatically. Example: delegate_task(workers=5,
+reason="Independent import/export, keyboard, layout and persistence checks on one frozen build",
+tasks=[{goal:"...",read_only:true}, ...]). Prepare a clean committed Git baseline
+first. Writers own disjoint files; shared schemas/manifests/lockfiles/Project Brain
+and progress stay with the lead. Read-only QA/review/research workers use separate
+baseline worktrees and return reports; do not edit shared reports or product code.
+The host saves each report and uses separate browser sessions/ports/test directories.
+Helpers are leaves and cannot delegate; an isolated wave cannot start more leads.
+Never bypass rejected integration, reset another worker's files or claim checks
+on an old baseline passed the current app. Run combined checks after integration
+and let the QA lead consolidate independent results into the final verdict.
+If slots are exhausted, continue directly; do not repeatedly retry unchanged work.
 
 QA must reproduce a failure before changing product code. Distinguish product bugs
 from browser/test harness mistakes and missing evidence. After two unsuccessful

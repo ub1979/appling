@@ -4,7 +4,7 @@ Appling is a local project studio for building apps, websites, slide decks and
 short videos. This branch runs its coding and agent workflow directly through
 [Codex app-server](https://learn.chatgpt.com/docs/app-server).
 
-Current source: **v0.17.13 beta**, branch `codex/appling-codex-base`.
+Current source: **v0.17.14 beta**, branch `codex/appling-codex-base`.
 
 Appling keeps its project UI, previews, owner approvals, project memory and
 five-minute status notes. Codex owns execution, native file/terminal tools,
@@ -49,12 +49,29 @@ independent final QA journey. Existing data integrity and acceptance checks stay
 required. Approved requirements remain authoritative; engineering bookkeeping
 does not reopen a plan after development starts.
 
-A development lead may launch up to **three** independent coding agents. Each
-gets disjoint owned paths in a separate Git worktree. The host checks all touched
-files, integrates in a temporary worktree and advances only an unchanged, clean
-primary project. Failed or interrupted work is preserved. Shared contracts,
-manifests and lockfiles belong to the lead. Native unmanaged subagents are disabled.
-Stop interrupts Codex and its child sessions and releases pending owner waits.
+All selected role leads can delegate useful independent work: development, QA,
+research, review, design exploration, documentation and planning investigation.
+Appling chooses the useful count and explains why. **Ten executing workers are
+shared across all projects**, including role leads and helpers. Settings → Parallel
+work can select 1–15; values above ten are experimental. This is a ceiling, not a
+worker-count target. A lead holding one slot can use at most nine simultaneous
+helpers at the default limit; excess tasks run as its worker slots become free.
+
+Writers get disjoint owned paths in separate Git worktrees. Read-only workers get
+a fixed committed snapshot and native read-only sandbox, with separate browser
+sessions, preview ports and temporary test data. The host validates changes and
+integrates in a temporary worktree. Source edits by read-only workers and stale
+baseline checks are rejected. Shared contracts/manifests remain lead-owned.
+
+Helpers cannot delegate further or introduce unselected roles. The owner interview
+and final decisions stay with one lead. Parallel role batches must explicitly
+identify independent work; dependent handoffs remain serial. Stop signals sibling
+workers concurrently. Wave events record elapsed time, peak concurrency, usage
+and integration results; reports and failed work remain recoverable.
+
+The prior working Codex edition is saved and pushed at
+`appling-codex-working-before-adaptive-workers-2026-11-15` (`c9e02c279`).
+See [adaptive worker validation](docs/lyra/2026-11-15-adaptive-workers.md).
 
 ## Keep the working version safe
 

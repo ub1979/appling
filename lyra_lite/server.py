@@ -10,7 +10,6 @@ import asyncio
 import hashlib
 import json
 import logging
-import os
 import re
 import secrets
 import subprocess
@@ -501,7 +500,9 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
     def _settings_view() -> dict:
         from lyra_lite import settings as st
 
+        from lyra_lite.engines.worker_pool import WORKERS
         return {
+            "parallel_work": WORKERS.snapshot(),
             "engine": st.default_engine(),
             "codex": st.codex_model(),
             "codex_effort": st.codex_effort(),
@@ -539,12 +540,18 @@ def create_app(lyra: Lyra | None = None, token: str | None = None) -> FastAPI:
             changes["engine"] = body["engine"]
         if "claude" in body:
             raise HTTPException(status_code=400, detail="Claude Code settings are no longer supported.")
+        if "parallel_work" in body:
+            value = body["parallel_work"]
+            limit = value.get("max_workers") if isinstance(value, dict) else None
+            if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 15:
+                raise HTTPException(status_code=400, detail="Choose a shared worker limit between 1 and 15.")
+            changes["parallel_work"] = {"max_workers": limit}
         if "about_me" in body:
             changes["about_me"] = str(body.get("about_me") or "").strip()[:st.ABOUT_ME_LIMIT]
         if changes:
             st.save_section(changes)
             # Reaffirming Codex must not close an engine with live helpers.
-            if changes.keys() - {"engine"}:
+            if changes.keys() - {"engine", "parallel_work"}:
                 _apply_everywhere()
         return _settings_view()
 

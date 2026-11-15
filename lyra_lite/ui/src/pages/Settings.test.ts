@@ -50,3 +50,21 @@ describe("agent model dropdown", () => {
     expect(modelMenu(agent, null)).toContain('value="local-model-b" selected=""');
   });
 });
+
+import { WorkerSettings } from "./Settings";
+import type { AiSettings } from "../api";
+
+describe("parallel worker settings", () => {
+  it("shows the saved cap and distinguishes experimental capacity", () => {
+    const settings: AiSettings = {
+      engine: "codex", codex: { provider: "codex", model: "example-model" },
+      codex_effort: { effort: "", effective: "medium", overridden: false },
+      about_me: "", agent_models: [], parallel_work: { active: 3, limit: 12, peak: 8 },
+    };
+    const html = renderToStaticMarkup(createElement(WorkerSettings, { settings, onSave: async () => {} }));
+    expect(html).toContain('value="12" selected=""');
+    expect(html).toContain("12 — experimental");
+    expect(html).toContain("3 workers active when loaded");
+    expect(html).toContain("includes role leads and helpers across all projects");
+  });
+});

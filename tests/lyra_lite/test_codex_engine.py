@@ -124,9 +124,16 @@ def test_native_workers_write_disjoint_worktrees_and_integrate(engine):
     (root / "contract.txt").write_text("frozen")
     git(root, "add", "contract.txt")
     git(root, "commit", "-m", "Baseline")
+    (engine.store.root / 'requirements.md').write_text('# Requirements\nTest feature.\n')
+    (engine.store.root / 'plan.md').write_text('# Plan\nImplement safely.\n')
+    revision = review.requirements_revision(engine.store.root)
+    engine.store.update_state(requirements_approved=revision, plan_requirements=revision,
+                              plan_approved=review.implementation_plan(engine.store.root)['revision'])
+    git(engine.store.root, 'add', 'requirements.md', 'plan.md')
+    git(engine.store.root, 'commit', '-m', 'Approved test contract')
     engine.role = "sw-developer"
     engine._hooks = Hooks()
-    result = json.loads(dispatch(engine, {"tasks": [
+    result = json.loads(dispatch(engine, {"reason": "Independent files under a frozen contract", "tasks": [
         {"goal": "write a.txt", "context": json.dumps({"owned_paths": ["a.txt"]})},
         {"goal": "write b.txt", "context": json.dumps({"owned_paths": ["b.txt"]})},
     ]}))

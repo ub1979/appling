@@ -84,6 +84,13 @@ def test_stop_between_worker_return_and_merge_preserves_primary(tmp_path, monkey
     (tmp_path / 'contract').write_text('frozen')
     git(tmp_path, 'add', 'contract');git(tmp_path, 'commit', '-m', 'Baseline')
     engine = CodexEngine(workspace=str(tmp_path), session_key='lead', role='sw-developer', store=store)
+    (engine.store.root / 'requirements.md').write_text('# Requirements\nTest feature.\n')
+    (engine.store.root / 'plan.md').write_text('# Plan\nImplement safely.\n')
+    revision = review.requirements_revision(engine.store.root)
+    engine.store.update_state(requirements_approved=revision, plan_requirements=revision,
+                              plan_approved=review.implementation_plan(engine.store.root)['revision'])
+    git(engine.store.root, 'add', 'requirements.md', 'plan.md')
+    git(engine.store.root, 'commit', '-m', 'Approved test contract')
     def worker(parent, task, **kwargs):
         (Path(kwargs['workspace']) / 'a.py').write_text('saved partial work')
         parent._stopped.set()

@@ -2,6 +2,8 @@
 import json
 import os
 import sys
+import time
+import uuid
 from pathlib import Path
 
 state_path = Path(os.environ["FAKE_CODEX_STATE"])
@@ -49,9 +51,10 @@ for line in sys.stdin:
     elif method == "model/list":
         result = {"data": [{"id": "fake-model", "model": "fake-model"}], "nextCursor": None}
     elif method == "thread/start":
-        thread_id = "thread-" + str(len(state["threads"]) + 1)
+        thread_id = "thread-" + uuid.uuid4().hex
         state["threads"][thread_id] = {"params": params}
-        state_path.write_text(json.dumps(state))
+        temporary = state_path.with_name(state_path.name + uuid.uuid4().hex)
+        temporary.write_text(json.dumps(state)); os.replace(temporary, state_path)
         result = {"thread": {"id": thread_id}}
     elif method == "thread/resume":
         thread_id = params["threadId"]
@@ -61,6 +64,13 @@ for line in sys.stdin:
         turn = "turn-" + str(turn_counter)
         send({"id": request["id"], "result": {"turn": {"id": turn, "status": "inProgress"}}})
         text = params["input"][0]["text"]
+        if os.environ.get("FAKE_CODEX_BARRIER"):
+            directory = Path(os.environ["FAKE_CODEX_BARRIER"])
+            directory.mkdir(exist_ok=True)
+            (directory / str(os.getpid())).write_text("started")
+            deadline = time.monotonic() + 10
+            while len(list(directory.iterdir())) < int(os.environ["FAKE_CODEX_EXPECTED"]) and time.monotonic() < deadline:
+                time.sleep(.01)
         if text.startswith("disconnect"):
             sys.exit(0)
         if text.startswith("wait"):

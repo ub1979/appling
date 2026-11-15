@@ -29,7 +29,8 @@ class CodexRPC:
         self._reader = threading.Thread(target=self._read, name="appling-codex-rpc", daemon=True)
         self._reader.start()
         try:
-            self.request("initialize", {"clientInfo": {"name": "appling", "title": "Appling", "version": "0.17.13"},
+            from lyra_lite import __version__
+            self.request("initialize", {"clientInfo": {"name": "appling", "title": "Appling", "version": __version__},
                                         "capabilities": {"experimentalApi": True}})
             self.notify("initialized", {})
         except Exception:

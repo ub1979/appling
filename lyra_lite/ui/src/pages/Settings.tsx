@@ -95,6 +95,10 @@ export function Settings({ projectId }: { projectId: string | null }) {
             }
           />
 
+          <WorkerSettings settings={settings} onSave={(limit) => run(async () => {
+            setSettings(await api.settingsSave({ parallel_work: { max_workers: limit } }));
+          }, "Shared worker limit saved. Active work keeps its slots until it finishes.")} />
+
           <section className="card card-pad">
             <h2 style={{ fontSize: 20 }}>Agent models</h2>
             <p className="muted small">Choose a Codex model and effort for each agent. Saved choices apply to future tasks. Appling handles Requirements using its own model.</p>
@@ -330,4 +334,28 @@ function AboutMe({ initial, onSave }: { initial: string; onSave: (text: string) 
       </div>
     </section>
   );
+}
+
+
+export function WorkerSettings({ settings, onSave }: {
+  settings: AiSettings;
+  onSave: (limit: number) => Promise<void>;
+}) {
+  const [limit, setLimit] = useState(settings.parallel_work.limit);
+  useEffect(() => setLimit(settings.parallel_work.limit), [settings.parallel_work.limit]);
+  return <section className="card card-pad">
+    <h2 style={{ fontSize: 20 }}>Parallel work</h2>
+    <p className="muted small">Appling chooses how many workers each task needs and explains why. This shared limit includes role leads and helpers across all projects. It does not force every slot to be used.</p>
+    <div className="folder-row" style={{ gridTemplateColumns: "minmax(0,1fr) auto" }}>
+      <label><span className="field-label">Maximum active workers</span>
+        <select className="input" value={limit} onChange={e => setLimit(Number(e.target.value))}>
+          {Array.from({ length: 15 }, (_, i) => i + 1).map(n => <option key={n} value={n}>
+            {n}{n === 10 ? " — default" : n > 10 ? " — experimental" : ""}
+          </option>)}
+        </select>
+      </label>
+      <button className="btn primary" disabled={limit === settings.parallel_work.limit} onClick={() => void onSave(limit)}>Save limit</button>
+    </div>
+    <p className="muted small">{settings.parallel_work.active} workers active when loaded. Coding uses separate worktrees; parallel QA uses a fixed version and isolated browser sessions.</p>
+  </section>;
 }

@@ -9,6 +9,24 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.14 beta — 2026-11-15
+
+Desktop package 0.17.14-beta.1.
+
+- Replace the three-worker cap with a shared pool of ten executing role leads and
+  helpers across projects, configurable from one to fifteen in Settings.
+- Let selected role leads delegate independent same-role work. The coordinator
+  can dispatch independent selected roles together. Keep helpers as leaves and
+  the owner interview/final decisions with one lead.
+- Require reasons for multi-task batches and show selected worker counts and
+  capacity. Record elapsed time, peak workers, usage, outcomes and recovery paths.
+- Give read-only QA/research/review workers fixed-baseline worktrees and native
+  read-only sandboxes. Reject source changes and stale-baseline acceptance.
+- Preserve disjoint writer ownership, checked Git integration and combined gates.
+  Release slots promptly and interrupt siblings concurrently on Stop.
+- Save the previous working Codex version at
+  `appling-codex-working-before-adaptive-workers-2026-11-15` (`c9e02c279`).
+
 ### Appling v0.17.13 beta — 2026-11-15
 
 Desktop package 0.17.13-beta.1. Codex migration branch.
@@ -501,6 +519,13 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.35-a] - 2026-11-15 — Adaptive parallel workers across selected roles
+
+Appling v0.17.14 beta. Desktop package 0.17.14-beta.1.
+
+- Shared 10-worker budget, configurable to 15; explanations and measured wave results.
+- Parallel role workers with isolated source, browser sessions and cancellation.
 
 ## [0.19.34-a] - 2026-11-15 — Native Codex engine and proportional workflows
 

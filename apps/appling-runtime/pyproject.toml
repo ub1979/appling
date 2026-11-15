@@ -1,6 +1,6 @@
 [project]
 name = "appling-codex-runtime"
-version = "0.17.13b1"
+version = "0.17.14b1"
 requires-python = ">=3.11"
 dependencies = [
   "fastapi==0.133.1",

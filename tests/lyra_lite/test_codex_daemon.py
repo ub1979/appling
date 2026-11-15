@@ -145,3 +145,15 @@ def test_review_survives_daemon_restart_without_automatic_approval(daemon):
     assert response.status_code == 200, response.text
     saved = json.loads((root / ".lyra/state.json").read_text())
     assert not saved.get("prototype_approved")
+
+
+def test_worker_limit_settings_validate_and_survive_restart(daemon):
+    app, home = daemon
+    assert app.get('/api/settings').json()['parallel_work']['limit'] == 10
+    for bad in [0, 16, True, '15', None]:
+        response = app.post('/api/settings', {'parallel_work': {'max_workers': bad}})
+        assert response.status_code == 400
+    response = app.post('/api/settings', {'parallel_work': {'max_workers': 15}})
+    assert response.status_code == 200 and response.json()['parallel_work']['limit'] == 15
+    app.stop();app.start()
+    assert app.get('/api/settings').json()['parallel_work']['limit'] == 15

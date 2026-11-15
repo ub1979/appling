@@ -68,6 +68,8 @@ class StatusUpdates:
         who = ", ".join(names) + (" agents" if len(names) > 1 else " agent") if names else "Appling"
         verb = "are" if len(names) > 1 else "is"
         text = f"Status update: {who} {verb} still assigned to the work."
+        if len(helpers) > 1:
+            text += f" {len(helpers)} workers are currently assigned."
         # Count the current lead's descendants, not finished waves from earlier
         # leads. Returned results are not a claim of successful integration.
         parents = {sid for sid, row in self.workers.items() if not row["returned"]}
