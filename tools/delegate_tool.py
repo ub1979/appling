@@ -1025,7 +1025,10 @@ def _build_child_progress_callback(
     ):
         if not parent_cb:
             return
-        payload = _identity_kwargs()
+        # Descendants already carry their own identity. Do not fill missing
+        # fields with this intermediary's model/session/counters.
+        nested = kwargs.get("subagent_id") and kwargs["subagent_id"] != subagent_id
+        payload = {} if nested else _identity_kwargs()
         payload.update(kwargs)  # caller overrides (e.g. status, duration_seconds)
         try:
             parent_cb(event_type, tool_name, preview, args, **payload)
@@ -1035,6 +1038,11 @@ def _build_child_progress_callback(
     def _callback(
         event_type, tool_name: str = None, preview: str = None, args=None, **kwargs
     ):
+        # These events are already normalised by a descendant callback.
+        if event_type in {"subagent.tool", "subagent.thinking", "subagent.progress", "subagent.spawn_requested"}:
+            _relay(event_type, tool_name, preview, args, **kwargs)
+            return
+
         # Lifecycle events emitted by the orchestrator itself — handled
         # before enum normalisation since they are not part of DelegateEvent.
         if event_type == "subagent.start":
@@ -1050,7 +1058,7 @@ def _build_child_progress_callback(
             return
 
         if event_type == "subagent.provider_status":
-            _relay("subagent.provider_status", preview=preview)
+            _relay("subagent.provider_status", preview=preview, **kwargs)
             return
 
         if event_type == "subagent.complete":
@@ -1070,7 +1078,7 @@ def _build_child_progress_callback(
             # No spinner echo — the CLI shows the child via the tree, and the
             # CLI/TUI progress handlers ignore non-tool event types, so this is
             # inert there; only a gateway watch window consumes it.
-            _relay("subagent.text", preview=preview)
+            _relay("subagent.text", preview=preview, **kwargs)
             return
 
         # Normalise legacy strings, new-style "delegate.*" strings, and

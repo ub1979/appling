@@ -63,6 +63,13 @@ def test_developer_fans_out_and_integrates_relative_file_and_terminal_work(env):
             worker_starts = [e for e in _events(root) if e["type"] == "helper" and e.get("event") == "start"
                              and e.get("goal", "").startswith("CODE-")]
             assert len(worker_starts) == 2 and all(e.get("parent_id") for e in worker_starts)
+            # Actual leaf file/terminal callbacks must survive the lead relay
+            # with each worker's identity, not disappear behind delegate_task.
+            for worker in worker_starts:
+                tools = [e for e in _events(root) if e["type"] == "helper" and e.get("event") == "tool"
+                         and e.get("subagent_id") == worker["subagent_id"]]
+                assert {e.get("tool") for e in tools} >= {"terminal", "write_file"}
+                assert all(e.get("parent_id") == worker["parent_id"] for e in tools)
             for request in requests:
                 first_user = next((str(m.get("content", "")) for m in request["messages"] if m["role"] == "user"), "")
                 names = {t["function"]["name"] for t in request.get("tools", [])}

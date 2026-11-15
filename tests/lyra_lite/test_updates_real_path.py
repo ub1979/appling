@@ -31,6 +31,12 @@ def test_open_and_update_with_prototype_and_change_review(env):
     _git(root, "add", ".")
     _git(root, "commit", "-m", "Original delivery")
     base = _git(root, "rev-parse", "HEAD")
+    from lyra_lite.store import ProjectStore
+
+    store = ProjectStore(root).init()
+    store.update_state(plan_approved="original-plan", plan_requirements=requirements_revision(root),
+                       plan_execution={"plan": "original-plan", "requirements": requirements_revision(root)},
+                       plan_review_required=True)
     plan = tool_step("delegate_task", {"goal": "task-planner: Plan the update"})
     change = tool_step("delegate_task", {"goal": "change-manager: Review the update"})
     preview = tool_step("clarify", {"question": "Do these flows work?", "choices": list(PROTOTYPE_CHOICES)})
@@ -59,6 +65,8 @@ def test_open_and_update_with_prototype_and_change_review(env):
             assert started.is_success, started.text
             assert _git(root, "branch", "--show-current") == "appling/update-2"
             assert _git(root, "rev-parse", "main") == base
+            assert store.state()['plan_execution'] is None
+            assert store.state()['plan_approved'] is None
             assert "change-manager" in daemon.get(url).json()["team"]
             assert daemon.post(f"{url}/update", {"branch": None}).status_code == 409
             setup = _wait_event(root, lambda e: e["type"] == "turn_start" and e["kind"] == "setup")

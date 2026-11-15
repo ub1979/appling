@@ -9,6 +9,17 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.12 beta — 2026-11-15
+
+Desktop package 0.17.12-beta.1.
+
+- Relay nested worker activity and preserve worker identities through the lead.
+  Status notes count running/returned workers and separate heartbeat liveness
+  from actual tool activity; quiet tools no longer imply an AI connection wait.
+- Keep pre-development plan approval closed once approved implementation starts.
+  Recover existing approval/start evidence after restart without approving a
+  changed plan or restarting development. New project updates reset the gate.
+
 ### Appling v0.17.11 beta — 2026-11-14
 
 Desktop package 0.17.11-beta.1.
@@ -470,6 +481,14 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.33-a] - 2026-11-15 — Accurate worker status and completed review recovery
+
+Appling v0.17.12 beta. Desktop package 0.17.12-beta.1.
+
+- Preserve descendant tool, progress, lifecycle and provider identities in status.
+- Stop reopening pre-development approval after approved execution; recover
+  existing projects and retain current-plan approval for new development cycles.
 
 ## [0.19.32-a] - 2026-11-14 — Status updates and isolated coding teams
 

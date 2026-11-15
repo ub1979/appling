@@ -231,7 +231,7 @@ class ProjectRunner:
                         if review.visual_project(self.root, state) and review.prototype_revision(self.root) != state.get("prototype_approved"):
                             raise ValueError("Review the current prototype before approving the implementation plan.")
                         self.store.update_state(plan_approved=revision, plan_needs_changes=None,
-                                                plan_requirements=requirements,
+                                                plan_requirements=requirements, plan_execution=None,
                                                 approval_followup={"revision": requirements, "offset": self.store.events_size(), "after": "plan"})
                     else:
                         self.store.update_state(plan_approved=None, plan_needs_changes=item.get("revision"))
@@ -327,6 +327,8 @@ class ProjectRunner:
                                     update.get("baseline_prototype_revision"))):
                 return None
         elif kind == "plan":
+            if review.plan_execution_started(state):
+                return None
             plan = review.implementation_plan(self.root)
             if (not plan or revision != plan["revision"]
                     or revision in (state.get("plan_approved"), state.get("plan_needs_changes"))
@@ -414,6 +416,8 @@ class ProjectRunner:
             if (self._stop or self._busy or state.get("paused") or state.get("queue") or self.helpers()
                     or self.store.inbox(status="open") or not state.get("plan_review_required")
                     or state.get("requirements_review")):
+                return
+            if review.plan_execution_started(state):
                 return
             requirements = review.requirements_revision(self.root)
             if not requirements or requirements != state.get("requirements_approved"):
@@ -517,6 +521,8 @@ class ProjectRunner:
             self.store.update_state(update=update, team=team, paused=False, watchdog={},
                                     requirements_review=True, requirements_approved=None,
                                     prototype_approved=None, prototype_needs_changes=None,
+                                    plan_execution=None, plan_approved=None, plan_requirements=None,
+                                    plan_needs_changes=None, plan_review_required=False,
                                     turn_start_offset=self.store.events_size())
             self.submit(agents.setup_message(self.root, team, state.get("models"), "",
                                              state.get("profile"), state.get("project_kind"), template,
@@ -745,6 +751,7 @@ class ProjectRunner:
     def _recover(self) -> None:
         """Make the files consistent after a crash or restart."""
         review.reconcile_requirements_approval(self.store)
+        review.reconcile_plan_execution(self.store)
         if not self.store.has_transcript():
             self._rebuild_transcript()
         state = self.store.state()

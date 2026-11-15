@@ -6,7 +6,7 @@ Appling is a local-first product studio for apps, websites, slide decks, and sho
 
 Appling is in beta. Review generated work and test it for your own use before publishing it.
 
-The current source version is **v0.17.11 beta**, with five-minute activity updates,
+The current source version is **v0.17.12 beta**, with accurate nested-worker status,
 isolated coding teams, visible reviews, project updates, and saved agent models.
 
 Agent execution and delegation use the original Hermes workflow and its normal

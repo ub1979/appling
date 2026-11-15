@@ -284,6 +284,9 @@ class HermesEngine:
             return
         fields = _helper_fields(kwargs)
         if event_type == "subagent.start" and self.store is not None:
+            from lyra_lite.review import record_plan_execution
+
+            record_plan_execution(self.store, str(kwargs.get("goal") or ""))
             # A replacement task supersedes a previous failure for the same goal.
             for old_id, old in list((self.store.state().get("provider_statuses") or {}).items()):
                 if old.get("goal") == kwargs.get("goal"):
@@ -317,6 +320,11 @@ class HermesEngine:
                 and state.get("requirements_approved") == review.requirements_revision(root)
                 and review.requests_plan_approval(question, choices)
             ):
+                if (review.plan_execution_started(state)
+                        and review.requirements_revision(root) == state.get("requirements_approved")):
+                    return ("Implementation has already started from the approved plan. Report progress or "
+                            "delivery instead of reopening pre-development approval. New scope belongs in "
+                            "a project update with its own requirements review.")
                 plan = review.implementation_plan(root)
                 if not plan:
                     return "Save the implementation plan before asking the owner to approve it."

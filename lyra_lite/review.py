@@ -75,6 +75,62 @@ def requirements_revision(root: Path) -> str | None:
     return hashlib.sha256(draft.encode()).hexdigest() if draft else None
 
 
+def plan_execution_started(state: dict) -> bool:
+    execution = state.get("plan_execution") or {}
+    return bool(state.get("plan_approved") and not state.get("requirements_review")
+                and execution.get("plan") == state["plan_approved"]
+                and execution.get("requirements") == state.get("requirements_approved")
+                == state.get("plan_requirements"))
+
+
+def record_plan_execution(store, goal: str) -> None:
+    """Latch the approved baseline when real development starts, not on edits."""
+    from lyra_lite.agents import agent_for_goal
+
+    if agent_for_goal(goal) != "sw-developer":
+        return
+    with store._lock:
+        state = store.state()
+        if (not state.get("plan_approved") or state.get("requirements_review")
+                or not state.get("plan_requirements")
+                or state["plan_requirements"] != state.get("requirements_approved")
+                or state["plan_requirements"] != requirements_revision(store.root)
+                or plan_execution_started(state)):
+            return
+        plan = implementation_plan(store.root)
+        if not plan or plan["revision"] != state["plan_approved"]:
+            return
+        store.update_state(plan_execution={"plan": state["plan_approved"],
+                                           "requirements": state["plan_requirements"]})
+
+
+def reconcile_plan_execution(store) -> None:
+    """Recover legacy execution only from an answered approval followed by a start."""
+    state = store.state()
+    if plan_execution_started(state) or not state.get("plan_approved"):
+        return
+    approved = [i for i in store.inbox() if i.get("kind") == "plan" and i.get("status") == "answered"
+                and i.get("answer") == PLAN_CHOICES[0] and i.get("revision") == state["plan_approved"]
+                and i.get("requirements") == state.get("plan_requirements")
+                and i.get("chat_id") == state.get("chat_id")]
+    if (not approved or state.get("requirements_review") or not state.get("plan_requirements")
+            or state["plan_requirements"] != state.get("requirements_approved")
+            or state["plan_requirements"] != requirements_revision(store.root)):
+        return
+    after = max(i.get("closed", i.get("created", 0)) for i in approved)
+    events, _ = store.read_events(0)
+    from lyra_lite.agents import agent_for_goal
+
+    for event in events:
+        if (event.get("ts", 0) >= after and event.get("type") == "helper" and event.get("event") == "start"
+                and agent_for_goal(str(event.get("goal") or "")) == "sw-developer"):
+            # The old plan no longer needs to match today's engineering
+            # notes: the persisted approval/start pair proves the baseline.
+            store.update_state(plan_execution={"plan": state["plan_approved"],
+                                               "requirements": state["plan_requirements"]})
+            return
+
+
 def reconcile_requirements_approval(store) -> bool:
     """Migrate a proven legacy approval without accepting any product changes."""
     state = store.state()

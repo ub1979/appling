@@ -84,3 +84,22 @@ in-flight reply. The browser smoke check showed the note inside the actual
 production-built conversation UI on a temporary local instance, with the
 composer and project map intact. Test results are recorded in the change's
 commit description.
+
+
+## Follow-up fixes — 2026-11-15 (Appling v0.17.12 beta)
+
+Nested callbacks now relay descendant tool, thinking, progress, spawn and provider
+status events with their original identities. Status notes count current nested
+workers and returned results, show the latest real tool timestamp, and report
+heartbeat liveness separately. A quiet tool clock never implies an AI connection
+wait; that wording requires an actual provider status. Returned worker results do
+not imply a successful merge or completed app. These remain display-only notes.
+
+Pre-development plan review now records the approved requirements/plan baseline
+when development actually starts. Later engineering edits no longer reopen that
+same approval at delivery. Recovery uses an answered plan approval followed by a
+recorded development start, preserves the original approval hash, and suppresses
+recovery of the erroneous late card. A changed plan before execution still needs
+review. Update project resets the execution baseline and approvals for its new
+cycle. Real daemon tests cover delivery/restart, nested worker events, and update
+reset without live model credentials or changes to cached prompt prefixes.

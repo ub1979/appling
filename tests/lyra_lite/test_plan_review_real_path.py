@@ -88,3 +88,40 @@ def test_plan_card_contains_the_actual_document_and_blocks_blind_or_stale_approv
             assert target.read_text() == 'export const sample = true;'
         finally:
             daemon.stop()
+
+
+def test_executed_plan_can_evolve_through_delivery_and_restart_without_new_approval(env):
+    goal = "sw-developer: Implement and verify the approved editor"
+    with FakeOpenAIServer([], side_scripts={goal: [
+        tool_step("write_file", {"path": "plan.md", "content": "# Plan\nVerified implementation details.\n"}),
+        text_step("Approved implementation and tests finished."),
+    ]}) as llm:
+        _write_config(env['hermes_home'], llm.base_url, lyra_lite={'watchdog': {'enabled': False}})
+        root = env['home'] / 'Completed editor'
+        root.mkdir()
+        (root / 'requirements.md').write_text('# Requirements\nEdit documents.\n')
+        (root / 'plan.md').write_text('# Plan\nImplement and test the editor.\n')
+        store = ProjectStore(root).init()
+        store.update_state(requirements_approved=review.requirements_revision(root), requirements_revision_format=2,
+                           requirements_review=False, plan_review_required=True)
+        llm.script = [tool_step('delegate_task', {'goal': goal}), text_step('Implementation running.'),
+                      text_step('Your app is ready.')]
+        daemon = Daemon(env).start()
+        try:
+            prefix = '/api/projects/' + daemon.post('/api/projects', {'path': str(root), 'create': False}).json()['id']
+            item, = daemon.get(prefix).json()['inbox']
+            assert daemon.post(prefix + '/inbox/' + item['id'], {'answer': {
+                'choice': 'Approve implementation plan', 'revision': item['revision'],
+            }}).is_success
+            _wait_event(root, lambda e: e['type'] == 'turn_end' and e.get('reply') == 'Your app is ready.')
+            detail = daemon.get(prefix).json()
+            assert detail['inbox'] == [] and detail['review_recovery'] is None
+            assert store.state()['plan_approved'] != review.implementation_plan(root)['revision']
+            requests = len(llm.main_requests())
+            daemon.stop()
+            daemon = Daemon(env).start()
+            detail = daemon.get(prefix).json()
+            assert detail['inbox'] == [] and detail['review_recovery'] is None
+            assert len(llm.main_requests()) == requests
+        finally:
+            daemon.stop()

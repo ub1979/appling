@@ -549,6 +549,11 @@ class TestDelegateTask(unittest.TestCase):
             )
 
         self.assertTrue(callable(mock_child.thinking_callback))
+        # Construction announces the pending child. Thinking alone still
+        # must not send a tool event or start a raw spinner.
+        parent.tool_progress_callback.assert_called_once()
+        self.assertEqual(parent.tool_progress_callback.call_args.args[0], "subagent.spawn_requested")
+        parent.tool_progress_callback.reset_mock()
         mock_child.thinking_callback("deliberating...")
         parent.tool_progress_callback.assert_not_called()
 
