@@ -52,7 +52,8 @@ Choose the method now, not after exhausting the call budget:
 - Reuse a working project browser command first. Otherwise use `terminal` once
   to check available Playwright automation and its browser. If available, save
   one small Playwright smoke test and run it directly. Do not install a
-  framework, write a raw-CDP fallback or launch a second QA worker.
+  framework or write a raw-CDP fallback. A leaf must not launch nested QA copies;
+  the authorized QA lead may distribute independent checks to same-role workers.
 - Use actual sequential click/fill/key actions with bounded assertions, console
   capture and cleanup. Reset state between independent cases; preserve state
   intentionally within a journey. Expected answers come from approved
@@ -139,8 +140,10 @@ replaying the whole campaign. Browser assertion counts are not journey counts.
 
 Report PASS, FAIL or BLOCKED for each in-scope criterion and link its evidence.
 Open serious defects or required untested behaviour prevent an approved verdict.
-QA must not create repair tasks, schedule workers, rewire dependencies or repair
-application source (including through `terminal`). This role boundary takes
+An authorized QA lead may schedule independent same-role checks using the host
+worktree contract, choose their count, and consolidate their results. QA leaves
+cannot schedule further workers. QA must not create Development repair tasks,
+rewire approved dependencies or repair application source (including through `terminal`). This role boundary takes
 precedence over generic follow-up-task advice. QA may write or repair tests and
 evidence. The coordinator owns Development routing in the approved scope.
 

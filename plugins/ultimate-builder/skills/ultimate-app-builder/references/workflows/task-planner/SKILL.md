@@ -57,9 +57,9 @@ explain a useful count within the shared 10-worker budget, configurable to 15.
 Keep top-level tasks proportional, but distinguish the accountable lead from
 worker packages inside a task. In a compact table give each package's exact
 owned paths or read-only scope, input/output contract, real dependencies,
-acceptance command, and the lead's combined integration gate. Evaluate a lead
-plus 2–3 workers; use more when useful independent work exists and capacity
-allows it. If serial execution wins, name the actual shared dependency or
+acceptance command, and the lead's combined integration gate. Let the execution lead choose the worker count from ready independent work,
+context/startup cost, capacity and provider limits; there is no fixed target.
+The shared default of 10 (configurable to 15) counts leads and workers. If serial execution wins, name the actual shared dependency or
 startup cost. Personal profile, one lead, and shared App integration alone do
 not justify serializing independent modules or checks.
 
@@ -266,8 +266,8 @@ Rules: split anything larger than L into M/S tasks; each task completable in one
 - Fit one helper (Reusable/Production): a task must be finishable by one developer helper within about 60 tool calls, including reading, testing, and committing — roughly one user-visible behavior touching at most ~5 files. Split anything bigger, but do not split below a coherent slice: every task costs a fresh agent start-up. For Personal projects prefer fewer, larger slices (see the profile section above).
 - Name file ownership: list the files each task creates or changes. Tasks in the same wave must not share files, so they can run as parallel helpers.
 - In Appling, group independent coding work under one development lead, which
-  must identify useful isolated worker packages, normally evaluating a lead
-  plus 2–3 workers first and scaling within the host budget (default 10 total
+  must identify useful isolated worker packages; the lead selects their useful
+  execution count within the host budget (default 10 total
   executing leads/workers, configurable to 15).
   Establish shared schemas/interfaces and dependencies first; keep shared
   configuration, manifests/lockfiles and project summaries with that lead.
@@ -334,7 +334,7 @@ graph LR
 
 ### Assign Dependency Waves
 
-Each wave contains tasks that execute in parallel; a wave starts only after all prior-wave dependencies complete.
+Waves describe ready independent work, not global barriers. Start a task when its own inputs and approval gates are satisfied, without waiting for unrelated tasks in earlier waves. Respect compatible workspace/ownership and integration constraints.
 
 **Iterative delivery mode** (when the orchestrator requests it): additionally group waves into **iterations of vertical slices** — each iteration is a small set of user-visible, end-to-end features (UI + API + data for that feature), ordered by value and risk. Iteration 0 is the walking skeleton: the smallest runnable end-to-end happy path on the real stack. Add an `Iteration` column to the wave table and an "Iteration Plan" section listing per iteration: goal, slices, what the user can try when it ships. Cross-cutting foundations (schema, auth, scaffolding) go in Iteration 0; park unscheduled features in a Backlog section for re-prioritization at feedback checkpoints.
 

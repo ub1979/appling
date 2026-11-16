@@ -403,7 +403,12 @@ whole project: the build profile; the task's id and text from `task-graph.md`
 (or the brief for Personal); the files it owns; the paths of
 `requirements.md` and `.sdlc/project-brain.md`; and the test command. Tell it
 to read the Project Brain first, then only the files its task needs, and to
-finish with tests run, its files committed, and the Project Brain refreshed.
+finish with relevant checks run, its files committed, and a concise result.
+Only the accountable lead refreshes the shared Project Brain at a verified
+milestone; leaves return findings and evidence links. Pass only task-relevant
+context and use project memory for earlier decisions. For an in-scope change,
+resume the existing plan and record its delta; preserve unaffected approvals.
+Do not duplicate full reports in the Brain, plan, progress and final response.
 
 In Appling, assign one `sw-developer:` lead for an implementation wave. When
 the host grants that lead nested delegation, it may run independent coding
@@ -414,9 +419,13 @@ genuine dependencies serial; do not turn list order into a dependency. Treat
 integration as provisional until the lead runs the combined checks. If the
 host declines parallel work, continue serially without bypassing its guards.
 
-Work through the enabled team one phase at a time, in the umbrella's delivery
-order, and do not stop after a single phase: when one finishes, mark it done and
-start the next one in the same flow. Do not do a specialist's work yourself
+Keep the enabled team organized by real dependencies and owner approval gates,
+not a global one-phase-at-a-time barrier. Dispatch ready independent work when
+workspace/ownership contracts are compatible; final integrated QA depends on
+committed development. Each lead chooses its useful worker count within shared
+capacity, including choosing direct execution for small changes. Requirements
+remain the existing interactive interview in this conversation. Do not stop
+after one completed phase: mark it done and start the next ready work. Do not do a specialist's work yourself
 because it looks quick — the only phases you run in this conversation are the
 interactive ones whose playbook says so (requirements). Everything else is a
 `delegate_task`.

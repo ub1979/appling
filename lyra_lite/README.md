@@ -30,8 +30,11 @@ While work is active, Appling adds a status note every five minutes using the
 existing activity record. These notes do not call the AI or change its cached
 conversation. Idle/paused projects and questions awaiting the owner stay quiet.
 
-On the local terminal backend, one development lead can delegate up to three
-independent coding tasks into separate Git worktrees. Workers declare disjoint
+On the local terminal backend, selected role leads choose their own useful
+worker count from ready independent work, startup/context cost, provider limits
+and available shared capacity. There is no fixed worker target: the default
+budget is 10 executing leads plus workers, configurable to 15. Requirements and
+its owner interview remain unchanged. Independent coding tasks use Git worktrees. Workers declare disjoint
 file ownership; shared interfaces, dependencies and project summaries stay with
 the lead. Completed work is checked in a temporary integration worktree before
 advancing an unchanged, clean project. Conflicts or incomplete workers retain

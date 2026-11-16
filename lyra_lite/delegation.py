@@ -207,9 +207,17 @@ def dispatch_project_tasks(store, agent, args: dict) -> str:
                    for r in list_async_delegations()):
                 return json.dumps({"error": "The development lead is already running. Wait for its report."})
         from lyra_lite.development import ROLE_CONTEXT, PARALLEL_ROLES
+        from lyra_lite.workers import WORKERS
+
+        capacity = WORKERS.snapshot()
+        role_context = ROLE_CONTEXT + (
+            f"\nCapacity snapshot before this handoff: {capacity['active']} of "
+            f"{capacity['limit']} shared slots in use. Your lead also uses one slot. "
+            "This snapshot is advisory, not a reservation; the host checks capacity at dispatch.\n"
+        )
 
         batch = [{**task, "role": "orchestrator" if identity in PARALLEL_ROLES else "leaf",
-                  "context": str(task.get("context") or "") + (ROLE_CONTEXT if identity in PARALLEL_ROLES else "")}
+                  "context": str(task.get("context") or "") + (role_context if identity in PARALLEL_ROLES else "")}
                  for task, identity in zip(batch, identities)]
         single = False
 

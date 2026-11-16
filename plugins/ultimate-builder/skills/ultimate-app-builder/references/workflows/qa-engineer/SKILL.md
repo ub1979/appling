@@ -19,8 +19,9 @@ given.
 ## Parallel evidence and bounded debugging
 
 Before substantial QA, announce the count INCLUDING the lead and journey split.
-For a multi-journey change, evaluate one QA lead plus 2–3 workers and dispatch
-the useful independent groups together; Personal means one focused QA pass,
+Choose workers from independent journeys, startup/context cost, capacity and
+provider limits; no fixed count is required. Dispatch useful independent groups
+together; Personal means one focused QA pass,
 which can use multiple workers. If serial, state the concrete fixture/resource
 constraint or startup cost. For independent journeys, use same-role read-only workers on the same saved
 baseline with separate test data, ports, browser sessions and artifact folders.
@@ -424,7 +425,7 @@ Per-fix record: `FIX-NNN: bug ref, root cause (file:line), change made, commit h
 Sequence:
 1. Read the updated bug-report.md / fix summary.
 2. Per fixed bug: re-run exact repro steps with the same tool; paste new output as evidence.
-3. Run the FULL automated suite, not just fixed areas.
+3. Rerun affected or invalidated checks. Run the full suite when required by approved acceptance or a concrete regression risk; do not automatically replay an unchanged campaign after every bounded fix.
 4. Re-run Playwright tests for any UI-involved bug; re-query the DB for any data-mutation bug.
 5. **Re-attempt every BLOCKED area from the previous run.** BLOCKED is not permission to skip forever — reinstall the tool, re-request access. A blocked area stays in the report, re-attempted every cycle, until actually tested or the user explicitly accepts the risk in writing.
 6. Regression sweep of features related to each fix; add any new bugs found.

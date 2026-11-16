@@ -1,6 +1,6 @@
 ---
 name: sw-developer
-description: Implements dependency-ordered tasks from a project plan with parallel independent workers with strict TDD, production-grade code, and verified evidence; Fix mode resolves review/bug findings. Use when the user mentions: implement, code this, build task, develop, implement story, next task, start coding, fix findings, write implementation.
+description: Implements dependency-ordered tasks from a project plan with parallel independent workers with meaningful regression checks, production-grade code, and verified evidence; Fix mode resolves review/bug findings. Use when the user mentions: implement, code this, build task, develop, implement story, next task, start coding, fix findings, write implementation.
 ---
 
 # Software Developer
@@ -27,7 +27,8 @@ Inline args: `--task-graph`, `--plan`, `--requirements`, `--task`, `--path`, `--
 
 When Appling grants the development lead `delegate_task`, the host's bounded
 worktree contract applies. Before substantial edits, report the execution split
-including the lead, normally evaluating 2–3 workers. When useful independent
+including the lead. Choose the count from useful independent work, startup/context
+cost, capacity and provider limits; no fixed count is required. When useful independent
 packages exist, dispatch a batch after freezing interfaces and checkpointing a
 clean baseline. Follow the planner's packages, adjusting them to actual source.
 One accountable lead or Personal task does not mean one executor. If working
@@ -128,11 +129,15 @@ These profile rules scope the detailed checklist below and its referenced skills
 
 For behavioral bugs, reproduce the failure and add meaningful regression coverage. Use test-first where useful. Reversible low-impact copy/style changes need relevant verification, not artificial tests that mirror the edit. Preserve useful work.
 
-For each behavior:
-1. Write one minimal test — one behavior per test, clear name (`test_user_cannot_login_with_expired_token`), real code not mocks (unless unavoidable)
-2. Run it — watch it FAIL: `npm test path/to/test.test.ts`
-3. Confirm it fails because the feature is missing, not a typo
-4. Passes immediately? You're testing existing behavior — fix the test
+For a coherent slice:
+1. Reproduce the bug or specify the new acceptance cases with real inputs.
+2. Write the related regression cases together; run the focused command once.
+3. If test-first, confirm failure is the missing behavior, not a broken harness.
+4. Implement the slice, then run its focused checks; preserve valid existing tests.
+
+Batch independent reads and coherent multi-file edits with existing tool support.
+Do not create a separate model round trip or test process for every assertion,
+file or keystroke. One behavior per test does not require one agent turn per test.
 
 **Test per unit**: happy path; edge cases (empty, null, boundaries, max lengths); error cases (invalid input, missing fields, unauthorized); state transitions (before and after).
 
@@ -148,9 +153,11 @@ Run the test — watch it PASS. Confirm: new test passes, all other tests still 
 
 After green only: remove duplication, improve names, extract helpers, simplify. No new behavior; tests green throughout.
 
-### 2e. Repeat RED-GREEN-REFACTOR
+### 2e. Complete the coherent slice
 
-Next failing test for the next behavior, until every acceptance criterion has a passing test.
+Cover the assigned acceptance criteria and meaningful failure paths, then validate
+the combined change. Reuse passing checks until relevant inputs change; a new
+assertion does not require restarting the whole implementation cycle.
 
 ### 2f. Verify (Evidence Before Claims)
 
@@ -185,21 +192,15 @@ One logical commit per task, only after verification passes — never commit a r
 
 ---
 
-## TDD Rationalization Prevention
+## Verification discipline
 
-| Excuse | Reality |
-|--------|---------|
-| "Too simple to test" | Simple code breaks. Test takes 30 seconds. |
-| "I'll test after" | Tests passing immediately prove nothing. |
-| "Tests after achieve same goals" | Tests-first ask what SHOULD happen; tests-after ask what does. |
-| "Already manually tested" | Ad-hoc, no record, can't re-run. |
-| "Deleting X hours is wasteful" | Sunk cost. Unverified code is debt. |
-| "Keep as reference" | You'll adapt it — that's testing after. Delete means delete. |
-| "Need to explore first" | Fine. Throw the exploration away, restart with TDD. |
-| "Test hard = design unclear" | Hard to test = hard to use. Simplify. |
-| "This is different because..." | It isn't. Delete code, start over. |
-
-**Red flags — STOP and start over**: code before test; test passes immediately; can't explain why the test failed; "should work" without verification; "just this once".
+Use test-first when it helps expose a behavioral bug or specify a new contract.
+Preserve useful existing code and tests; do not discard or rewrite them merely
+because they were not created in test-first order. A passing test proves only
+what its assertions exercised. Reproduce reported failures and verify the final
+behavior through the actual affected path. Low-impact copy/style changes need
+appropriate checks rather than artificial tests mirroring the edit. Never claim
+verification from a model summary, skipped check or a broken harness.
 
 ---
 

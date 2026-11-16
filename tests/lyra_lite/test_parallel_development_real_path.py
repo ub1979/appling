@@ -12,7 +12,7 @@ from tests.lyra_lite.test_lyrad_real_path import (  # noqa: F401
 )
 
 
-@pytest.mark.parametrize("workers,limit", [(2, 10), (3, 10), (9, 10), (14, 15)])
+@pytest.mark.parametrize("workers,limit", [(1, 10), (2, 10), (3, 10), (5, 10), (9, 10), (14, 15)])
 def test_developer_fans_out_and_integrates_relative_file_and_terminal_work(env, workers, limit):
     letters = [chr(ord("A") + i) for i in range(workers)]
     lead = "sw-developer: DEV-LEAD implement independent modules"
@@ -62,8 +62,7 @@ def test_developer_fans_out_and_integrates_relative_file_and_terminal_work(env, 
             # that a provider inserts the goal at a fixed message index.
             terminal_outputs = [str(m.get("content", "")) for r in requests for m in r["messages"]
                                 if m.get("role") == "tool" and "worker-" in str(m.get("content", ""))]
-            assert any("worker-0" in output for output in terminal_outputs)
-            assert any("worker-1" in output for output in terminal_outputs)
+            assert all(any(f"worker-{i}" in output for output in terminal_outputs) for i in range(workers))
             worker_starts = [e for e in _events(root) if e["type"] == "helper" and e.get("event") == "start"
                              and e.get("goal", "").startswith("CODE-")]
             assert len(worker_starts) == workers and all(e.get("parent_id") for e in worker_starts)
@@ -94,6 +93,7 @@ def test_developer_fans_out_and_integrates_relative_file_and_terminal_work(env, 
                 assert prefixes.setdefault(first, prefix) == prefix
             plans = [e for e in _events(root) if e["type"] == "worker_plan"]
             assert len(plans) == 1 and plans[0]["workers"] == workers and plans[0]["reason"]
+            assert plans[0]["total_workers"] == workers + 1
             assert daemon.get("/api/settings").json()["parallel_work"]["active"] == 0
             assert not [e for e in _events(root) if e["type"] == "turn_end" and e.get("status") == "error"]
         finally:
@@ -191,17 +191,18 @@ def test_stop_reaches_nested_workers_and_prevents_integration(env):
             daemon.stop()
 
 
-def test_qa_read_only_workers_keep_the_selected_role_provider_and_model(env):
+@pytest.mark.parametrize("workers", [1, 3, 5])
+def test_qa_read_only_workers_keep_the_selected_role_provider_and_model(env, workers):
     tasks = [{"goal": f"READ-{n}", "context": json.dumps({
         "read_only": True, "instructions": "Read the contract and return findings without editing files."
-    })} for n in range(3)]
-    barrier = threading.Barrier(3, timeout=30)
+    })} for n in range(workers)]
+    barrier = threading.Barrier(workers, timeout=30)
     with FakeOpenAIServer([]) as coordinator, FakeOpenAIServer([], side_scripts={
         "QA-LEAD": [tool_step("delegate_task", {"tasks": tasks,
-            "context": "One QA lead plus three independent read-only contract checks."}),
+            "context": f"One QA lead plus {workers} independent read-only contract checks."}),
             text_step("QA findings consolidated.")],
         **{f"READ-{n}": [{**tool_step("read_file", {"path": "contract.txt"}), "worker_barrier": True},
-                         text_step("Contract checked; no modifications.")] for n in range(3)},
+                         text_step("Contract checked; no modifications.")] for n in range(workers)},
     }) as role_provider:
         next_step = role_provider.next_step
         def simultaneous(body):
@@ -241,7 +242,7 @@ def test_qa_read_only_workers_keep_the_selected_role_provider_and_model(env):
             assert all(r["model"] == "selected-qa-model" for r in role_provider.main_requests())
             assert all(r["model"] == "fake-model" for r in coordinator.main_requests())
             assert len([e for e in _events(root) if e["type"] == "helper" and e.get("event") == "start"
-                        and e.get("goal", "").startswith("READ-")]) == 3
+                        and e.get("goal", "").startswith("READ-")]) == workers
         finally:
             daemon.stop()
 
@@ -275,5 +276,35 @@ def test_planner_receives_worker_contract_without_implementation_permission(env)
                 assert 'Preserve this approved boundary: local files only.' in context
                 assert 'delegate_task' not in {t['function']['name'] for t in request['tools']}
             assert not [e for e in _events(root) if e['type'] == 'worker_plan']
+        finally:
+            daemon.stop()
+
+
+@pytest.mark.parametrize('role', ['sw-developer', 'researcher', 'code-reviewer'])
+def test_role_can_choose_direct_execution_without_forced_workers(env, role):
+    leaf_step = (tool_step('write_file', {'path': 'small-fix.txt', 'content': 'Fixed directly.\n'})
+                 if role == 'sw-developer' else tool_step('read_file', {'path': 'contract.txt'}))
+    with FakeOpenAIServer([], side_scripts={
+        'DIRECT-LEAD': [leaf_step, text_step('Small assignment completed directly; worker startup would cost more.')],
+    }) as llm:
+        _write_config(env['hermes_home'], llm.base_url,
+                      lyra_lite={'watchdog': {'enabled': False}, 'parallel_work': {'max_workers': 15}})
+        daemon = Daemon(env).start()
+        try:
+            pid, root = _new_project(daemon, env, 'Small direct task')
+            (root / 'contract.txt').write_text('Approved stable contract.\n')
+            llm.script = [tool_step('delegate_task', {'goal': f'{role}: DIRECT-LEAD small scoped assignment'}),
+                          text_step('Working.'), text_step('Direct assignment report received.')]
+            assert daemon.post(f'/api/projects/{pid}/messages', {'text': 'Complete the small assignment'}).is_success
+            _wait_event(root, lambda e: e['type'] == 'turn_end'
+                        and e.get('reply') == 'Direct assignment report received.', 60)
+            events = _events(root)
+            assert not [e for e in events if e['type'] == 'worker_plan']
+            assert not [e for e in events if e['type'] == 'helper' and e.get('parent_id')]
+            if role == 'sw-developer':
+                assert (root / 'small-fix.txt').read_text() == 'Fixed directly.\n'
+            assert (root / 'contract.txt').read_text() == 'Approved stable contract.\n'
+            assert daemon.get('/api/settings').json()['parallel_work']['active'] == 0
+            assert not [e for e in events if e['type'] == 'turn_end' and e.get('status') == 'error']
         finally:
             daemon.stop()

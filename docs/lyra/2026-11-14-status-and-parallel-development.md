@@ -23,9 +23,12 @@ projects and owner questions suppress the timer. Heartbeats do not count as
 file/tool progress; a quiet wait is described honestly. Notes survive refresh
 and restart through the existing transcript and SSE mechanisms.
 
-Development uses one lead with at most three leaf coding workers. The host
-grants two delegation levels only to Appling; the global Hermes default is
-unchanged. Non-development phases remain ordinary leaf agents. The lead's
+Selected role leads choose useful same-role workers, within a shared default
+budget of 10 executing leads/workers (configurable to 15). Counts are ceilings,
+not targets; small changes can run directly. The host grants two delegation
+levels only to Appling; the global Hermes default is unchanged. Research, review,
+QA and other enabled parallel-capable roles use the same guarded contract.
+The requirements interview and its approvals remain unchanged. The lead's
 initial task context explains the contract before its first model request.
 Existing approval checks run before development is dispatched. The global
 orchestrator kill switch and normal concurrency/approval controls still apply.

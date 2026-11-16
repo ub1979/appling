@@ -56,7 +56,10 @@ is normally optional at this profile. Do not change profile or invent features.
    permission to start a new planning exercise.
    Apply the shared QA Evidence execution preflight before browser interaction;
    choose installed automation early rather than after manual clicking stalls.
-2. Run the automated suite. Review failures and any critical coverage gaps.
+2. Run the assigned automated checks against the current revision, allocating
+   independent commands across workers without duplicating them in every worker
+   and the lead. Review failures and critical coverage gaps. Full-suite coverage
+   is required when approved acceptance or a concrete regression risk calls for it.
    For a dependency-free Node project, the built-in `node --test` runner is
    sufficient. Do not install another framework merely because no config exists.
 3. Exercise each approved core journey through its real entry point. Cover the

@@ -210,7 +210,9 @@ Reuse verified artifacts; an in-scope UI revision does not restart discovery or
 planning. Keep one role lead through implementation, its fixes and integration.
 Selected roles can fan out independent same-role work within the shared 10-worker
 budget (configurable to 15); workers use isolated worktrees, disjoint ownership or
-read-only snapshots. Explain the useful worker count. Focused checks during edits,
+read-only snapshots. The lead chooses a useful count from ready work, context
+cost and capacity; this budget is a ceiling, not a target. Requirements remain
+interactive and unchanged. Explain the useful worker count briefly. Focused checks during edits,
 one combined integration gate and selected final QA; repeat only for changed code,
 failures or unresolved risk. Keep handoffs concise and update memory at milestones.
 
@@ -257,7 +259,9 @@ files or state. Give each development delegate:
 - the instruction to create a local Git commit after verification. Never push
   to a remote unless the user explicitly asks.
 
-After parallel work, run one integration delegate over the combined state.
+The same accountable development lead integrates its workers and runs combined
+validation once. Do not launch another integration delegate by default. Keep
+Brain updates and reports concise; link evidence instead of duplicating it.
 
 ## Step 4: independent verification loop
 

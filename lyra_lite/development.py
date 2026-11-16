@@ -218,63 +218,65 @@ PARALLEL_ROLES = frozenset({"sw-developer", "website-builder", "oop-restructurer
     "security-auditor", "tech-writer", "ux-writer", "benchmark", "health", "devops-engineer"})
 
 PLANNING_CONTEXT = """
-Include a compact execution split in task-graph.md, even for Personal projects.
-One accountable development task may contain several same-role worker packages;
-the Personal 1-3 task limit does not limit workers. For each useful package name
-its exact owned paths (or read-only scope), frozen input/output contract, real
-dependencies, acceptance command and integration gate. Keep shared files and
-decisions with the lead. Evaluate a lead plus 2-3 workers first; expand for more
-independent useful work within the host's shared budget (default 10, maximum 15).
-If only one executor is useful, name the concrete dependency or startup cost
-instead of citing Personal profile or one-lead ownership. Do not serialize all
-testing merely because some tests share fixtures: separate independent checks
-using isolated data/artifacts/ports and keep genuinely shared fixtures serial.
-Plan an independent QA lead with parallel journey groups on one committed build.
-Worker packages implement approved scope; they add neither product scope nor
-owner review gates. Do not launch implementation or QA during planning.
+Keep requirements and their interview/approvals unchanged. In task-graph.md name
+coherent deliverables with exact worker ownership, input/output contracts, real
+dependencies, acceptance commands and a combined integration gate. The lead
+chooses worker counts at execution time from ready independent work, context
+startup cost, available capacity and provider limits. No fixed target or minimum
+count; Personal task counts do not limit workers. Do not chain independent work
+by list/phase order or wait for unrelated previous-wave tasks. Shared contracts
+and decisions have one owner. Workers add no scope, roles or approval gates.
+Plan independent QA on the committed integrated build. Keep genuinely shared
+fixtures serial and use separate data/ports/artifacts for independent checks.
+For modifications reuse the existing graph and Brain, recording only the delta
+and invalidated checks. Do not launch implementation or QA during planning.
 """
 
 ROLE_CONTEXT = """
-Stay within the assigned role and approved team. Own the whole coherent assignment,
-including fixes and integration; do not hand back after every tiny task. Before
-substantial implementation or QA, report the execution split: count INCLUDING
-the lead, worker scopes, ownership, dependencies and why the count helps. Assess
-a lead plus 2-3 workers first. When two or more useful independent packages exist,
-dispatch them together through delegate_task after freezing their contracts and
-checkpointing the baseline; permission to delegate is an execution requirement,
-not just an optional suggestion. Use fewer only for concrete dependencies,
-startup cost, capacity or provider limits and state that reason even when no
-workers are dispatched. One lead and one Personal task do not mean one executor.
-Keep this assessment concise; do not create a new approval or planning phase.
-Put the batch's one-sentence rationale in its top-level context.
-The shared process-wide budget defaults to 10 executing
-role leads plus workers, configurable to 15; your own lead occupies one slot.
-Fewer independent tasks, provider limits or shared dependencies justify fewer.
-Do small/dependent work directly. If capacity is unavailable, continue useful work
-directly or wait for existing results; do not repeatedly retry delegation.
+Stay within the assigned role, approved team and scope. Complete the coherent
+assignment, fixes and integration without returning after each tiny edit.
+You choose how many same-role workers are useful: no fixed target or minimum.
+Base the count on ready independent work, expected time saved versus context/
+startup/merge cost, provider limits and free shared capacity. Use independent
+workers when they help; do small or coupled changes directly. Reassess at natural
+milestones. Explain the choice in one sentence including the lead. The default
+shared budget is 10 executing leads plus workers, configurable to 15; your lead
+uses one slot. This is a ceiling, not a worker target. Put a batch's rationale in
+its top-level context. If capacity is unavailable, do useful work directly or
+wait for existing results; do not retry dispatch in a loop.
 
-Every leaf task context is JSON: {"read_only":true,"instructions":"focused check"}
-for analysis/research/QA, or {"owned_paths":["src/feature/","tests/feature/"],
-"instructions":"contract, acceptance criteria, affected check commands"} for edits.
-The same role/model/provider is inherited; helpers do not activate unselected roles.
-Requirements interviews, architecture decisions, shared contracts, manifests,
-lockfiles, plan/progress and Project Brain stay with their responsible lead.
-Checkpoint a clean project-root Git repository before a wave. Each leaf receives
-an isolated worktree at the same baseline. Never bypass ownership/integration
-rejections or edit another worktree. If no committed project repo exists, work
-directly rather than repeatedly requesting workers. No recursive leaf delegation.
-Read-only workers return findings without changing source or shared reports; use
-isolated test data, ports, browser sessions and temporary artifact directories.
-Checks on the old baseline cannot certify newly integrated changes.
+Leaf context is JSON: {"read_only":true,"instructions":"scope, checks, inputs"}
+for analysis/QA, or {"owned_paths":["src/feature/","tests/feature/"],
+"instructions":"contract, acceptance, check commands"} for edits. Same role,
+model and provider are inherited; workers do not activate unselected roles.
+Freeze shared interfaces and checkpoint a clean project-root Git repository
+before a batch. Each leaf uses its isolated worktree and owns only declared
+paths; no recursive delegation or bypass of integration/Stop guards. Shared
+contracts, manifests/lockfiles, Brain and reports stay with their lead. If the
+host cannot provide safe workers, continue directly and report the constraint.
+Read-only workers use separate test data, ports and temporary artifacts and
+return findings without editing source or shared reports. Baseline checks do
+not certify later changes; final QA waits for the committed integrated build.
 
-Use focused checks while editing; run the combined build/typecheck/relevant tests
-once after integrating a coherent change, and independent final QA when selected.
-Repeat broad checks only for new changes, failures or unresolved risk. QA must
-reproduce a product defect before proposing a fix; distinguish harness/setup
-errors. After two failed attempts with the same hypothesis, inspect new evidence
-and revise the hypothesis rather than repeating the same loop. Return a concise
-report of changed paths/commits, exact checks/results, evidence and remaining work.
-Refresh shared project memory once per meaningful verified milestone.
+Keep tokens focused: give each worker the approved scope, exact task/paths,
+contracts, existing setup/check commands and relevant Brain references. Do not
+copy the entire conversation/history/reports into every handoff. Read current
+code needed for the task; use project_recall for missing earlier decisions.
+Preserve the Brain and project memory; the lead updates them once per verified
+milestone with decisions, current commit, checks, blockers and evidence links.
+Do not duplicate full reports or recopy/hash every unchanged artifact.
+
+Batch independent reads and coherent edits using existing tools; one behavior
+per test does not require one model call or test run per assertion. Preserve
+working code and meaningful coverage rather than restarting for test order.
+Use focused checks while editing, then one combined validation after integration.
+Independent QA executes its assigned acceptance checks; it need not replay every
+developer command. Reuse still-valid QA evidence after bounded fixes; rerun
+changed/invalidated checks or broader checks for a concrete regression risk.
+Preserve required coverage and owner approvals. After two failures with the same
+hypothesis, inspect fresh evidence rather than repeating the loop. Return a
+concise result: changed paths/commit, actual checks/results, evidence links and
+remaining work. Tool output proves checks; model summaries alone do not.
 """
 
 
@@ -332,7 +334,7 @@ def install_development_policy(agent, store) -> None:
                     child._configure_delegate_child = configure_leaf
 
                     def execute(prepared, records):
-                        store.append_event("worker_plan", agent=identity, workers=requested,
+                        store.append_event("worker_plan", agent=identity, workers=requested, total_workers=requested + 1,
                             reason=str(args.get("context") or
                                        f"{requested} independent {identity} tasks with isolated worktrees; shared limit {limit}")[:400])
                         # Preserve this role's resolved runtime rather than a

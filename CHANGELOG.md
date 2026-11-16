@@ -9,6 +9,16 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.16 beta — 2026-11-16
+
+Hermes desktop package 0.17.16-beta.1. Codex remains separate and unchanged.
+
+- Let role leads select useful worker counts within shared capacity, including
+  direct execution for small changes; no fixed worker target or phase barrier.
+- Preserve requirements/interview, approvals, project memory and checked merges.
+- Resolve conflicting QA delegation instructions. Use affected-check retests,
+  concise handoffs and milestone Brain updates instead of duplicate campaigns.
+
 ### Appling v0.17.15 beta — 2026-11-15
 
 Hermes desktop package 0.17.15-beta.1. Codex remains separate and unchanged.
@@ -524,6 +534,14 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.37-a] - 2026-11-16 — Adaptive Hermes execution
+
+- Give coding, modification, QA and other parallel-capable leads adaptive worker
+  guidance and an initial capacity snapshot without changing core Hermes tools.
+- Preserve the interactive requirements workflow, owner gates and project memory.
+- Remove artificial phase barriers and redundant integration/reporting steps;
+  keep required validation and checked worktree integration.
 
 ## [0.19.36-a] - 2026-11-15 — Explicit parallel execution handoffs
 
