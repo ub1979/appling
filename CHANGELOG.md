@@ -9,6 +9,16 @@ Versions are `MAJOR.MINOR.PATCH` with an optional pre-release suffix (`-a`); the
 
 ## [Unreleased]
 
+### Appling v0.17.17 beta — 2026-11-16
+
+Hermes desktop package 0.17.17-beta.1. Codex remains separate and unchanged.
+
+- Save the current adaptive Hermes workflow as a versioned Git checkpoint,
+  retaining checked worker integration, project memory and approval controls.
+- Synchronize product, compatibility runtime and desktop release metadata.
+  This checkpoint introduces no agent execution changes; ongoing generated-app
+  work remains in its own project repository.
+
 ### Appling v0.17.16 beta — 2026-11-16
 
 Hermes desktop package 0.17.16-beta.1. Codex remains separate and unchanged.
@@ -534,6 +544,12 @@ Same projects, linked models and builder playbooks; new plumbing.
   approvals for agents' risky commands, ready banner, Open app, notifications.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
+
+## [0.19.38-a] - 2026-11-16 — Hermes workflow checkpoint
+
+- Record the current Hermes workflow as Appling v0.17.17 beta with synchronized
+  desktop metadata and a versioned rollback checkpoint.
+- Keep agent execution unchanged and preserve the separate Codex branch.
 
 ## [0.19.37-a] - 2026-11-16 — Adaptive Hermes execution
 
