@@ -57,3 +57,13 @@ The [architecture overview](APPLING.md) and [technical guide](lyra_lite/README.m
 Appling grew out of a project previously called Lyra. Some internal paths, Python packages, and older changelog entries retain that name so existing installations and projects continue to work. The user-facing product and this repository are **Appling**.
 
 Appling builds on [Hermes Agent](https://github.com/NousResearch/hermes-agent) by Nous Research. Hermes provides the agent runtime and model connections; Appling adds the project studio and guided building workflow. See the repository [license](LICENSE).
+
+## License
+
+Original material controlled by ub1979 is designated **CC BY-NC-ND 4.0**
+for noncommercial use, with education and research as the intended audience.
+Attribution is required; sharing adapted versions is not licensed.
+See [LICENSE](LICENSE) and [licensing scope and exceptions](LICENSING.md).
+Inherited Hermes material remains MIT under [LICENSE-MIT.upstream](LICENSE-MIT.upstream);
+other third-party licenses and earlier grants remain in effect.
+The restricted original material is source-available rather than OSI open source.

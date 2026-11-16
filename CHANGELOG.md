@@ -312,6 +312,15 @@ Same projects, linked models and builder playbooks; new plumbing.
 - **Fixed in Hermes:** a helper's flagged command no longer gets parked
   unseen — the approval now reaches the owner (single and parallel helpers).
 
+## [0.19.20-a] - 2026-11-16 — Licensing scope and upstream notices
+
+### Changed
+
+- Designated original material controlled by ub1979 CC BY-NC-ND 4.0, matching
+  job-agent, with noncommercial education and research as the intended audience.
+- Preserved inherited Hermes MIT notices, third-party terms and earlier grants.
+- Updated licensing documentation; application behavior is unchanged.
+
 ## [0.19.19-a] - 2026-10-30 — Installer download links
 
 Appling v0.15 beta; the Studio compatibility version advances to 0.19.19-a.

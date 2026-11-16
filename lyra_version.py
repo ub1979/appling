@@ -18,16 +18,16 @@ import time
 from pathlib import Path
 from typing import Any, Optional
 
-LYRA_VERSION = "0.19.19-a"
+LYRA_VERSION = "0.19.20-a"
 """Semantic version. Bump with every release; the changelog's top entry must match."""
 
 LYRA_CHANNEL = "beta"
 """alpha → beta → rc → stable. Shown next to the number so nobody mistakes this for finished."""
 
-LYRA_RELEASE_NAME = "Installer download links"
+LYRA_RELEASE_NAME = "Licensing scope and upstream notices"
 """Short human name for the release. The line under the number in the UI."""
 
-LYRA_RELEASED = "2026-10-30"
+LYRA_RELEASED = "2026-11-16"
 
 PROJECT_ROOT = Path(__file__).resolve().parent
 CHANGELOG_PATH = PROJECT_ROOT / "CHANGELOG.md"
