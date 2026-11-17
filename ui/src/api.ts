@@ -34,6 +34,7 @@ export interface QueueItem {
 }
 
 export interface ProjectDetail {
+  phase?: string;
   id: string;
   name: string;
   root: string;

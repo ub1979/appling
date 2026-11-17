@@ -160,6 +160,8 @@ export function Studio({ id }: { id: string }) {
     if (live.turnsEnded > 0 || live.helperChanges > 0 || live.answersChanged > 0 || live.conversationChanges > 0) void load();
   }, [live.turnsEnded, live.helperChanges, live.answersChanged, live.conversationChanges, load]);
 
+  useEffect(() => { void load(); }, [live.inbox.length, load]);
+
   useEffect(() => {
     const timer = window.setInterval(() => void load().catch(() => undefined), 3000);
     return () => window.clearInterval(timer);
@@ -301,10 +303,18 @@ export function Studio({ id }: { id: string }) {
       }
     });
   };
-  const send = (text: string) => {
+  const send = async (text: string) => {
     askNotificationPermission();
-    setSent((n) => n + 1);
-    return run(() => api.send(id, text));
+    try {
+      setProblem(null);
+      await api.send(id, text);
+      setSent((n) => n + 1);
+      await load().catch(() => undefined);
+      return true;
+    } catch (error) {
+      setProblem(error instanceof Error ? error.message : String(error));
+      return false;
+    }
   };
   const labelOf = (agentId: string) => agents.find((a) => a.id === agentId)?.label ?? agentId;
 
@@ -503,7 +513,7 @@ export function Studio({ id }: { id: string }) {
             ids={ids}
             agents={agents}
             team={team}
-            requirementsInterview={detail.review_pending}
+            requirementsInterview={detail.phase === "requirements"}
             asksQuestion={asksQuestion}
             asksApproval={asksApproval}
             proposal={openProposal}
@@ -824,6 +834,9 @@ function ChatScroll(props: {
   };
 
   const lastLyraIndex = shown.map((s) => s.role).lastIndexOf("lyra");
+  const pendingQuestionIndexes = new Set(live.inbox.filter((item) => item.kind === "question").map((item) =>
+    shown.map((message) => message.role === "lyra" ? message.text.trim() : "").lastIndexOf(item.question?.trim() ?? ""),
+  ));
 
   return (
     <div
@@ -842,7 +855,7 @@ function ChatScroll(props: {
         {shown.length === 0 && !turn && (
           <div className="empty-note">{props.emptyNote ?? "Let's start building. What's the idea? ✨"}</div>
         )}
-        {shown.map((s, i) => (
+        {shown.map((s, i) => pendingQuestionIndexes.has(i) ? null : (
           <Message key={i} item={s}>
             {i === lastLyraIndex && props.proposal && (
               <TeamProposal key={props.proposal.join(",")} agents={props.agents} proposal={props.proposal} current={props.team} onConfirm={props.onTeam} />
@@ -992,6 +1005,14 @@ export function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype, requi
 }) {
   const [text, setText] = useState("");
   const [planShown, setPlanShown] = useState(false);
+  if (item.kind === "question") {
+    return <Message item={{ role: "lyra", text: item.question ?? "", proposal: null }}>
+      {!!item.choices?.length && <div className="answer-row">
+        {item.choices.map((choice) => <button key={choice} className="chip" onClick={() => onAnswer(choice)}>{choice}</button>)}
+      </div>}
+      {requirementsInterview && <div className="answer-row"><QuestionShortcuts onAnswer={onAnswer} /></div>}
+    </Message>;
+  }
   if (item.kind === "plan") {
     return (
       <div className="need-card">
@@ -1081,12 +1102,13 @@ export function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype, requi
 
 interface Attachment { key: string; name: string; progress: number; path?: string; error?: string }
 
-function Composer({ busy, inbox, onSend, projectId, dropped, picks, onPicksChange }: {
-  busy: boolean; onSend: (text: string) => Promise<void>; projectId: string; dropped: File[];
+export function Composer({ busy, inbox, onSend, projectId, dropped, picks, onPicksChange }: {
+  busy: boolean; onSend: (text: string) => Promise<boolean>; projectId: string; dropped: File[];
   inbox: InboxItem[];
   picks: PickedElement[]; onPicksChange: (p: PickedElement[]) => void;
 }) {
   const [text, setText] = useState("");
+  const [sending, setSending] = useState(false);
   const [files, setFiles] = useState<Attachment[]>([]);
   const area = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
@@ -1095,7 +1117,8 @@ function Composer({ busy, inbox, onSend, projectId, dropped, picks, onPicksChang
     const el = area.current;
     if (!el) return;
     el.style.height = "auto";
-    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+    const lineHeight = parseFloat(getComputedStyle(el).lineHeight) || 24;
+    el.style.height = `${Math.min(el.scrollHeight, lineHeight * 10 + 16)}px`;
   }, [text]);
   const attach = useCallback((list: File[]) => {
     for (const file of list) {
@@ -1112,14 +1135,16 @@ function Composer({ busy, inbox, onSend, projectId, dropped, picks, onPicksChang
   const ready = files.filter((f) => f.path);
   const send = async () => {
     const value = text.trim();
-    if ((!value && !ready.length && !picks.length) || uploading) return;
+    if ((!value && !ready.length && !picks.length) || uploading || sending) return;
     const parts = [value];
     if (picks.length) parts.push(picks.map(pickNote).join("\n\n"));
     if (ready.length) parts.push(`Attached: ${ready.map((f) => f.path).join(", ")}`);
-    setText("");
-    setFiles([]);
-    onPicksChange([]);
-    await onSend(parts.filter(Boolean).join("\n\n"));
+    setSending(true);
+    try {
+      if (await onSend(parts.filter(Boolean).join("\n\n"))) {
+        setText(""); setFiles([]); onPicksChange([]);
+      }
+    } finally { setSending(false); }
   };
   return (
     <div className="composer">
@@ -1146,19 +1171,21 @@ function Composer({ busy, inbox, onSend, projectId, dropped, picks, onPicksChang
         <input ref={picker} type="file" multiple hidden onChange={(e) => { attach(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
         <textarea
           ref={area}
-          rows={1}
+          rows={6}
+          aria-label="Message Appling"
+          disabled={sending}
           value={text}
           placeholder={context.placeholder}
           onChange={(e) => setText(e.target.value)}
           onPaste={(e) => { const pasted = Array.from(e.clipboardData.files); if (pasted.length) { e.preventDefault(); attach(pasted); } }}
           onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
+            if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) {
               e.preventDefault();
               void send();
             }
           }}
         />
-        <button className="send" onClick={() => void send()} disabled={(!text.trim() && !ready.length && !picks.length) || uploading} aria-label="Send" title={uploading ? "Wait for the upload to finish" : "Send"}><ArrowUp size={18} /></button>
+        <button className="send" onClick={() => void send()} disabled={(!text.trim() && !ready.length && !picks.length) || uploading || sending} aria-label="Send" title={uploading ? "Wait for the upload to finish" : "Send"}><ArrowUp size={18} /></button>
       </div>
       <div className="hint">{context.hint}</div>
     </div>

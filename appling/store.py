@@ -120,8 +120,14 @@ class Store:
         item = dict(id=ident(), kind=kind, question=question, choices=choices, created=time.time(), **extra)
         with self.connect() as c:
             c.execute("INSERT INTO inbox VALUES (?,?,?)", (item['id'], pid, json.dumps(item)))
+        if kind=='question':self.record_question(pid,question)
         self.event(pid, "inbox", item=item)
         return item
+
+    def record_question(self,pid,question):
+        messages=self.messages(pid)
+        if not messages or messages[-1].get('role')!='assistant' or messages[-1].get('content')!=question:
+            self.message(pid,'assistant',question,'question')
 
     def inbox(self, pid):
         with self.connect() as c:

@@ -121,8 +121,7 @@ def create_app(home=None,execute=None):
         if brief:
             workflow.submit(p['id'],brief)
         else:
-            store.message(p['id'],'assistant',f'What would you like to build or change in {root.name}?')
-            store.ask(p['id'],'question','What would you like to build or change?',[])
+            store.ask(p['id'],'question',f'What would you like to build or change in {root.name}?',[])
         return detail(p['id'])
 
     @app.get('/api/projects/{pid}')

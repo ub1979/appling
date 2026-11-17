@@ -5,7 +5,7 @@ export function composerContext(inbox: InboxItem[], busy: boolean) {
   if (targets.length === 1) {
     if (targets[0].kind === "question") return {
       placeholder: "Answer Appling’s question…",
-      hint: "Sent as your answer to the question above. Picked parts and attachments are included.",
+      hint: "Sent as your answer to the question above. Picked parts and attachments are included. Enter to send · Shift+Enter for a new line.",
     };
     return {
       placeholder: "Describe what you want changed…",

@@ -1,7 +1,7 @@
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { describe, expect, it } from "vitest";
-import { asksForQuestion, NeedCard } from "./Studio";
+import { asksForQuestion, NeedCard, Composer } from "./Studio";
 
 describe("question detection", () => {
   it("recognises a question followed by an explanation in the final paragraph", () => {
@@ -70,4 +70,26 @@ describe("implementation plan review", () => {
     expect(html).not.toContain("Actual saved implementation plan");
   });
 
+});
+
+describe("conversational questions and multiline composer", () => {
+  it("renders an ordinary question as chat without a second input or warning card", () => {
+    const html = renderToStaticMarkup(createElement(NeedCard, {
+      item: { id: "question", kind: "question", created: 1, question: "What should your app do?", choices: ["Track spending"] },
+      requirementsInterview: true, onAnswer: () => {}, seenPrototype: null, onOpenPrototype: () => {},
+    }));
+    expect(html).toContain('class="msg lyra"');
+    expect(html).toContain("What should your app do?");
+    expect(html).toContain("Track spending");expect(html).toContain("Use smart defaults");
+    expect(html).not.toContain("need-card");expect(html).not.toContain("<input");
+    expect(html).not.toContain("Appling has a question");
+  });
+  it("provides a single main textarea with six visible rows", () => {
+    const html = renderToStaticMarkup(createElement(Composer, {
+      busy: false, inbox: [{ id: "q", kind: "question", created: 1 }], projectId: "test",
+      onSend: async () => true, dropped: [], picks: [], onPicksChange: () => {},
+    }));
+    expect(html).toContain("<textarea");expect(html).toContain('rows="6"');
+    expect(html).toContain('aria-label="Message Appling"');expect(html).toContain("Shift+Enter");
+  });
 });

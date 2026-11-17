@@ -179,3 +179,20 @@ def test_task_dependencies_reject_cycles_and_missing_ids():
         with pytest.raises(ValueError):
             parse_tasks(tasks)
     assert parse_tasks([{'id':'b','goal':'second','depends_on':['a']},{'id':'a','goal':'first'}])
+
+
+def test_question_and_multiline_answer_survive_in_normal_conversation(tmp_path):
+    store=Store(tmp_path/'studio.db');p=store.add(tmp_path/'app')
+    w=Workflow(store,lambda conn,run:{'question':'Which users need access?','choices':['Me','My team']})
+    try:
+        store.ask(p['id'],'question','What would you like to build?',[])
+        answer='Track spending.\nGroup transactions.\nShow monthly totals.\nSupport several accounts.\nKeep my data private.'
+        w.submit(p['id'],answer);wait_idle(w,p['id'])
+        messages=store.messages(p['id'])
+        assert messages[0]['role']=='assistant';assert messages[0]['content']=='What would you like to build?'
+        assert messages[1]['role']=='user';assert messages[1]['content']==answer
+        assert messages[-1]['content']=='Which users need access?'
+        assert sum(m['content']=='What would you like to build?' for m in messages)==1
+        assert Store(tmp_path/'studio.db').messages(p['id'])==messages
+        assert store.get(p['id'])['requirements_notes']==[answer]
+    finally:w.shutdown()

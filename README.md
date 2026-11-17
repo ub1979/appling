@@ -73,6 +73,11 @@ runs with the local user's permissions; it is not an OS sandbox.
 
 ## Build workflow
 
+Ordinary questions appear in the conversation and are answered in the main chat
+composer. It starts with six visible lines and expands to ten before scrolling.
+Use Shift+Enter for line breaks and Enter to send. Failed sends keep your draft.
+Prototype, plan, permission and secret controls retain their dedicated treatment.
+
 1. Requirements interviews ask one focused question at a time. Skip, decide for
    me and smart defaults remain available. Answers are saved separately from
    engine sessions, so switching connections doesn't discard them.

@@ -197,6 +197,7 @@ class Workflow:
             item=next((i for i in self.store.inbox(pid) if i['id']==iid),None)
             if item is None:
                 raise ValueError('This question has already been answered.')
+            if item['kind']=='question':self.store.record_question(pid,item['question'])
             choice=answer.get('choice','') if isinstance(answer,dict) else str(answer)
             if item.get('runtime'):
                 if item['kind']=='approval' and choice not in item['choices']:

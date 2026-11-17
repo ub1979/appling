@@ -2,9 +2,10 @@
 
 ## Automated coverage
 
-Latest local result: **47 backend tests passed; 46 frontend tests passed**.
+Latest local result: **48 backend tests passed; 48 frontend tests passed**.
 TypeScript checks and the Vite production build passed. The stylesheet was
-retained byte-for-byte from the original interface.
+initially copied from the original interface; the composer now has six visible
+lines and grows to ten, as requested. Ordinary questions use normal chat bubbles.
 
 - Backend behavior checks exercise the complete controller flow with temporary
   project files, revision-bound approvals, task dependencies, memory isolation,
@@ -19,6 +20,9 @@ retained byte-for-byte from the original interface.
 - Claude regressions cover stdin EOF, plain-text and pretty-printed JSON results,
   resolved model reporting, login-error propagation with secret redaction, and
   using the same custom Claude config for authentication and generation.
+- Conversation checks cover normal question rendering without a separate input,
+  a six-row shared composer, and persistence of multiline answers and questions
+  through submission and reopening the project store.
 - Subprocess protocol checks exercise Codex initialization, thread resume,
   approvals, questions, task completion and usage notifications through a real
   child process implementing the protocol.
