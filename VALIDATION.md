@@ -2,13 +2,15 @@
 
 ## Automated coverage
 
-Latest local result: **28 backend tests passed; 42 frontend tests passed**.
+Latest local result: **32 backend tests passed; 42 frontend tests passed**.
 TypeScript checks and the Vite production build passed. The stylesheet was
 retained byte-for-byte from the original interface.
 
 - Backend behavior checks exercise the complete controller flow with temporary
   project files, revision-bound approvals, task dependencies, memory isolation,
   interruption/restart, follow-up changes, API authentication and settings.
+- Launcher checks cover occupied-port fallback, strict explicit ports, permission
+  failures, and keeping the browser URL aligned with the reserved server socket.
 - Subprocess protocol checks exercise Codex initialization, thread resume,
   approvals, questions, task completion and usage notifications through a real
   child process implementing the protocol.

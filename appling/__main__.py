@@ -1,21 +1,55 @@
 from __future__ import annotations
 import argparse
+import errno
+import socket
 import webbrowser
 import threading
 import uvicorn
 from .server import create_app
 
 
+def reserve_port(port, *, fallback=False):
+    """Keep the socket bound until Uvicorn takes over, avoiding a port race."""
+    for candidate in range(port, min(port + (50 if fallback else 1), 65536)):
+        listener=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
+        try:
+            listener.bind(('127.0.0.1',candidate))
+            listener.listen(2048)
+            return listener
+        except OSError as exc:
+            listener.close()
+            if exc.errno!=errno.EADDRINUSE or not fallback:
+                raise
+    raise OSError(errno.EADDRINUSE,f'No free port found between {port} and {min(port+49,65535)}')
+
+
 def main():
     parser=argparse.ArgumentParser(description='Appling C — your local app studio')
-    parser.add_argument('--port',type=int,default=9210)
+    parser.add_argument('--port',type=int,help='Use this exact port; otherwise try 9210 and the next available ports')
     parser.add_argument('--home',help='Separate studio settings and state directory')
     parser.add_argument('--no-open',action='store_true')
     args=parser.parse_args()
-    app=create_app(args.home)
-    if not args.no_open:
-        threading.Timer(1.2,lambda:webbrowser.open(f'http://127.0.0.1:{args.port}')).start()
-    uvicorn.run(app,host='127.0.0.1',port=args.port,log_level='info')
+    port=9210 if args.port is None else args.port
+    if not 0<=port<=65535:
+        parser.error('Port must be between 0 and 65535.')
+    try:
+        listener=reserve_port(port,fallback=args.port is None)
+    except OSError as exc:
+        if exc.errno==errno.EADDRINUSE:
+            parser.error(f'Port {port} is already in use. Omit --port to select an available port, or choose another port.')
+        parser.error(f'Cannot open a localhost listener: {exc}')
+    try:
+        actual_port=listener.getsockname()[1]
+        url=f'http://127.0.0.1:{actual_port}'
+        if actual_port!=port and port!=0:
+            print(f'Port {port} is occupied; using {actual_port}.',flush=True)
+        print(f'Open Appling: {url}',flush=True)
+        app=create_app(args.home)
+        if not args.no_open:
+            threading.Timer(1.2,lambda:webbrowser.open(url)).start()
+        uvicorn.run(app,host='127.0.0.1',port=actual_port,fd=listener.fileno(),log_level='info')
+    finally:
+        listener.close()
 
 
 if __name__=='__main__':

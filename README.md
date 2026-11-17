@@ -15,12 +15,16 @@ to use, or run Ollama locally.
 ```
 
 The launcher creates its own Python environment, installs dependencies, builds
-the interface and opens **http://127.0.0.1:9210**. The original Appling uses a
-different port and is independent. Stop this server with Ctrl+C.
+the interface and opens **http://127.0.0.1:9210**, or the next available port if
+9210 is occupied. The actual URL is printed in the terminal and opened in the
+browser. Other applications keep running. Stop this server with Ctrl+C.
 
 ```bash
 ./start.sh --no-open --port 9211
 ```
+
+An explicit `--port` is used exactly as requested; if occupied, the launcher
+reports that clearly instead of silently changing it.
 
 Open Settings to select a default connection/model or assign a connection to an
 individual role. `default` selects a CLI's configured model. Ollama discovers
