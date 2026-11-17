@@ -11,6 +11,7 @@ import time
 from pathlib import Path
 import httpx
 from .engines import Run, environment, execute
+from .engines.claude_support import MODEL_IDS, CliError, claude_environment
 
 
 class DiscoveryError(Exception):
@@ -144,14 +145,14 @@ def discover(connection):
         elif engine=='claude-cli':
             binary=connection.get('binary','claude')
             if not shutil.which(binary):raise DiscoveryError('Claude Code CLI is not installed or is missing from PATH. Install it, then run claude auth login.')
-            result=subprocess.run([binary,'auth','status','--json'],env=environment(),capture_output=True,text=True,timeout=12)
+            result=subprocess.run([binary,'auth','status','--json'],env=claude_environment(),stdin=subprocess.DEVNULL,capture_output=True,text=True,timeout=12)
             try:auth=json.loads(result.stdout)
             except ValueError:raise DiscoveryError('Could not read Claude Code login status. Run claude auth status and check its version.')
-            names=['default','sonnet','opus','haiku'];source='cli_aliases'
+            names=[*MODEL_IDS,'default','sonnet','opus','haiku','fable'];source='documented_models'
             if not auth.get('loggedIn',False):
                 state='login_required';message='Claude Code is not signed in. Run claude auth login, then test the connection.'
             else:
-                message='Claude Code is signed in. These are CLI aliases, not an account model catalogue. Test an alias or enter a full model ID.'
+                message='Claude Code is signed in. Versioned IDs and aliases are shown; availability depends on your account. Test a model to verify access.'
         elif engine in {'ollama','openai-compatible','anthropic'}:
             auth=headers(connection,require_key=engine=='anthropic' or bool(connection.get('api_key_env')) and engine!='ollama')
             names=[];cursor=None
@@ -204,10 +205,11 @@ def test_connection(connection,model=''):
                     prompt='Return exactly {"summary":"OK"}.')
                 result=execute({**connection,'timeout':45},run)
                 if not result.get('summary'):raise DiscoveryError('The CLI completed without a valid test response.')
-            resolved=model or 'CLI default'
+            resolved=result.get('_model') or model or 'CLI default'
         return dict(ok=True,state='connected',model=resolved,message='The selected model responded successfully.',latency_ms=round((time.monotonic()-started)*1000))
     except Exception as exc:
-        if isinstance(exc,DiscoveryError):message=str(exc)
+        if isinstance(exc,(DiscoveryError,CliError)):message=str(exc)
+        elif isinstance(exc,TimeoutError) and engine=='claude-cli':message=str(exc)
         elif isinstance(exc,(httpx.ConnectError,httpx.TimeoutException,TimeoutError)):message='The model request could not connect or timed out. Check the endpoint and provider status.'
         elif isinstance(exc,FileNotFoundError):message='The CLI executable was not found. Check its installation and PATH.'
         else:message='The model test failed. Check the CLI login, selected model, provider quota and endpoint configuration.'

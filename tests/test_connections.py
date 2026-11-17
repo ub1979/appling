@@ -42,8 +42,9 @@ def test_copilot_models_come_from_acp_session(tmp_path):
 def test_claude_aliases_do_not_claim_account_catalogue_or_successful_login(tmp_path):
     binary=executable(tmp_path,"print('{\"loggedIn\":false}')")
     result=connections.discover({'engine':'claude-cli','binary':binary})
-    assert result['state']=='login_required';assert result['source']=='cli_aliases'
+    assert result['state']=='login_required';assert result['source']=='documented_models'
     assert 'sonnet' in result['models'];assert 'claude auth login' in result['message']
+    assert {'claude-sonnet-4-6','claude-opus-4-6'}<=set(result['models'])
 
 
 def mock_http(monkeypatch,handler):
@@ -104,3 +105,51 @@ def test_claude_connection_test_disables_tools_and_session_persistence(tmp_path)
 def test_copilot_token_is_passed_to_cli_environment(monkeypatch):
     monkeypatch.setenv('COPILOT_GITHUB_TOKEN','test-token')
     assert environment()['COPILOT_GITHUB_TOKEN']=='test-token'
+
+
+def test_claude_plain_success_reports_actual_model_and_stdin_eof(tmp_path):
+    binary=executable(tmp_path,'''
+        import sys,json
+        assert sys.stdin.read()==''
+        assert sys.argv[sys.argv.index('--output-format')+1]=='json'
+        assert '--permission-mode' not in sys.argv
+        print(json.dumps({'type':'result','result':'OK','modelUsage':{'claude-sonnet-4-6':{'inputTokens':2}}}))
+    ''')
+    result=connections.test_connection({'engine':'claude-cli','binary':binary},'sonnet')
+    assert result['ok'];assert result['model']=='claude-sonnet-4-6'
+
+
+def test_claude_errors_from_stdout_are_actionable_and_redacted(tmp_path,monkeypatch):
+    monkeypatch.setenv('ANTHROPIC_AUTH_TOKEN','private-test-credential')
+    binary=executable(tmp_path,'''
+        import os,json
+        print(json.dumps({'type':'result','is_error':True,'errors':['Login expired for '+os.environ['ANTHROPIC_AUTH_TOKEN']+'; run claude auth login']}))
+    ''')
+    result=connections.test_connection({'engine':'claude-cli','binary':binary},'sonnet')
+    assert not result['ok'];assert 'Login expired' in result['message']
+    assert 'claude auth login' in result['message']
+    assert 'private-test-credential' not in result['message'];assert '[REDACTED]' in result['message']
+
+
+def test_claude_custom_config_used_for_both_login_and_inference(tmp_path,monkeypatch):
+    monkeypatch.setenv('CLAUDE_CONFIG_DIR',str(tmp_path/'my-login'))
+    monkeypatch.setenv('CLAUDECODE','parent-session')
+    binary=executable(tmp_path,'''
+        import sys,os,json
+        assert os.environ['CLAUDE_CONFIG_DIR'].endswith('my-login')
+        assert 'CLAUDECODE' not in os.environ
+        if 'auth' in sys.argv:print(json.dumps({'loggedIn':True}))
+        else:print(json.dumps({'type':'result','result':'OK'}))
+    ''')
+    conn={'engine':'claude-cli','binary':binary}
+    assert connections.discover(conn)['state']=='ready'
+    assert connections.test_connection(conn,'sonnet')['ok']
+
+
+def test_claude_pretty_printed_json_result_is_parsed_as_an_envelope(tmp_path):
+    binary=executable(tmp_path,'''
+        import json
+        print(json.dumps({'type':'result','result':'OK','modelUsage':{'versioned-model':{}}},indent=2))
+    ''')
+    result=connections.test_connection({'engine':'claude-cli','binary':binary},'sonnet')
+    assert result['ok'];assert result['model']=='versioned-model'

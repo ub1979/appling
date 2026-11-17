@@ -29,8 +29,9 @@ reports that clearly instead of silently changing it.
 Open Settings to select a default connection/model or assign a connection to an
 individual role. `default` selects a CLI's configured model. The dropdown queries
 Codex's model catalogue, Copilot's ACP model list, and API `/models` endpoints
-(including Ollama). Claude Code displays its supported aliases and login status;
-those aliases are not represented as an account-specific model catalogue. API
+(including Ollama). Claude Code displays documented versioned model IDs (including
+Sonnet and Opus 4.6), CLI aliases and login status. This list is not an
+account-entitlement catalogue; test a selected model to confirm access. API
 and CLI connections also accept custom model IDs. Engine
 model compatibility and account entitlement still apply.
 
@@ -43,6 +44,14 @@ AI connections. Testing sends a short prompt using that connection's quota and
 reports success/failure and latency; no generated project files are included.
 Save edited connection settings before testing them. CLI installation alone does
 not establish that authentication or a selected model works.
+
+Claude tests use a headless one-shot request with stdin closed and tools disabled.
+They accept normal text replies and show the actual resolved model when the CLI
+reports it. CLI errors are redacted and displayed directly. If the test reports
+that Claude is not logged in, run `claude auth login` in the same account that
+starts Appling, then refresh the model list and test again. Existing
+`CLAUDE_CONFIG_DIR` and Anthropic CLI endpoint/model environment settings are
+preserved for both the login check and generation.
 
 API keys are read from environment variables named in Settings. CLI adapters
 use their own login. Appling never silently falls back to another provider.

@@ -2,7 +2,7 @@
 
 ## Automated coverage
 
-Latest local result: **43 backend tests passed; 46 frontend tests passed**.
+Latest local result: **47 backend tests passed; 46 frontend tests passed**.
 TypeScript checks and the Vite production build passed. The stylesheet was
 retained byte-for-byte from the original interface.
 
@@ -16,6 +16,9 @@ retained byte-for-byte from the original interface.
   refresh, selected-model inference requests, and visible failure messages using
   controlled processes/transports. Frontend rendering checks verify the primary
   dropdown, connection-test controls and quota/context disclosure.
+- Claude regressions cover stdin EOF, plain-text and pretty-printed JSON results,
+  resolved model reporting, login-error propagation with secret redaction, and
+  using the same custom Claude config for authentication and generation.
 - Subprocess protocol checks exercise Codex initialization, thread resume,
   approvals, questions, task completion and usage notifications through a real
   child process implementing the protocol.
@@ -44,6 +47,11 @@ installation path.
 Authenticated real-model generation through Codex, Claude Code, Copilot, Ollama
 and API providers has not been verified here. Protocol and controlled-transport
 tests establish integration behavior, not model output quality or a speedup.
+
+The installed Claude CLI was exercised through the corrected one-shot path. It
+returned `Not logged in · Please run /login` in this execution session; that
+response is now surfaced instead of a generic failure. This does not establish
+the login state of a separately launched server or a successful paid inference.
 
 ## Live acceptance run
 
