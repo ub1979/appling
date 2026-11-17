@@ -20,6 +20,7 @@ from .engines import available
 from .preview import Previews
 from .store import Store, safe_path
 from .workflow import Workflow, ARTIFACTS, artifact_revision
+from . import connections
 
 
 def create_app(home=None,execute=None):
@@ -28,6 +29,7 @@ def create_app(home=None,execute=None):
     workflow=Workflow(store,**({'execute':execute} if execute else {}));previews=Previews()
     token=secrets.token_urlsafe(32)
     default_root=home/'projects';default_root.mkdir(exist_ok=True)
+    model_cache={}
 
     @asynccontextmanager
     async def lifespan(app):
@@ -346,19 +348,31 @@ def create_app(home=None,execute=None):
         return settings_payload()
 
     @app.get('/api/settings/models')
-    async def models():
-        s=workflow.settings();providers=[]
-        async with httpx.AsyncClient(timeout=3) as client:
-            for key,conn in s['connections'].items():
-                names=list(conn.get('models',[]))
-                if conn['engine']=='ollama':
-                    try:
-                        response=await client.get(conn.get('base_url','http://127.0.0.1:11434/v1').rstrip('/')+'/models')
-                        response.raise_for_status();names=[m['id'] for m in response.json()['data']]
-                    except (httpx.HTTPError,ValueError,KeyError):
-                        pass
-                providers.append(dict(slug=key,name=conn.get('label',key),models=names,current=key==s['provider']))
+    async def models(refresh:bool=False):
+        s=workflow.settings()
+        async def discover_one(key,conn):
+            fingerprint=json.dumps(conn,sort_keys=True)
+            cached=model_cache.get(key)
+            if not refresh and cached and cached['fingerprint']==fingerprint and time.monotonic()-cached['time']<60:
+                result=cached['result']
+            else:
+                result=await asyncio.to_thread(connections.discover,conn)
+                model_cache[key]=dict(fingerprint=fingerprint,time=time.monotonic(),result=result)
+            names=list(result['models'])
+            if key==s['provider'] and s['model'] and s['model'] not in names:names.append(s['model'])
+            return dict(slug=key,name=conn.get('label',key),models=names,current=key==s['provider'],
+                        default_model=result.get('default_model'),status={k:result[k] for k in ['state','message','source']})
+        providers=await asyncio.gather(*(discover_one(key,conn) for key,conn in s['connections'].items()))
         return dict(providers=providers,provider=s['provider'],model=s['model'])
+
+    @app.post('/api/settings/connections/{key}/test')
+    async def connection_test(key:str,request:Request):
+        s=workflow.settings()
+        if key not in s['connections']:raise ValueError('Configure this connection before testing it.')
+        data=await request.json()
+        result=await asyncio.to_thread(connections.test_connection,s['connections'][key],str(data.get('model','')))
+        model_cache.pop(key,None)
+        return result
 
     @app.get('/api/engines')
     def engines_list():

@@ -100,9 +100,17 @@ export interface AiSettings {
 }
 
 export interface ModelOptions {
-  providers: { slug: string; name: string; models: string[]; current: boolean }[];
+  providers: { slug: string; name: string; models: string[]; current: boolean; default_model?: string | null; status?: { state: string; message: string; source: string } }[];
   provider: string | null;
   model: string | null;
+}
+
+export interface ConnectionTestResult {
+  ok: boolean;
+  state: string;
+  message: string;
+  model: string;
+  latency_ms: number;
 }
 
 export interface MapPhase {
@@ -233,6 +241,7 @@ export const api = {
     call<AiSettings>("POST", `/api/settings/agents/${id}`, { selection }),
   effortSave: (effort: string) => call<AiSettings["hermes_effort"]>("POST", "/api/settings/effort", { effort }),
   modelOptions: (refresh = false) => call<ModelOptions>("GET", `/api/settings/models${refresh ? "?refresh=true" : ""}`),
+  testConnection: (provider: string, model: string) => call<ConnectionTestResult>("POST", `/api/settings/connections/${encodeURIComponent(provider)}/test`, { model }),
   modelSave: (provider: string, model: string, confirm: boolean) =>
     call<{ ok: boolean; confirm_required?: boolean; message?: string }>("POST", "/api/settings/model", { provider, model, confirm }),
   templates: (kind: ProjectKind) => call<{ templates: Template[] }>("GET", `/api/templates?kind=${kind}`),

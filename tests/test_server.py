@@ -62,3 +62,26 @@ def test_usage_snapshots_are_not_double_counted(client):
         store.event(p['id'],'usage',role='sw-developer',usage={'input_tokens':n,'cached_input_tokens':5,'output_tokens':2})
     result=c.get('/api/projects/'+p['id']+'/usage').json()['total']
     assert result['prompt']==30;assert result['cache_read']==5;assert result['api_calls']==1
+
+
+def test_model_discovery_cache_refresh_and_visible_status(client,monkeypatch):
+    c,app,_=client;calls=[]
+    def discover(conn):
+        calls.append(conn['engine'])
+        return dict(models=['discovered-model'],default_model='discovered-model',state='ready',message='Catalogue connected.',source='provider')
+    monkeypatch.setattr('appling.server.connections.discover',discover)
+    first=c.get('/api/settings/models').json()
+    assert all('discovered-model' in p['models'] for p in first['providers'])
+    assert all(p['status']['message']=='Catalogue connected.' for p in first['providers'])
+    count=len(calls);c.get('/api/settings/models');assert len(calls)==count
+    c.get('/api/settings/models?refresh=true');assert len(calls)>count
+
+
+def test_connection_test_uses_selected_saved_connection_and_model(client,monkeypatch):
+    c,app,_=client;calls=[]
+    def test(conn,model):
+        calls.append((conn,model));return dict(ok=True,state='connected',message='Responded.',model=model,latency_ms=10)
+    monkeypatch.setattr('appling.server.connections.test_connection',test)
+    response=c.post('/api/settings/connections/codex/test',json={'model':'chosen-coder'})
+    assert response.json()['ok'];assert calls[0][0]['engine']=='codex';assert calls[0][1]=='chosen-coder'
+    assert c.post('/api/settings/connections/missing/test',json={'model':'anything'}).status_code==400

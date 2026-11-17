@@ -18,6 +18,7 @@ class Run:
     effort: str = ''
     session: str | None = None
     readonly: bool = False
+    connection_test: bool = False
     cancel: threading.Event = field(default_factory=threading.Event)
     emit: Callable = lambda *a, **k: None
     ask: Callable = lambda *a, **k: 'deny'
@@ -54,7 +55,7 @@ def environment():
     # CLI login stays in its normal credential store. Do not forward unrelated secrets.
     allowed = {'PATH','HOME','USER','LOGNAME','SHELL','TMPDIR','TEMP','TMP','LANG','LC_ALL','SYSTEMROOT',
                'OPENAI_API_KEY','ANTHROPIC_API_KEY','CLAUDE_CODE_OAUTH_TOKEN','GH_TOKEN','GITHUB_TOKEN',
-               'GITHUB_COPILOT_TOKEN','CODEX_HOME','HTTPS_PROXY','HTTP_PROXY','NO_PROXY'}
+               'GITHUB_COPILOT_TOKEN','COPILOT_GITHUB_TOKEN','CODEX_HOME','HTTPS_PROXY','HTTP_PROXY','NO_PROXY'}
     return {k:v for k,v in os.environ.items() if k in allowed}
 
 

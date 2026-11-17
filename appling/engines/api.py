@@ -5,17 +5,17 @@ import os
 import uuid
 import httpx
 from .. import tools
+from ..connections import base_url, headers as connection_headers
 from . import result_json
 
 
 def execute(connection,run):
     engine=connection['engine']
-    base=connection.get('base_url','http://127.0.0.1:11434/v1' if engine=='ollama' else 'https://api.openai.com/v1').rstrip('/')
-    key=os.environ.get(connection.get('api_key_env','OPENAI_API_KEY'),'')
+    base=base_url(connection)
     anthropic=engine=='anthropic'
     if run.effort and engine in {'anthropic','ollama'}:
         raise ValueError('This API adapter does not yet map effort settings for this provider. Choose default effort for this connection.')
-    headers={'x-api-key':key,'anthropic-version':'2023-06-01'} if anthropic else ({'Authorization':'Bearer '+key} if key else {})
+    headers=connection_headers(connection)
     private=run.root/'.appling'/'sessions';private.mkdir(parents=True,exist_ok=True)
     # Session IDs never become arbitrary paths.
     sid=run.session if run.session and all(c in '0123456789abcdef-' for c in run.session) else str(uuid.uuid4())

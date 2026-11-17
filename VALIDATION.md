@@ -2,7 +2,7 @@
 
 ## Automated coverage
 
-Latest local result: **32 backend tests passed; 42 frontend tests passed**.
+Latest local result: **43 backend tests passed; 46 frontend tests passed**.
 TypeScript checks and the Vite production build passed. The stylesheet was
 retained byte-for-byte from the original interface.
 
@@ -11,6 +11,11 @@ retained byte-for-byte from the original interface.
   interruption/restart, follow-up changes, API authentication and settings.
 - Launcher checks cover occupied-port fallback, strict explicit ports, permission
   failures, and keeping the browser URL aligned with the reserved server socket.
+- Connection checks cover live RPC-shaped model catalogues, pagination, Claude
+  alias/login distinction, authenticated API model discovery, discovery cache
+  refresh, selected-model inference requests, and visible failure messages using
+  controlled processes/transports. Frontend rendering checks verify the primary
+  dropdown, connection-test controls and quota/context disclosure.
 - Subprocess protocol checks exercise Codex initialization, thread resume,
   approvals, questions, task completion and usage notifications through a real
   child process implementing the protocol.

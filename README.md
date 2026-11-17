@@ -27,9 +27,22 @@ An explicit `--port` is used exactly as requested; if occupied, the launcher
 reports that clearly instead of silently changing it.
 
 Open Settings to select a default connection/model or assign a connection to an
-individual role. `default` selects a CLI's configured model. Ollama discovers
-installed models; API and CLI connections also accept custom model IDs. Engine
+individual role. `default` selects a CLI's configured model. The dropdown queries
+Codex's model catalogue, Copilot's ACP model list, and API `/models` endpoints
+(including Ollama). Claude Code displays its supported aliases and login status;
+those aliases are not represented as an account-specific model catalogue. API
+and CLI connections also accept custom model IDs. Engine
 model compatibility and account entitlement still apply.
+
+Use **Refresh list** to refresh discovery. Errors and missing logins appear next
+to the chosen connection rather than hiding the model list. Discovery is cached
+briefly and does not make inference calls.
+
+Use **Test connection** beside the selected model, an individual role, or in
+AI connections. Testing sends a short prompt using that connection's quota and
+reports success/failure and latency; no generated project files are included.
+Save edited connection settings before testing them. CLI installation alone does
+not establish that authentication or a selected model works.
 
 API keys are read from environment variables named in Settings. CLI adapters
 use their own login. Appling never silently falls back to another provider.

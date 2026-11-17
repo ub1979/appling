@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { api, type AiConnection, type AgentModelSetting, type AiSettings, type ModelOptions, type ModelSelection, type ProjectDetail } from "../api";
+import { api, type AiConnection, type AgentModelSetting, type AiSettings, type ConnectionTestResult, type ModelOptions, type ModelSelection, type ProjectDetail } from "../api";
 import { WorkerSettings } from "../components/WorkerSettings";
 import { Brand, PrefButtons } from "../components/common";
 import { DEFAULT_EFFORT_LABEL, HERMES_EFFORT_LEVELS, effortName } from "../effort";
@@ -74,7 +74,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
         <p className="muted">Loading…</p>
       ) : (
         <div className="settings-grid">
-          <HermesModel
+          <PrimaryModel
             settings={settings}
             options={options}
             loading={loadingModels}
@@ -116,7 +116,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
           <WorkerSettings value={settings.parallel_work.max_workers}
             onSave={(max_workers) => run(async () => setSettings(await api.settingsSave({ parallel_work: { max_workers } })), "Worker limit saved. Active work continues safely.")} />
 
-          <Connections settings={settings} onSave={async (id, connection) => {
+          <Connections settings={settings} options={options} onSave={async (id, connection) => {
             setSettings(await api.settingsSave({ connections: { [id]: connection } }));
             await loadModels(true);
           }} />
@@ -139,7 +139,7 @@ export function Settings({ projectId }: { projectId: string | null }) {
   );
 }
 
-function HermesModel({
+export function PrimaryModel({
   settings,
   options,
   loading,
@@ -161,11 +161,14 @@ function HermesModel({
   }, [settings.hermes_effort.effort]);
   const [provider, setProvider] = useState(settings.hermes.provider);
   const [model, setModel] = useState(settings.hermes.model);
+  const [customModel, setCustomModel] = useState(false);
   useEffect(() => {
     setProvider(settings.hermes.provider);
     setModel(settings.hermes.model);
   }, [settings.hermes.provider, settings.hermes.model]);
   const models = useMemo(() => providers.find((p) => p.slug === provider)?.models ?? [], [providers, provider]);
+  const selectedProvider = providers.find((p) => p.slug === provider);
+  const supportsDefault = ["codex", "claude-cli", "copilot"].includes(settings.connections[provider]?.engine ?? "");
   const changed = provider !== settings.hermes.provider || model !== settings.hermes.model;
 
   return (
@@ -174,7 +177,7 @@ function HermesModel({
         <div>
           <h2 style={{ fontSize: 20 }}>Appling’s model</h2>
           <p className="muted small" style={{ margin: "4px 0 0" }}>
-            Now: <b>{settings.hermes.model || "the connection’s default model"}</b>
+            Now: <b>{settings.hermes.model || providers.find((item) => item.slug === settings.hermes.provider)?.default_model || "the connection’s default model"}</b>
             {settings.hermes.provider ? ` · ${providers.find((p) => p.slug === settings.hermes.provider)?.name ?? settings.hermes.provider}` : ""}
           </p>
         </div>
@@ -189,6 +192,7 @@ function HermesModel({
             <select className="input" value={provider} onChange={(e) => {
               setProvider(e.target.value);
               setModel(providers.find((p) => p.slug === e.target.value)?.models[0] ?? "");
+              setCustomModel(false);
             }}>
               {!providers.some((p) => p.slug === provider) && <option value={provider}>{provider || "Choose…"}</option>}
               {providers.map((p) => <option key={p.slug} value={p.slug}>{PROVIDER_HINTS[p.slug] ? `${p.name} — ${PROVIDER_HINTS[p.slug]}` : p.name}</option>)}
@@ -196,14 +200,24 @@ function HermesModel({
           </label>
           <label>
             <span className="field-label">Model</span>
-            <input className="input" list="connection-models" value={model} placeholder="default, or a model ID" onChange={(e) => setModel(e.target.value)} />
-            <datalist id="connection-models">{models.map((m) => <option key={m} value={m} />)}</datalist>
+            <select className="input" aria-label="Appling model" value={customModel ? ":custom-model:" : model} onChange={(event) => {
+              const custom = event.target.value === ":custom-model:";
+              setCustomModel(custom); setModel(custom ? "" : event.target.value);
+            }}>
+              <option value="">{supportsDefault ? `CLI default${selectedProvider?.default_model ? ` · ${selectedProvider.default_model}` : ""}` : "Choose a model"}</option>
+              {model && !customModel && !models.includes(model) && <option value={model}>{model} (saved)</option>}
+              {models.map((m) => <option key={m} value={m}>{m}</option>)}
+              <option value=":custom-model:">Enter a custom model ID…</option>
+            </select>
           </label>
-          <button className="btn primary" disabled={!changed || !provider || !model} onClick={() => void onSave(provider, model, false)}>
+          <button className="btn primary" disabled={!changed || !provider || (!model && !supportsDefault)} onClick={() => void onSave(provider, model || "default", false)}>
             Use this model
           </button>
         </div>
       )}
+      {customModel && <label><span className="field-label">Custom model ID</span><input className="input" value={model} onChange={(event) => setModel(event.target.value)} placeholder="Enter the provider’s model ID" /></label>}
+      <DiscoveryStatus provider={selectedProvider} />
+      <ConnectionCheck key={`${provider}:${model}`} provider={provider} model={model} disabled={!provider || (!model && !supportsDefault)} />
       <div className="folder-row" style={{ marginTop: 12, gridTemplateColumns: "minmax(0,1fr) auto" }}>
         <label>
           <span className="field-label">Effort</span>
@@ -225,14 +239,17 @@ function HermesModel({
   );
 }
 
-function Connections({ settings, onSave }: { settings: AiSettings; onSave: (id: string, value: AiConnection) => Promise<void> }) {
+function Connections({ settings, options, onSave }: { settings: AiSettings; options: ModelOptions | null; onSave: (id: string, value: AiConnection) => Promise<void> }) {
   const [id, setId] = useState("ollama-local");
   const [value, setValue] = useState<AiConnection>(settings.connections[id]);
   const [problem, setProblem] = useState("");
   const [saving, setSaving] = useState(false);
   const [notice, setNotice] = useState("");
+  const [testModel, setTestModel] = useState("");
+  const provider = options?.providers.find((item) => item.slug === id);
+  const changed = JSON.stringify(value) !== JSON.stringify(settings.connections[id]);
   const select = (key: string) => {
-    setId(key); setValue(settings.connections[key] ?? { engine: "openai-compatible", label: "Custom API", models: [] }); setNotice("");
+    setId(key); setValue(settings.connections[key] ?? { engine: "openai-compatible", label: "Custom API", models: [] }); setNotice(""); setTestModel("");
   };
   const save = async () => {
     setSaving(true); setProblem("");
@@ -243,7 +260,7 @@ function Connections({ settings, onSave }: { settings: AiSettings; onSave: (id: 
   return <section className="card card-pad">
     <h2 style={{ fontSize: 20 }}>AI connections</h2>
     <p className="muted small">CLI connections use their existing login. API keys stay in environment variables; never paste them into chat. No automatic provider fallback.</p>
-    <div className="agent-status">{settings.installed.map((item) => <p key={item.id} className="small">{item.installed ? "✓" : "○"} {item.label} · {item.installed ? "installed; login still required" : "not installed"}</p>)}</div>
+    <div className="agent-status">{settings.installed.map((item) => <p key={item.id} className="small">{item.installed ? "✓" : "○"} {item.label} · {item.installed ? "installed" : "not installed"}</p>)}</div>
     <label><span className="field-label">Connection</span><select className="input" value={id in settings.connections ? id : ":new:"} onChange={(event) => select(event.target.value === ":new:" ? "custom-api" : event.target.value)}>
       {Object.entries(settings.connections).map(([key, connection]) => <option key={key} value={key}>{connection.label}</option>)}
       <option value=":new:">Add a custom API</option>
@@ -258,8 +275,37 @@ function Connections({ settings, onSave }: { settings: AiSettings; onSave: (id: 
     </>}
     <label><span className="field-label">Model IDs (comma separated; Ollama also discovers installed models)</span><input className="input" value={(value.models ?? []).join(", ")} onChange={(event) => setValue({ ...value, models: event.target.value.split(",").map((model) => model.trim()).filter(Boolean) })} /></label>
     <button className="btn primary" disabled={saving} style={{ marginTop: 12 }} onClick={() => void save()}>{saving ? "Saving…" : "Save connection"}</button>
+    <DiscoveryStatus provider={provider} />
+    <label><span className="field-label">Model to test</span><input className="input" list="test-models" value={testModel} onChange={(event) => setTestModel(event.target.value)} placeholder={["codex", "claude-cli", "copilot"].includes(value.engine) ? "Leave empty for the CLI default" : "Choose or enter a model ID"} /></label>
+    <datalist id="test-models">{provider?.models.map((model) => <option key={model} value={model} />)}</datalist>
+    {changed && <p className="small muted">Save the connection changes before testing.</p>}
+    <ConnectionCheck key={`${id}:${testModel}`} provider={id} model={testModel} disabled={changed || (!testModel && !["codex", "claude-cli", "copilot"].includes(value.engine))} />
     {(problem || notice) && <p className="small" role="status">{problem || notice}</p>}
   </section>;
+}
+
+export function DiscoveryStatus({ provider }: { provider?: ModelOptions["providers"][number] }) {
+  if (!provider?.status) return null;
+  return <p className={`small ${["error", "login_required"].includes(provider.status.state) ? "" : "muted"}`} role="status">{provider.status.message}</p>;
+}
+
+export function ConnectionCheck({ provider, model, disabled = false }: { provider: string; model: string; disabled?: boolean }) {
+  const [checking, setChecking] = useState(false);
+  const [result, setResult] = useState<ConnectionTestResult | null>(null);
+  const [problem, setProblem] = useState("");
+  useEffect(() => { setResult(null); setProblem(""); }, [provider, model]);
+  const test = async () => {
+    setChecking(true); setResult(null); setProblem("");
+    try { setResult(await api.testConnection(provider, model)); }
+    catch (error) { setProblem(error instanceof Error ? error.message : String(error)); }
+    finally { setChecking(false); }
+  };
+  return <div style={{ marginTop: 12 }}>
+    <button className="btn small" disabled={disabled || checking} onClick={() => void test()}>{checking ? "Testing connection…" : "Test connection"}</button>
+    <p className="tiny muted">Sends a short test prompt to this model using its account quota. No project files are sent.</p>
+    {result && <p className="small" role="status">{result.ok ? "✓ Connected" : "Connection failed"} · {result.message}{result.ok ? ` ${result.model} · ${(result.latency_ms / 1000).toFixed(1)}s` : ""}</p>}
+    {problem && <p className="small" role="alert">{problem}</p>}
+  </div>;
 }
 
 interface AgentModelProps {
@@ -348,6 +394,8 @@ export function AgentModel({ agent, options, onSave }: AgentModelProps) {
         </label>
       </div>
       {problem && <p className="small" role="alert">{problem}</p>}
+      <DiscoveryStatus provider={providers.find((item) => item.slug === provider)} />
+      <ConnectionCheck key={`${provider}:${model}`} provider={provider} model={model} disabled={!provider || (!model && !["codex", "claude-cli", "copilot"].includes(provider))} />
       <div className="dialog-actions">
         {agent.selection && <button className="btn small" disabled={saving} onClick={() => void save(null)}>Reset default</button>}
         <button className="btn primary small" disabled={saving || !provider || !model.trim()}

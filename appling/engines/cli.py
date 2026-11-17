@@ -25,6 +25,8 @@ def execute(connection, run):
                 '--append-system-prompt',run.instructions, '--permission-mode','acceptEdits' if writable else 'plan']
         if writable:
             args += ['--allowedTools','Read,Glob,Grep,Edit,Write,Bash']
+        if run.connection_test:
+            args += ['--tools','','--no-session-persistence']
         if run.session:
             args += ['--resume',run.session]
         if run.effort:
