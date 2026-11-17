@@ -1,0 +1,19 @@
+{
+  "kind": "website",
+  "id": "grand-reveal",
+  "name": "Grand Reveal (photo-real)",
+  "tagline": "A product unveiled on scroll: your video played frame by frame.",
+  "best_for": "Cars, luxury goods, launches, hotels — anything worth unveiling",
+  "palette": [
+    "#0b0908",
+    "#6e1620",
+    "#c9a46a",
+    "#efe6d8"
+  ],
+  "has_demo": true,
+  "media": {
+    "needs": "video",
+    "ask": "This design plays real footage as you scroll. Do you have a video of the reveal (or its frames)? Attach it with 📎. No video? Lyra can use 2–5 photos of the same shot, make AI pictures on your ChatGPT plan, or start with placeholders."
+  },
+  "photoreal": true
+}

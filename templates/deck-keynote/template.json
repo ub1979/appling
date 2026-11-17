@@ -1,0 +1,14 @@
+{
+  "kind": "slides",
+  "id": "deck-keynote",
+  "name": "Keynote Story",
+  "tagline": "A cinematic talk: full-bleed photos, big type, one idea per slide.",
+  "best_for": "Keynotes, conference talks, launches, company all-hands",
+  "palette": [
+    "#05060a",
+    "#eef1f6",
+    "#f2c46d",
+    "#aab1c0"
+  ],
+  "has_demo": true
+}

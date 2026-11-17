@@ -1,0 +1,195 @@
+{
+  "AGENTS": [
+    [
+      "req-engineer",
+      "Requirements",
+      "Clarify goals, users, scope, and acceptance criteria."
+    ],
+    [
+      "change-manager",
+      "Change management",
+      "Check the update against the existing project and resolve conflicts before planning."
+    ],
+    [
+      "researcher",
+      "Research",
+      "Investigate markets, competitors, standards, and technical choices with verified sources."
+    ],
+    [
+      "spec",
+      "Technical specification",
+      "Turn the request into detailed, testable behavior."
+    ],
+    [
+      "ui-designer",
+      "Design",
+      "Set the look and feel from real references, then review the build against it."
+    ],
+    [
+      "website-builder",
+      "Website studio",
+      "Plan, write and build a professional website, then check it in a real browser."
+    ],
+    [
+      "deck-builder",
+      "Presentation studio",
+      "Shape the story and design the slides, then check every slide and the PDF."
+    ],
+    [
+      "video-builder",
+      "Video studio",
+      "Script, animate and render short promo, social and explainer videos."
+    ],
+    [
+      "sw-architect",
+      "Architecture",
+      "Design the system, data, APIs, and boundaries."
+    ],
+    [
+      "task-planner",
+      "Task planning",
+      "Create an ordered implementation graph."
+    ],
+    [
+      "proj-manager",
+      "Project planning",
+      "Build milestones, checkpoints, and delivery plans."
+    ],
+    [
+      "sw-developer",
+      "Development",
+      "Write and integrate working application code."
+    ],
+    [
+      "oop-restructurer",
+      "Code restructuring",
+      "Improve modules, classes, and maintainability."
+    ],
+    [
+      "debugger",
+      "Debugging",
+      "Find root causes and add regression coverage."
+    ],
+    [
+      "code-reviewer",
+      "Code review",
+      "Review correctness, quality, and maintainability."
+    ],
+    [
+      "ux-writer",
+      "UX writing",
+      "Write the labels, empty states, and error messages users read."
+    ],
+    [
+      "qa-engineer",
+      "Quality assurance",
+      "Test real user journeys and report reproducible bugs."
+    ],
+    [
+      "a11y-auditor",
+      "Accessibility",
+      "Audit against WCAG 2.2 with measured contrast and keyboard paths."
+    ],
+    [
+      "security-auditor",
+      "Security",
+      "Audit authentication, data, dependencies, and secrets."
+    ],
+    [
+      "devops-engineer",
+      "Deployment",
+      "Prepare CI/CD, containers, operations, and rollback."
+    ],
+    [
+      "tech-writer",
+      "Documentation",
+      "Write user, developer, and API documentation."
+    ],
+    [
+      "benchmark",
+      "Benchmarks",
+      "Measure speed, reliability, and resource usage."
+    ],
+    [
+      "health",
+      "Health checks",
+      "Record operational health and stability baselines."
+    ],
+    [
+      "context-save",
+      "Project Brain",
+      "Keep verified decisions, architecture, progress, and next actions available as projects grow."
+    ],
+    [
+      "learn",
+      "Controlled learning",
+      "Record evidence-backed improvement candidates."
+    ]
+  ],
+  "REQUIRED": [
+    "req-engineer",
+    "task-planner"
+  ],
+  "STYLES": [
+    {
+      "id": "app-it",
+      "name": "Let Appling guide me",
+      "accent": "violet",
+      "description": "Start with your idea. Appling asks a few questions and recommends the smallest useful team.",
+      "team": []
+    },
+    {
+      "id": "sdlc",
+      "name": "Complete build",
+      "accent": "violet",
+      "description": "Take the product from a clear idea through building, checks, documentation, and launch preparation.",
+      "team": [
+        "req-engineer",
+        "sw-architect",
+        "sw-developer",
+        "qa-engineer",
+        "security-auditor",
+        "devops-engineer"
+      ]
+    },
+    {
+      "id": "mvp",
+      "name": "Fast first version",
+      "accent": "coral",
+      "description": "Build the smallest useful version quickly, test it, and leave clear instructions for using it.",
+      "team": [
+        "req-engineer",
+        "sw-developer",
+        "qa-engineer",
+        "tech-writer"
+      ]
+    },
+    {
+      "id": "planning",
+      "name": "Plan before building",
+      "accent": "blue",
+      "description": "Work out the product, structure, and delivery plan without writing application code yet.",
+      "team": [
+        "req-engineer",
+        "spec",
+        "sw-architect",
+        "task-planner",
+        "proj-manager",
+        "context-save"
+      ]
+    },
+    {
+      "id": "review",
+      "name": "Review and improve",
+      "accent": "purple",
+      "description": "Open an existing project to find problems, test important journeys, and recommend improvements.",
+      "team": [
+        "code-reviewer",
+        "qa-engineer",
+        "debugger",
+        "security-auditor",
+        "tech-writer"
+      ]
+    }
+  ]
+}

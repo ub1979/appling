@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rostra — Sales Demo deck demo</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reset.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@500;700;800&family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root { --paper: #f3f6f9; --card: #ffffff; --ink: #0f1b2d; --muted: #4a5a70; --accent: #0b7a5a; --accent-hi: #18c29c;
+    --accent-soft: #dff5ee; --warn: #b4430f; --warn-soft: #fdebe1; --line: #0f1b2d1f;
+    --r-background-color: var(--paper); --r-main-color: var(--ink); --r-heading-color: var(--ink);
+    --r-main-font: "Instrument Sans", system-ui, sans-serif; --r-heading-font: "Schibsted Grotesk", system-ui, sans-serif; --r-main-font-size: 28px; }
+  .reveal { font-family: var(--r-main-font); color: var(--ink); font-size: 28px; }
+  .reveal .slides { text-align: left; }
+  .reveal .slides section { height: 100%; padding: 64px !important; box-sizing: border-box; }
+  .reveal h1, .reveal h2 { font-family: var(--r-heading-font); font-weight: 800; letter-spacing: -.035em; line-height: 1.02; margin: 0 0 22px; text-transform: none; }
+  .reveal h1 { font-size: 112px; }
+  .reveal h2 { font-size: 58px; max-width: 1100px; }
+  .reveal h2 .hl { color: var(--accent); }
+  .reveal p { margin: 0 0 16px; line-height: 1.45; }
+  .kicker { font-family: var(--r-heading-font); font-size: 18px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+  .lead { font-size: 28px; color: var(--muted); max-width: 820px; }
+  .foot { position: absolute; left: 64px; right: 64px; bottom: 36px; display: flex; justify-content: space-between; font-size: 16px; color: var(--muted); }
+  .reveal .dark h1, .reveal .dark h2, .reveal .dark p { color: #f3f6f9; }
+  .dark .kicker { color: var(--accent-hi); }
+  .dark .lead { color: #c3cedd; }
+
+  .split { display: grid; grid-template-columns: 5fr 6fr; gap: 56px; align-items: center; margin-top: 18px; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; margin-top: 64px; }
+  .card.tall { padding: 40px 32px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 28px; }
+  .card b { display: block; font-family: var(--r-heading-font); font-size: 64px; letter-spacing: -.04em; line-height: 1; }
+  .card span { display: block; margin-top: 10px; color: var(--muted); font-size: 24px; line-height: 1.4; }
+  .big { font-family: var(--r-heading-font); font-weight: 800; font-size: 150px; letter-spacing: -.05em; line-height: .95; color: var(--warn); }
+  .costs { display: grid; gap: 16px; }
+  .cost { display: flex; justify-content: space-between; align-items: baseline; background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 20px 26px; font-size: 26px; }
+  .cost b { font-family: var(--r-heading-font); font-size: 34px; }
+  .note { font-size: 16px; color: var(--muted); margin-top: 18px; }
+
+  /* product screens drawn in HTML */
+  .screen { background: var(--card); border: 1px solid var(--line); border-radius: 20px; box-shadow: 0 30px 70px #0f1b2d1a; overflow: hidden; }
+  .bar { display: flex; align-items: center; gap: 8px; padding: 14px 18px; border-bottom: 1px solid var(--line); font-size: 16px; color: var(--muted); }
+  .bar i { width: 11px; height: 11px; border-radius: 50%; background: #0f1b2d22; }
+  .bar span { margin-left: 10px; }
+  .body { padding: 22px; display: grid; gap: 14px; }
+  .row { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 14px; background: var(--paper); font-size: 20px; }
+  .av { width: 40px; height: 40px; border-radius: 50%; display: grid; place-items: center; font-size: 16px; font-weight: 600; background: #0f1b2d14; flex: none; }
+  .row .grow { flex: 1; }
+  .tag { font-size: 16px; font-weight: 600; padding: 6px 12px; border-radius: 99px; background: var(--accent-soft); color: #0a6b50; }
+  .tag.warn { background: var(--warn-soft); color: var(--warn); }
+  .open { border: 2px dashed var(--warn); background: var(--warn-soft); }
+  .points { display: grid; gap: 18px; margin-top: 8px; }
+  .points div { font-size: 26px; line-height: 1.35; padding-left: 26px; position: relative; }
+  .points div::before { content: ""; position: absolute; left: 0; top: 13px; width: 12px; height: 12px; border-radius: 3px; background: var(--accent); }
+
+  /* before / after */
+  .phone { width: 380px; height: 400px; border-radius: 40px; background: var(--ink); padding: 16px; box-shadow: 0 30px 60px #0f1b2d33; }
+  .phone .glass { height: 100%; border-radius: 28px; background: var(--card); padding: 22px; display: grid; gap: 10px; align-content: start; overflow: hidden; }
+  .call { font-size: 18px; padding: 9px 14px; border-radius: 10px; background: var(--warn-soft); color: var(--warn); display: flex; justify-content: space-between; }
+  .tap { margin-top: 30px; border-radius: 20px; background: var(--accent-soft); padding: 26px; font-size: 22px; color: #0a5b44; }
+  .tap b { display: block; font-family: var(--r-heading-font); font-size: 30px; color: var(--ink); margin-bottom: 8px; }
+  .tap .btn { display: inline-block; margin-top: 16px; padding: 12px 22px; border-radius: 12px; background: var(--accent); color: #fff; font-weight: 600; font-size: 20px; }
+  .counter { font-family: var(--r-heading-font); font-weight: 800; font-size: 120px; letter-spacing: -.05em; line-height: 1; }
+  .counter small { display: block; font-family: var(--r-main-font); font-weight: 500; font-size: 26px; letter-spacing: 0; color: var(--muted); margin-top: 10px; }
+
+  /* week view */
+  .week { display: grid; grid-template-columns: 150px repeat(7, 1fr); gap: 8px; font-size: 16px; align-items: center; }
+  .week .h { color: var(--muted); text-align: center; font-weight: 600; }
+  .week .c { height: 40px; border-radius: 8px; background: var(--accent-soft); }
+  .week .c.mid { background: #fbe3b0; }
+  .week .c.gap { background: var(--warn); }
+  .legend { display: flex; gap: 24px; font-size: 16px; color: var(--muted); margin-top: 16px; }
+  .legend i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; margin-right: 8px; vertical-align: -2px; }
+
+  /* proof, start, plans */
+  .quote { font-family: var(--r-heading-font); font-weight: 500; font-size: 36px; line-height: 1.25; letter-spacing: -.02em; }
+  .who { margin-top: 18px; font-size: 20px; color: var(--muted); }
+  .steps { display: grid; gap: 16px; }
+  .step { display: grid; grid-template-columns: 64px 1fr; gap: 18px; align-items: start; }
+  .step b { font-family: var(--r-heading-font); font-size: 22px; width: 52px; height: 52px; border-radius: 14px; display: grid; place-items: center; background: var(--ink); color: #fff; }
+  .step span { font-size: 24px; line-height: 1.35; padding-top: 10px; }
+  .plans { display: grid; gap: 16px; }
+  .plan { background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 22px 26px; display: flex; justify-content: space-between; align-items: center; font-size: 22px; }
+  .plan.rec { border: 2px solid var(--accent); }
+  .plan b { font-family: var(--r-heading-font); font-size: 30px; }
+  .plan em { font-style: normal; display: block; font-size: 18px; color: var(--muted); margin-top: 4px; }
+  .ask { display: inline-flex; align-items: center; gap: 14px; margin-top: 30px; padding: 20px 30px; border-radius: 16px; background: var(--accent-hi); color: var(--ink); font-weight: 600; font-size: 28px; }
+</style>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+
+  <!-- 1 · Title -->
+  <section data-background-color="#0f1b2d" class="dark">
+    <div class="kicker">Rostra × Brightline Clinics · 14 October 2026</div>
+    <h1>Every shift covered <span style="color:#18c29c">by Friday.</span></h1>
+    <p class="lead" style="font-size:32px">Staff scheduling for multi-site clinics — without the Sunday spreadsheet.</p>
+    <svg viewBox="0 0 1152 120" style="position:absolute;left:64px;bottom:110px;width:1152px" aria-hidden="true">
+      <g fill="#ffffff14"><rect x="0" y="40" width="150" height="40" rx="8"/><rect x="166" y="40" width="150" height="40" rx="8"/><rect x="332" y="40" width="150" height="40" rx="8"/><rect x="498" y="40" width="150" height="40" rx="8"/><rect x="664" y="40" width="150" height="40" rx="8"/><rect x="830" y="40" width="150" height="40" rx="8"/></g>
+      <rect x="996" y="40" width="156" height="40" rx="8" fill="#18c29c"/>
+    </svg>
+    <div class="foot" style="color:#c3cedd;right:140px"><span>Rostra</span><span>Prepared for Brightline Clinics · an Appling template (fictional company)</span></div>
+  </section>
+
+  <!-- 2 · Their situation -->
+  <section>
+    <div class="kicker">Where you are today</div>
+    <h2>Your rota lives in a spreadsheet only one person can safely edit.</h2>
+    <div class="grid3">
+      <div class="card tall"><b>6</b><span>clinics, each with its own opening hours</span></div>
+      <div class="card tall"><b>140</b><span>nurses, receptionists and locums</span></div>
+      <div class="card tall"><b>1</b><span>shared spreadsheet, rebuilt every Sunday</span></div>
+    </div>
+    <aside class="notes">Play back what we heard in discovery. Six sites, 140 people, one spreadsheet that Dana rebuilds every Sunday evening. Ask: "Is that still accurate?" Transition: and when someone calls in sick, here is what it costs.</aside>
+  </section>
+
+  <!-- 3 · The cost -->
+  <section>
+    <div class="kicker">What it costs</div>
+    <h2>Last-minute gaps cost you <span class="hl" style="color:var(--warn)">£18,400</span> last quarter.</h2>
+    <div class="split" style="grid-template-columns:4fr 6fr">
+      <div class="big">£18.4k</div>
+      <div class="costs">
+        <div class="cost fragment"><span>Agency cover</span><b>£11,200</b></div>
+        <div class="cost fragment"><span>Short-notice overtime</span><b>£5,100</b></div>
+        <div class="cost fragment"><span>Manager hours chasing cover</span><b>£2,100</b></div>
+      </div>
+    </div>
+    <p class="note">Brightline figures, Q3 2026 — from your finance export.</p>
+    <aside class="notes">Reveal each line as you say it. Stress agency cover: it is the line we remove first. These are their own numbers from the finance export they sent — say so. Transition: here is what one sick call looks like today.</aside>
+  </section>
+
+  <!-- 4 · Before -->
+  <section data-auto-animate>
+    <div class="kicker">Before</div>
+    <h2 data-id="ba-title">Today, one sick call means twelve phone calls.</h2>
+    <div class="split" style="grid-template-columns:5fr 4fr">
+      <div class="counter" data-id="ba-count" style="color:var(--warn)">12<small>calls to fill one early shift</small></div>
+      <div class="phone" data-id="ba-phone"><div class="glass">
+        <div class="call"><span>Priya — no answer</span><span>7:02</span></div>
+        <div class="call"><span>Sam — can't</span><span>7:05</span></div>
+        <div class="call"><span>Joe — voicemail</span><span>7:09</span></div>
+        <div class="call"><span>Ana — no answer</span><span>7:14</span></div>
+        <div class="call"><span>Agency — £42/h</span><span>7:31</span></div>
+      </div></div>
+    </div>
+    <aside class="notes">This is a real Tuesday from their Northgate clinic, re-told. The manager starts calling at 7:00 and ends up booking agency cover at 7:31. Pause on the 12. Transition: same morning, with Rostra.</aside>
+  </section>
+
+  <!-- 5 · After -->
+  <section data-auto-animate>
+    <div class="kicker">After</div>
+    <h2 data-id="ba-title">With Rostra, one sick call means <span class="hl">one tap.</span></h2>
+    <div class="split" style="grid-template-columns:5fr 4fr">
+      <div class="counter" data-id="ba-count" style="color:var(--accent)">1<small>tap — the shift is offered to who can work it</small></div>
+      <div class="phone" data-id="ba-phone"><div class="glass">
+        <div class="tap"><b>Early shift covered</b>Northgate · 7:30–15:30<br>Accepted by Priya at 7:04<span class="btn">View rota</span></div>
+      </div></div>
+    </div>
+    <aside class="notes">Rostra offers the open shift to qualified, rested staff in order; the first to accept gets it. The manager sees one notification. Four minutes, no agency. Transition: let me show you the three parts that make this work.</aside>
+  </section>
+
+  <!-- 6 · Capability 1 -->
+  <section>
+    <div class="kicker">1 · Fill gaps</div>
+    <h2>Open shifts fill themselves from people who can work them.</h2>
+    <div class="split">
+      <div class="points">
+        <div>Only staff with the right role and rest are asked.</div>
+        <div class="fragment">The first to accept gets it.</div>
+      </div>
+      <div class="screen">
+        <div class="bar"><i></i><i></i><i></i><span>Open shift · Northgate · Tue 7:30</span></div>
+        <div class="body">
+          <div class="row open"><span class="grow">Practice nurse — early</span><span class="tag warn">Open</span></div>
+          <div class="row"><span class="av">PR</span><span class="grow">Priya R.</span><span class="tag">Accepted</span></div>
+          <div class="row"><span class="av">TM</span><span class="grow">Tom M.</span><span class="tag" style="background:#0f1b2d10;color:var(--muted)">Offered</span></div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">Rules come from their contracts: role, minimum rest, maximum hours. Nobody gets asked who can't legally work it. Mention that offers go by app, SMS or WhatsApp. Transition: the second thing people asked for was swaps.</aside>
+  </section>
+
+  <!-- 7 · Capability 2 -->
+  <section>
+    <div class="kicker">2 · Swap shifts</div>
+    <h2>Staff agree swaps themselves; managers approve in one tap.</h2>
+    <div class="split">
+      <div class="points">
+        <div>Swaps that break a rule are blocked before anyone asks.</div>
+        <div class="fragment">Every change is logged for payroll.</div>
+      </div>
+      <div class="screen">
+        <div class="bar"><i></i><i></i><i></i><span>Swap request</span></div>
+        <div class="body">
+          <div class="row"><span class="av">AN</span><span class="grow">Ana · Sat late</span><span style="color:var(--muted)">⇄</span><span class="av">JO</span><span class="grow">Joe · Sun early</span></div>
+          <div class="row"><span class="grow">Rest time, hours, role</span><span class="tag">✓ Checks pass</span></div>
+          <div class="row" style="background:var(--accent);color:#fff;justify-content:center;font-weight:600">Approve swap</div>
+        </div>
+      </div>
+    </div>
+    <aside class="notes">Swaps today go through Dana by text message. Here staff find each other in the app, the rules are checked automatically, and the manager just approves. Transition: and managers finally see the whole week.</aside>
+  </section>
+
+  <!-- 8 · Capability 3 -->
+  <section>
+    <div class="kicker">3 · See ahead</div>
+    <h2>Managers see every clinic's gaps before they happen.</h2>
+    <div class="screen" style="margin-top:22px">
+      <div class="bar"><i></i><i></i><i></i><span>Week of 3 November · all clinics</span></div>
+      <div class="body">
+        <div class="week">
+          <span></span><span class="h">Mon</span><span class="h">Tue</span><span class="h">Wed</span><span class="h">Thu</span><span class="h">Fri</span><span class="h">Sat</span><span class="h">Sun</span>
+          <span>Northgate</span><i class="c"></i><i class="c gap"></i><i class="c"></i><i class="c"></i><i class="c mid"></i><i class="c"></i><i class="c"></i>
+          <span>Riverside</span><i class="c"></i><i class="c"></i><i class="c"></i><i class="c mid"></i><i class="c"></i><i class="c"></i><i class="c"></i>
+          <span>Eastfield</span><i class="c mid"></i><i class="c"></i><i class="c"></i><i class="c"></i><i class="c"></i><i class="c gap"></i><i class="c"></i>
+          <span>Old Town</span><i class="c"></i><i class="c"></i><i class="c"></i><i class="c"></i><i class="c"></i><i class="c"></i><i class="c mid"></i>
+        </div>
+        <div class="legend"><span><i style="background:var(--accent-soft)"></i>Covered</span><span><i style="background:#fbe3b0"></i>Tight</span><span><i style="background:var(--warn)"></i>Gap</span></div>
+      </div>
+    </div>
+    <aside class="notes">One screen for all six sites (four shown). Red cells are gaps Rostra could not fill yet; amber means one person short of the safe minimum. Point at Tuesday Northgate: that is the sick call from earlier, already flagged. Transition: does this work in a real clinic group?</aside>
+  </section>
+
+  <!-- 9 · Proof -->
+  <section>
+    <div class="kicker">Proof · sample case study</div>
+    <h2>Harbour Health filled 96% of gaps within an hour.</h2>
+    <div class="split" style="grid-template-columns:6fr 5fr;margin-top:64px">
+      <div>
+        <div class="quote" style="font-size:42px">“We stopped booking agency for routine gaps in the first month.”</div>
+        <div class="who">Ops lead, Harbour Health (fictional) · 9 clinics</div>
+      </div>
+      <div class="grid3" style="grid-template-columns:1fr 1fr;margin-top:0">
+        <div class="card"><b style="color:var(--accent)">96%</b><span>of gaps filled within an hour</span></div>
+        <div class="card"><b style="color:var(--accent)">−71%</b><span>agency spend</span></div>
+      </div>
+    </div>
+    <aside class="notes">Replace with a real, attributed customer before sending — this template's case study is fictional. Say how long they have used it and how big they are compared with Brightline. Transition: so how would you start?</aside>
+  </section>
+
+  <!-- 10 · How you start + options -->
+  <section>
+    <div class="kicker">How you start</div>
+    <h2>Start with a two-week pilot, then pay per clinic.</h2>
+    <div class="split" style="grid-template-columns:1fr 1fr">
+      <div class="steps">
+        <div class="step"><b>1</b><span>We import your current rota and contracts.</span></div>
+        <div class="step"><b>2</b><span>Northgate runs on Rostra for two weeks.</span></div>
+        <div class="step"><b>3</b><span>We review gaps, cost and staff feedback together.</span></div>
+      </div>
+      <div class="plans">
+        <div class="plan"><span><b>Pilot</b><em>1 clinic · 2 weeks</em></span><span>Free</span></div>
+        <div class="plan rec"><span><b>Clinics</b><em>Recommended for 6 sites</em></span><span>£190 / clinic / month</span></div>
+      </div>
+    </div>
+    <aside class="notes">The pilot needs about two hours of Dana's time for the import. No contract until the review. Prices are per clinic per month, billed monthly; mention volume pricing above ten clinics only if asked. Transition: one decision today.</aside>
+  </section>
+
+  <!-- 11 · Next step -->
+  <section data-background-color="#0f1b2d" class="dark">
+    <div class="kicker">Next step</div>
+    <h2 style="font-size:72px">Let's start the Northgate pilot on 3 November.</h2>
+    <p class="lead">We need your rota export and one contact at Northgate by 27 October.</p>
+    <div class="ask">Reply “yes” to dana@rostra.example →</div>
+    <div class="foot" style="color:#c3cedd;right:140px"><span>Rostra · rostra.example</span><span>Thank you</span></div>
+    <aside class="notes">One ask, one date. If they hesitate, ask what would need to be true for the pilot to start on the 3rd. Leave this slide up during questions.</aside>
+  </section>
+
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/plugin/notes/notes.min.js"></script>
+<script>
+  Reveal.initialize({ hash: true, width: 1280, height: 720, margin: 0, transition: "slide", backgroundTransition: "fade",
+    controls: true, progress: true, center: false, plugins: [RevealNotes] });
+</script>
+</body>
+</html>

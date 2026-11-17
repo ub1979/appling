@@ -1,0 +1,1166 @@
+import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import {
+  api,
+  streamUrl,
+  uploadFile,
+  type AppPreview,
+  type Agent,
+  type Catalog,
+  type ChatMessage,
+  type ProjectDetail,
+  type ProjectMap,
+  type ReviewAnswer,
+} from "../api";
+import { ArrowLeft, ArrowUp, Check, Copy, Crosshair, MessageSquarePlus, Paperclip, Play, Square, UsersRound, X } from "lucide-react";
+import { PreviewPanel, pickLabel, pickNote, type PickedElement } from "../components/PreviewPanel";
+import { Avatar, IconButton, PrefButtons, TeamPicker } from "../components/common";
+import { activeHelpers, applyEvent, emptyLive, type InboxItem, type LiveState, type LyraEvent } from "../live";
+import { go } from "../router";
+import { ProviderAlerts } from "../components/ProviderAlerts";
+import { UpdateDialog } from "../components/UpdateDialog";
+import { composerContext } from "./composer-context";
+import {
+  extractAppItSkillSelection,
+  orderGuidedPhases,
+  parseGuidedPhaseMarkers,
+  phasesFromProgressLedger,
+  sanitizeGuidedResponse,
+} from "../studio";
+
+// The same answers the Studio offered under a requirements question.
+const ANSWERS = [
+  { label: "Skip this question", text: "Skip this question. Record it as an open decision and ask the next single question." },
+  { label: "Decide for me", text: "Decide this question for me using the safest sensible default. Briefly state the default, then ask the next single question." },
+  { label: "Use smart defaults", text: "Use sensible defaults for all remaining requirements questions. Summarize the complete requirements and choices for my approval before any coding." },
+];
+
+// Stop first only when the owner explicitly chooses to interrupt active work.
+export async function applyUpdatedRules(id: string, stopFirst: boolean) {
+  if (stopFirst) {
+    await api.stop(id);
+    let stopped = false;
+    for (let attempt = 0; attempt < 30; attempt++) {
+      const project = await api.project(id);
+      if (!project.running && project.helpers.length === 0) { stopped = true; break; }
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+    if (!stopped) throw new Error("The agents are still stopping. Try applying the rules again shortly.");
+  }
+  await api.applyRules(id);
+}
+
+interface ResetAction {
+  type: "reset" | "sync";
+  detail: ProjectDetail;
+}
+
+function liveReducer(state: LiveState, action: LyraEvent | ResetAction): LiveState {
+  if (action.type === "sync" && "detail" in action) {
+    const { detail } = action as ResetAction;
+    return { ...state, queued: detail.queue, paused: detail.paused,
+      turn: !detail.running ? null : state.turn ?? (detail.turn ? { id: detail.turn.id, text: detail.turn.text, kind: detail.turn.kind, reply: "" } : null),
+      providerStatuses: detail.provider_statuses ?? state.providerStatuses };
+  }
+  if (action.type === "reset" && "detail" in action) {
+    const { detail } = action as ResetAction;
+    return { ...emptyLive(detail.started_at ?? 0), inbox: detail.inbox, queued: detail.queue, paused: detail.paused,
+      turn: detail.running && detail.turn ? { id: detail.turn.id, text: detail.turn.text, kind: detail.turn.kind, reply: "" } : null,
+      providerStatuses: detail.provider_statuses ?? {} };
+  }
+  return applyEvent(state, action as LyraEvent);
+}
+
+interface Shown {
+  role: "user" | "lyra" | "note" | "report";
+  text: string;
+  proposal: string[] | null;
+  active?: boolean;
+}
+
+function clean(raw: string, ids: string[]): { text: string; proposal: string[] | null; started: string[]; completed: string[] } {
+  const markers = parseGuidedPhaseMarkers(raw, ids);
+  const selection = extractAppItSkillSelection(markers.content, ids);
+  return {
+    text: sanitizeGuidedResponse(selection ? selection.content : markers.content),
+    proposal: selection?.skillIds.length ? selection.skillIds : null,
+    started: markers.started,
+    completed: markers.completed,
+  };
+}
+
+function shownMessage(m: ChatMessage, ids: string[]): Shown {
+  if (m.kind === "auto" || m.kind === "status") return { active: m.active, role: "note", text: m.content, proposal: null };
+  if (m.kind === "system") return { active: m.active, role: "report", text: m.content, proposal: null };
+  if (m.role === "user") return { active: m.active, role: "user", text: m.content, proposal: null };
+  const c = clean(m.content, ids);
+  return { active: m.active, role: "lyra", text: c.text, proposal: c.proposal };
+}
+
+const timeOf = (ts: number) => new Date(ts * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+
+export function Studio({ id }: { id: string }) {
+  const [detail, setDetail] = useState<ProjectDetail | null>(null);
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
+  const [map, setMap] = useState<ProjectMap | null>(null);
+  const [live, dispatch] = useReducer(liveReducer, undefined, emptyLive);
+  const [problem, setProblem] = useState<string | null>(null);
+  const [dismissed, setDismissed] = useState<string | null>(null);
+  const [showTeam, setShowTeam] = useState(false);
+  const [showUpdate, setShowUpdate] = useState(false);
+  const [deletingProject, setDeletingProject] = useState(false);
+  const [applyingRules, setApplyingRules] = useState(false);
+  // Bumped on every owner message so the chat jumps to the bottom to show it.
+  const [sent, setSent] = useState(0);
+  // The live preview beside the chat, and parts of it the owner picked.
+  const [preview, setPreview] = useState<AppPreview | null>(null);
+  const [seenPrototype, setSeenPrototype] = useState<string | null>(null);
+  const [prototypeRevision, setPrototypeRevision] = useState<string | null>(null);
+  const [picks, setPicks] = useState<PickedElement[]>([]);
+  const addPick = useCallback((p: PickedElement) => setPicks((all) => [...all.slice(-4), p]), []);
+  // Files dropped anywhere on the chat go to the composer's attachments.
+  const [dragging, setDragging] = useState(false);
+  const [dropped, setDropped] = useState<File[]>([]);
+
+  const load = useCallback(async () => {
+    const data = await api.project(id);
+    setDetail(data);
+    dispatch({ type: "sync", detail: data });
+    return data;
+  }, [id]);
+
+  useEffect(() => {
+    void api.catalog().then(setCatalog).catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    let source: EventSource | null = null;
+    let cancelled = false;
+    load().then((data) => {
+      if (cancelled) return;
+      dispatch({ type: "reset", detail: data });
+      setShowUpdate(data.update_available);
+      source = new EventSource(streamUrl(id, data.turn_start_offset));
+      source.onmessage = (msg) => {
+        try {
+          dispatch(JSON.parse(msg.data) as LyraEvent);
+        } catch {
+          // skip a malformed line
+        }
+      };
+    }).catch((e) => setProblem(e instanceof Error ? e.message : String(e)));
+    return () => {
+      cancelled = true;
+      source?.close();
+    };
+  }, [id, load]);
+
+  useEffect(() => {
+    if (live.turnsEnded > 0 || live.helperChanges > 0 || live.answersChanged > 0 || live.conversationChanges > 0) void load();
+  }, [live.turnsEnded, live.helperChanges, live.answersChanged, live.conversationChanges, load]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => void load().catch(() => undefined), 3000);
+    return () => window.clearInterval(timer);
+  }, [load]);
+
+  // A hidden problem comes back if a later turn fails the same way.
+  useEffect(() => void setDismissed(null), [live.turnsEnded]);
+
+  useEffect(() => {
+    let alive = true;
+    const fetchMap = () => void api.map(id).then((m) => alive && setMap(m)).catch(() => undefined);
+    fetchMap();
+    const timer = window.setInterval(fetchMap, 15000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [id, live.turnsEnded]);
+
+  const [canOpen, setCanOpen] = useState(false);
+  const [opening, setOpening] = useState(false);
+  useEffect(() => {
+    void api.preview(id).then((p) => {
+      setCanOpen(p.available);
+      setPrototypeRevision(p.prototype ?? null);
+    }).catch(() => undefined);
+  }, [id, live.turnsEnded, live.helperChanges]);
+
+  useAttentionSignals(detail?.name ?? "Appling", live);
+
+  const run = useCallback(async (action: () => Promise<unknown>) => {
+    try {
+      setProblem(null);
+      await action();
+    } catch (e) {
+      setProblem(e instanceof Error ? e.message : String(e));
+    }
+  }, []);
+
+  const openPrototype = useCallback(() => run(async () => {
+    setPreview(null);
+    setSeenPrototype(null);
+    setPreview(await api.openPrototype(id));
+  }), [id, run]);
+  const pendingPrototype = live.inbox.find((item) => item.kind === "prototype")?.revision;
+  useEffect(() => {
+    if (pendingPrototype) void openPrototype();
+  }, [pendingPrototype, openPrototype]);
+
+  const agents = useMemo(() => (catalog?.agents ?? []).map((agent) =>
+    detail?.active_update && agent.id === "change-manager" ? { ...agent, required: true } : agent,
+  ), [catalog, detail?.active_update]);
+  const ids = useMemo(() => agents.map((a) => a.id), [agents]);
+  const team = detail?.team?.length ? detail.team : ["req-engineer", "task-planner"];
+  const helpers = detail?.helpers ?? [];
+  const liveHelpers = activeHelpers(live);
+  const busy = !!live.turn;
+  const providerStatuses = Object.values(live.providerStatuses);
+
+  // Phase state from Appling's markers, then the project's own plan file.
+  const phases = useMemo(() => {
+    const started: string[] = [];
+    const completed = new Set<string>();
+    const raws = [...(detail?.messages ?? []).filter((m) => m.role === "assistant").map((m) => m.content), live.turn?.reply ?? ""];
+    for (const raw of raws) {
+      const p = parseGuidedPhaseMarkers(raw, ids);
+      started.push(...p.started);
+      p.completed.forEach((c) => completed.add(c));
+    }
+    if (detail?.requirements_started) {
+      started.push("req-engineer");
+      if (detail.review_pending) completed.delete("req-engineer");
+      else completed.add("req-engineer");
+    }
+    let current: string | null = [...started].reverse().find((s) => !completed.has(s)) ?? null;
+    if (map?.markdown) {
+      const labels = Object.fromEntries(agents.map((a) => [a.id, a.label]));
+      const section = detail?.active_update
+        ? map.markdown.split(new RegExp(`^## Revision ${detail.active_update.revision}\\s*$`, "im"))[1]
+        : map.markdown;
+      const ledger = phasesFromProgressLedger(section ?? "", labels);
+      ledger.completed.forEach((c) => completed.add(c));
+      if (ledger.current) current = ledger.current;
+    }
+    const ordered = orderGuidedPhases(Array.from(new Set([...team, ...started, ...completed])).filter((x) => ids.includes(x)));
+    // A current phase whose plan row is blocked is waiting (usually on the owner).
+    const currentAgent = agents.find((a) => a.id === current);
+    const waiting =
+      !!currentAgent &&
+      (map?.phases ?? []).some((row) => (row.state === "blocked" || row.state === "owner") && rowIsAgent(row.name, currentAgent));
+    return { ordered, completed, current, waiting };
+  }, [detail?.messages, detail?.active_update, detail?.requirements_started, detail?.review_pending, live.turn?.reply, ids, agents, map?.markdown, map?.phases, team]);
+  const allDone = phases.ordered.length > 0 && phases.ordered.every((p) => phases.completed.has(p));
+  const workingIds = new Set(helpers.map((h) => agentForGoal(h.goal, agents)).filter((x): x is string => !!x));
+
+  const shown: Shown[] = useMemo(() => (detail?.messages ?? []).map((m) => shownMessage(m, ids)), [detail?.messages, ids]);
+  const lastLyra = [...shown].map((s, i) => [s, i] as const).reverse().find(([s]) => s.role === "lyra");
+  const lastTeamNote = shown.map((s, i) => [s, i] as const).reverse().find(([s]) => s.role === "note" && s.text.startsWith("Team updated"));
+  const openProposal =
+    !busy && lastLyra && (lastLyra[0].proposal || teamProposalForText(lastLyra[0].text, agents, team)) && (!lastTeamNote || lastTeamNote[1] < lastLyra[1]) ? lastLyra[0].proposal || teamProposalForText(lastLyra[0].text, agents, team) : null;
+  const lastText = lastLyra?.[0].text.trim() ?? "";
+  const asksQuestion = !busy && live.queued.length === 0 && live.inbox.length === 0
+    && asksForQuestion(lastText) && !openProposal;
+  // Only when the reply actually asks for approval — not when it merely
+  // says an approval was recorded (that showed the button after every turn).
+  const asksApproval = !busy && live.queued.length === 0 && !openProposal && !detail?.review_pending && asksForApproval(lastText);
+
+  if (!detail) {
+    return (
+      <div className="page">
+        <p className="muted" style={{ padding: 40 }}>{problem ?? "Opening project…"}</p>
+      </div>
+    );
+  }
+
+  const status = providerStatuses.length
+    ? { text: "AI needs attention", tone: "need" }
+    : live.inbox.length
+    ? { text: "Needs you", tone: "need" }
+    : busy
+      ? { text: "Appling is working", tone: "busy" }
+      : helpers.length
+        ? { text: `${helpers.length} agent${helpers.length > 1 ? "s" : ""} working`, tone: "busy" }
+        : live.paused
+          ? { text: "Stopped", tone: "" }
+          : { text: "Ready", tone: "good" };
+
+  // Appling builds the site if it needs it and serves it at its own address.
+  // The tab opens right away (browsers block tabs opened after a wait).
+  // Appling builds the app if it needs it and shows it beside the chat
+  // (phone apps get a QR code for Expo Go).
+  const openApp = () => {
+    setOpening(true);
+    void run(async () => {
+      try {
+        setPreview(await api.openApp(id));
+      } finally {
+        setOpening(false);
+      }
+    });
+  };
+  const send = (text: string) => {
+    askNotificationPermission();
+    setSent((n) => n + 1);
+    return run(() => api.send(id, text));
+  };
+  const labelOf = (agentId: string) => agents.find((a) => a.id === agentId)?.label ?? agentId;
+
+  return (
+    <div className="studio">
+      <header className="studio-top">
+        <IconButton label="All projects" onClick={() => go("/")}><ArrowLeft size={16} /></IconButton>
+        <span className="brand-mark" style={{ width: 30, height: 30, fontSize: 14, borderRadius: 9 }}>A</span>
+        <div className="studio-title">
+          <b>{detail.name}</b>
+          <span><bdi>{detail.root}</bdi></span>
+        </div>
+        <div className="studio-actions">
+          <span className={`pill ${status.tone}`}>{status.text}</span>
+          <label className="toggle" title="When work is left and nothing waits for you, Appling continues by itself after 10 quiet minutes.">
+            <span
+              className={`switch ${detail.keep_going ? "on" : ""}`}
+              role="switch"
+              aria-checked={detail.keep_going}
+              tabIndex={0}
+              onClick={() => {
+                const on = !detail.keep_going;
+                setDetail({ ...detail, keep_going: on });
+                void run(async () => { await api.settings(id, { keep_going: on }); await load(); });
+              }}
+            />
+            <span className="label">Keep going</span>
+          </label>
+          {(busy || live.queued.length > 0 || helpers.length > 0) && (
+            <IconButton label="Stop Appling and its agents" tone="danger" onClick={() => void run(() => api.stop(id))}>
+              <Square size={14} fill="currentColor" />
+            </IconButton>
+          )}
+          {detail.update_available && (
+            <button className="btn small" disabled={busy || helpers.length > 0} onClick={() => setShowUpdate(true)}>
+              Update project
+            </button>
+          )}
+          {(prototypeRevision || pendingPrototype) && (
+            <button className="btn small" onClick={() => void openPrototype()}>Open prototype</button>
+          )}
+          {canOpen && (
+            <button className="btn small" disabled={opening} onClick={openApp}>
+              <Play size={14} fill="currentColor" /> {opening ? "Opening app…" : "Open app"}
+            </button>
+          )}
+          <IconButton
+            label="New chat — project files stay as they are"
+            disabled={busy || helpers.length > 0}
+            onClick={() => void run(async () => { await api.newChat(id); await load(); })}
+          >
+            <MessageSquarePlus size={16} />
+          </IconButton>
+          <button className="btn small danger" disabled={busy || helpers.length > 0 || deletingProject}
+            onClick={() => {
+              if (!window.confirm(`Delete "${detail.name}" from your projects? Its folder, files and saved chats will move to Appling Projects/Archive.`)) return;
+              setDeletingProject(true);
+              void run(async () => {
+                try { await api.deleteProject(id); go("/"); }
+                finally { setDeletingProject(false); }
+              });
+            }}>{deletingProject ? "Moving to archive…" : "Delete project"}</button>
+          <PrefButtons onAi={() => go(`/settings?project=${id}`)} />
+          <span className="engine-tag" title="Engine used by this project">{detail.engine}</span>
+        </div>
+      </header>
+
+      <div>
+        {providerStatuses.length > 0 && <ProviderAlerts statuses={providerStatuses}
+          agentName={(goal) => labelOf(agentForGoal(goal, agents) ?? "") || "Agent"}
+          onChangeAi={() => void run(async () => { await api.stop(id); go(`/settings?project=${id}`); })} />}
+        {helpers.length > 0 && providerStatuses.length === 0 && live.inbox.length === 0 && (
+          <div className="banner" role="status">
+            <span><b>{helpers.map((h) => labelOf(agentForGoal(h.goal, agents) ?? "") || "Agent").join(", ")} working</b>
+              {" — "}{agentTaskDescription(helpers[0].goal)}
+              <span className="small"> Please wait. The result or next question will appear here automatically.</span>
+            </span>
+          </div>
+        )}
+        {detail.active_update && (
+          <div className="banner">Version {detail.active_update.revision} update{detail.active_update.branch ? ` · ${detail.active_update.branch}` : ""}</div>
+        )}
+        {detail.rules_outdated && (
+          <div className="banner warn">
+            <span>Appling's rules were updated since this chat started.
+              {(busy || helpers.length > 0) && <span className="small"> Finish or stop the current work to apply them.</span>}
+            </span>
+            <button className="btn small" disabled={applyingRules} onClick={() => {
+              setApplyingRules(true);
+              void run(async () => {
+                try {
+                  await applyUpdatedRules(id, busy || helpers.length > 0);
+                  await load();
+                } finally { setApplyingRules(false); }
+              });
+            }}>{applyingRules ? "Applying…" : busy || helpers.length > 0 ? "Stop and apply rules" : "Use the new rules"}</button>
+          </div>
+        )}
+        {detail.review_recovery && !busy && helpers.length === 0 && live.inbox.length === 0 && (
+          <div className="banner warn">
+            <span>Your {detail.review_recovery.kind} review is still pending. Reopen it to see the approval and change-request buttons.</span>
+            <button className="btn small" onClick={() => void run(async () => {
+              await api.reopenReview(id, detail.review_recovery!.id);
+              await load();
+            })}>Reopen {detail.review_recovery.kind} review</button>
+          </div>
+        )}
+        {(() => {
+          const shown = problem ?? live.lastProblem;
+          if (!shown || shown === dismissed) return null;
+          return (
+            <div className="banner bad">
+              <span>{shown}</span>
+              <button className="btn small" aria-label="Hide this message" onClick={() => setDismissed(shown)}>×</button>
+            </div>
+          );
+        })()}
+        {!busy && helpers.length === 0 && allDone && (
+          <div className="banner good">
+            🎉 {detail.name} is ready — every step is done.
+            {canOpen && <button className="btn primary small" disabled={opening} onClick={openApp}>{opening ? "Getting it ready…" : "▶ Open app"}</button>}
+          </div>
+        )}
+      </div>
+
+      <div className={`studio-body ${preview ? "with-preview" : ""}`}>
+        <aside className="side left">
+          <section className="panel">
+            <div className="agent-row working" style={{ background: "transparent", padding: 0 }}>
+              <Avatar id="app-it" size={44} />
+              <div className="who">
+                <b>Appling</b>
+                <span>
+                  {live.inbox.length ? "Waiting for your answer" : busy ? "Working on it…" : helpers.length ? "Guiding the agents" : "Here when you need me"}
+                </span>
+              </div>
+            </div>
+          </section>
+          <section className="panel">
+            <h3>
+              Your team
+              <button className="mini-icon" onClick={() => setShowTeam(true)} title="Change the team" aria-label="Change the team"><UsersRound size={15} /></button>
+            </h3>
+            {orderedTeamAgents(agents, team).map((a) => {
+              const working = workingIds.has(a.id) || (busy && helpers.length === 0 && phases.current === a.id && !phases.waiting);
+              const done = phases.completed.has(a.id);
+              const tool = working
+                ? liveHelpers.find((h) => agentForGoal(h.goal, agents) === a.id)?.lastTool ?? "Working"
+                : undefined;
+              const line = working
+                ? tool
+                : phases.current === a.id && phases.waiting
+                  ? "Waiting on you"
+                  : done
+                    ? "Done ✓"
+                    : phases.current === a.id
+                      ? (live.inbox.length ? "Waiting for your answer" : "In progress")
+                      : "Not started yet";
+              return (
+                <div key={a.id} className={`agent-row ${working ? "working" : ""}`} title={a.description}>
+                  <Avatar id={a.id} size={36} />
+                  <div className="who">
+                    <b>{a.label}</b>
+                    <span>{line}</span>
+                  </div>
+                </div>
+              );
+            })}
+          </section>
+          {helpers.length > 0 && (
+            <section className="panel">
+              <h3>Agents at work</h3>
+              {helpers.map((h) => {
+                const lh = liveHelpers.find((x) => x.goal && h.goal.startsWith(x.goal.slice(0, 30)));
+                return (
+                  <div key={h.id} style={{ marginBottom: 10 }}>
+                    <div className="tiny muted">{lh?.lastTool ?? "Working"}{h.started ? ` · since ${timeOf(h.started)}` : ""}</div>
+                    <div className="helper-goal">{h.goal}</div>
+                  </div>
+                );
+              })}
+            </section>
+          )}
+        </aside>
+
+        <section
+          className={`chat-col ${dragging ? "dragging" : ""}`}
+          onDragOver={(e) => { if (e.dataTransfer.types.includes("Files")) { e.preventDefault(); setDragging(true); } }}
+          onDragLeave={(e) => { if (e.currentTarget === e.target) setDragging(false); }}
+          onDrop={(e) => { if (e.dataTransfer.files.length) { e.preventDefault(); setDragging(false); setDropped(Array.from(e.dataTransfer.files)); } }}
+        >
+          <ChatScroll
+            sent={sent}
+            shown={shown}
+            live={live}
+            ids={ids}
+            agents={agents}
+            team={team}
+            requirementsInterview={detail.review_pending}
+            asksQuestion={asksQuestion}
+            asksApproval={asksApproval}
+            proposal={openProposal}
+            onSend={(t) => void send(t)}
+            onTeam={(t) => void run(async () => { await api.team(id, t); await load(); })}
+            onAnswer={(item, a) => void run(async () => { await api.answer(id, item, a); await load(); })}
+            emptyNote={detail.update_available ? "Open the app or ask Appling about this project." : undefined}
+            seenPrototype={preview?.revision === seenPrototype ? seenPrototype : null}
+            onOpenPrototype={() => void openPrototype()}
+          />
+          <Composer busy={busy} inbox={live.inbox} onSend={send} projectId={id} dropped={dropped} picks={picks} onPicksChange={setPicks} />
+        </section>
+
+        <aside className="side right">
+          <section className="panel">
+            <h3>Project map</h3>
+            <ol className="phase-list">
+              {phases.ordered.map((pid, i) => {
+                const state = phases.completed.has(pid)
+                  ? "done"
+                  : phases.current === pid
+                    ? (phases.waiting ? "owner" : "now")
+                    : workingIds.has(pid)
+                      ? "now"
+                      : "pending";
+                return (
+                  <li key={pid} className={`phase ${state}`}>
+                    <span className="dot">{state === "done" ? "✓" : state === "owner" ? "!" : i + 1}</span>
+                    <span className="name">{labelOf(pid)}</span>
+                    <span className="state">{state === "done" ? "Done" : state === "owner" ? "Needs you" : state === "now" ? "Now" : ""}</span>
+                  </li>
+                );
+              })}
+            </ol>
+            {map?.exists && map.phases.length > 0 && (
+              <details style={{ marginTop: 10 }}>
+                <summary className="small muted" style={{ cursor: "pointer" }}>From the project plan</summary>
+                <ol className="phase-list" style={{ marginTop: 6 }}>
+                  {map.phases.map((p, i) => (
+                    <li key={`${i}-${p.name}`} className={`phase ${p.state === "running" ? "now" : p.state}`} title={p.status}>
+                      <span className="dot">{p.state === "done" ? "✓" : p.state === "owner" ? "!" : "·"}</span>
+                      <span className="name">{p.name}</span>
+                    </li>
+                  ))}
+                </ol>
+              </details>
+            )}
+          </section>
+          <UsagePanel id={id} refresh={live.turnsEnded + live.helperChanges} agents={agents} />
+          <section className="panel" style={{ flex: 1 }}>
+            <h3>Activity</h3>
+            {live.activity.length === 0 ? (
+              <p className="muted small" style={{ margin: 0 }}>Nothing yet.</p>
+            ) : (
+              <ul className="activity">
+                {[...live.activity].reverse().slice(0, 60).map((a) => (
+                  <li key={a.key} title={a.detail}>
+                    <time>{timeOf(a.ts)}</time>
+                    <span className={`what ${a.tone}`}>{a.text}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+        </aside>
+        {preview && <PreviewPanel key={preview.url + (preview.revision ?? "")} preview={preview}
+          onClose={() => setPreview(null)} onPicked={addPick} onReady={setSeenPrototype} />}
+      </div>
+
+      {showUpdate && (
+        <UpdateDialog
+          name={detail.name}
+          revision={detail.next_revision}
+          onClose={() => setShowUpdate(false)}
+          onStart={async (branch) => {
+            const result = await api.startUpdate(id, branch);
+            go(`/p/${id}?chat=${result.chat_id}`);
+          }}
+        />
+      )}
+      {showTeam && catalog && (
+        <TeamDialog
+          agents={agents}
+          team={team}
+          onClose={() => setShowTeam(false)}
+          onSave={async (t) => {
+            await run(async () => { await api.team(id, t); await load(); });
+            setShowTeam(false);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+export function asksForQuestion(reply: string): boolean {
+  const lastParagraph = reply.trim().split(/\n\s*\n/).at(-1) ?? "";
+  const prose = lastParagraph.replace(/https?:\/\/[^\s)]+/g, "").replace(/`[^`]*`/g, "");
+  return /[?？]/.test(prose);
+}
+
+function QuestionShortcuts({ onAnswer }: { onAnswer: (answer: string) => void }) {
+  return ANSWERS.map((answer) => (
+    <button key={answer.label} className="chip" onClick={() => onAnswer(answer.text)}>{answer.label}</button>
+  ));
+}
+
+export function asksForApproval(reply: string): boolean {
+  const tail = reply.trim().slice(-400);
+  if (/approve\s*\/\s*change/i.test(tail)) return true;
+  const lastSentence = tail.split(/(?<=[.!])\s+/).pop() ?? "";
+  return /[?？]\s*$/.test(lastSentence) && /\bapprov/i.test(lastSentence);
+}
+
+function askNotificationPermission(): void {
+  try {
+    if ("Notification" in window && Notification.permission === "default") void Notification.requestPermission();
+  } catch {
+    // notifications unavailable; the tab badge still works
+  }
+}
+
+/** When the tab is in the background: badge the title and notify on a reply or a question. */
+function useAttentionSignals(name: string, live: LiveState): void {
+  const seen = useRef({ ended: live.turnsEnded, inbox: live.inbox.length });
+  useEffect(() => {
+    const base = `${name} · Appling`;
+    const clear = () => {
+      if (!document.hidden) document.title = base;
+    };
+    clear();
+    document.addEventListener("visibilitychange", clear);
+    return () => document.removeEventListener("visibilitychange", clear);
+  }, [name]);
+  useEffect(() => {
+    const prev = seen.current;
+    seen.current = { ended: live.turnsEnded, inbox: live.inbox.length };
+    const needs = live.inbox.length > prev.inbox;
+    const replied = live.turnsEnded > prev.ended && !live.turn && live.queued.length === 0;
+    if (!document.hidden || (!needs && !replied)) return;
+    const text = needs ? "Appling needs you" : "Appling replied";
+    document.title = `● ${text} — ${name}`;
+    try {
+      if ("Notification" in window && Notification.permission === "granted") new Notification(text, { body: name, icon: "/avatars/app-it.webp" });
+    } catch {
+      // ignore
+    }
+  }, [live.turnsEnded, live.inbox.length, live.turn, live.queued.length, name]);
+}
+
+function rowIsAgent(row: string, agent: Agent): boolean {
+  const r = row.toLowerCase();
+  return r.includes(agent.label.toLowerCase()) || r.includes(agent.id) || (agent.id === "qa-engineer" && /\bqa\b/.test(r));
+}
+
+const GOAL_HINTS: Record<string, RegExp> = {
+  "qa-engineer": /\bqa\b|quality assurance/i,
+  "sw-developer": /\bdevelop/i,
+  "task-planner": /task[- ]planner|task planning/i,
+  "req-engineer": /requirements/i,
+  debugger: /\bdebug/i,
+};
+
+/** Which team member a delegated goal is for — mirrors lyra_lite.agents.agent_for_goal. */
+export function agentForGoal(goal: string, agents: Agent[]): string | null {
+  const text = (goal || "").toLowerCase();
+  return (
+    agents.find((a) => text.includes(a.id))?.id ??
+    agents.find((a) => text.includes(a.label.toLowerCase()))?.id ??
+    Object.entries(GOAL_HINTS).find(([, re]) => re.test(text))?.[0] ??
+    null
+  );
+}
+
+interface UsageTotals {
+  api_calls: number;
+  input: number;
+  cache_read: number;
+  output: number;
+  prompt: number;
+  cached_pct: number;
+  cost_usd: number;
+}
+
+interface UsageReport {
+  lyra: UsageTotals;
+  agents: UsageTotals;
+  total: UsageTotals;
+  by_agent: (UsageTotals & { id: string; label: string })[];
+}
+
+export function tokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${Math.round(n / 1_000)}k`;
+  return String(n);
+}
+
+function UsagePanel({ id, refresh, agents }: { id: string; refresh: number; agents: Agent[] }) {
+  const [u, setU] = useState<UsageReport | null>(null);
+  useEffect(() => {
+    void api.usage(id).then((r) => setU(r as UsageReport)).catch(() => undefined);
+  }, [id, refresh]);
+  if (!u || !u.total.api_calls) return null;
+  if (!u.total.prompt) {
+    return (
+      <section className="panel">
+        <h3>Token use</h3>
+        <p className="tiny muted" style={{ margin: 0 }}>Token counts are recorded from the next step on.</p>
+      </section>
+    );
+  }
+  const row = (label: string, t: UsageTotals, avatar?: string) => (
+    <div className="usage-row" key={label}>
+      {avatar ? <Avatar id={avatar} size={22} /> : <span style={{ width: 22 }} />}
+      <span className="u-name">{label}</span>
+      <span title="model calls">{t.api_calls}×</span>
+      <span title="tokens sent (fresh + cached)">{tokens(t.prompt)}</span>
+      <span title="share served from cache" className="u-cache">{t.cached_pct}%</span>
+      <span title="tokens written">{tokens(t.output)}</span>
+    </div>
+  );
+  return (
+    <section className="panel">
+      <h3>Token use</h3>
+      <div className="usage-big">
+        <b>{tokens(u.total.prompt)}</b> read · <b>{u.total.cached_pct}%</b> from cache · <b>{tokens(u.total.output)}</b> written
+      </div>
+      <div className="usage-row head"><span style={{ width: 22 }} /><span className="u-name" /><span>calls</span><span>read</span><span>cache</span><span>out</span></div>
+      {row("Appling", u.lyra, "app-it")}
+      {u.by_agent.map((a) => row(a.label, a, agents.some((x) => x.id === a.id) ? a.id : undefined))}
+      <div className="tiny muted" style={{ marginTop: 6 }}>
+        Fresh (not cached) input: {tokens(u.total.input)}{u.total.cost_usd ? ` · cost $${u.total.cost_usd.toFixed(2)}` : ""}
+      </div>
+    </section>
+  );
+}
+
+function orderedTeamAgents(agents: Agent[], team: string[]): Agent[] {
+  return agents.filter((a) => team.includes(a.id));
+}
+
+function TeamDialog({ agents, team, onClose, onSave }: { agents: Agent[]; team: string[]; onClose: () => void; onSave: (t: string[]) => Promise<void> }) {
+  const [draft, setDraft] = useState(team);
+  const toggle = (agentId: string) => setDraft((d) => (d.includes(agentId) ? d.filter((x) => x !== agentId) : [...d, agentId]));
+  return (
+    <div className="overlay" onClick={onClose}>
+      <div className="dialog wide" onClick={(e) => e.stopPropagation()}>
+        <h2>Your team</h2>
+        <p className="muted small" style={{ margin: 0 }}>Appling will use only these agents. Requirements and Task planning are always on.</p>
+        <TeamPicker agents={agents} selected={draft} onToggle={toggle} />
+        <div className="dialog-actions">
+          <button className="btn ghost" onClick={onClose}>Cancel</button>
+          <button className="btn primary" onClick={() => void onSave(draft)}>Save team</button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatScroll(props: {
+  sent: number;
+  shown: Shown[];
+  live: LiveState;
+  ids: string[];
+  agents: Agent[];
+  team: string[];
+  requirementsInterview: boolean;
+  asksQuestion: boolean;
+  asksApproval: boolean;
+  proposal: string[] | null;
+  onSend: (text: string) => void;
+  onTeam: (team: string[]) => void;
+  onAnswer: (item: string, answer: ReviewAnswer) => void;
+  emptyNote?: string;
+  seenPrototype: string | null;
+  onOpenPrototype: () => void;
+}) {
+  const { shown, live, ids } = props;
+  const box = useRef<HTMLDivElement>(null);
+  const stick = useRef(true);
+  const [away, setAway] = useState(false);
+  const turn = live.turn;
+  const liveText = turn ? clean(turn.reply, ids).text : "";
+
+  const inner = useRef<HTMLDivElement>(null);
+  // Keep the newest message in view as content (markdown, avatars) lays out,
+  // unless the owner has scrolled up to read.
+  useEffect(() => {
+    const el = box.current;
+    const content = inner.current;
+    if (!el || !content) return;
+    const toBottom = () => {
+      if (stick.current) el.scrollTop = el.scrollHeight;
+    };
+    toBottom();
+    const observer = new ResizeObserver(toBottom);
+    observer.observe(content);
+    return () => observer.disconnect();
+  }, []);
+  useEffect(() => {
+    const el = box.current;
+    if (el && stick.current) el.scrollTop = el.scrollHeight;
+  }, [shown.length, liveText.length, live.queued.length, live.inbox.length, props.proposal]);
+  // The owner just sent something: always show it, even if they had scrolled
+  // up to read Appling's last reply. Later layout keeps it pinned via `stick`.
+  useEffect(() => {
+    if (!props.sent) return;
+    stick.current = true;
+    setAway(false);
+    const el = box.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [props.sent]);
+  const jumpToLatest = () => {
+    const el = box.current;
+    stick.current = true;
+    setAway(false);
+    el?.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+  };
+
+  const lastLyraIndex = shown.map((s) => s.role).lastIndexOf("lyra");
+
+  return (
+    <div
+      className="chat-scroll"
+      ref={box}
+      onScroll={(e) => {
+        const el = e.currentTarget;
+        stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+        setAway(!stick.current);
+      }}
+    >
+      {away && (
+        <button type="button" className="jump-latest" onClick={jumpToLatest}>↓ Latest</button>
+      )}
+      <div className="chat-inner" ref={inner}>
+        {shown.length === 0 && !turn && (
+          <div className="empty-note">{props.emptyNote ?? "Let's start building. What's the idea? ✨"}</div>
+        )}
+        {shown.map((s, i) => (
+          <Message key={i} item={s}>
+            {i === lastLyraIndex && props.proposal && (
+              <TeamProposal key={props.proposal.join(",")} agents={props.agents} proposal={props.proposal} current={props.team} onConfirm={props.onTeam} />
+            )}
+            {i === lastLyraIndex && (props.asksQuestion || props.asksApproval) && (
+              <div className="answer-row">
+                {props.asksApproval && (
+                  <button className="btn primary small" onClick={() => props.onSend("approve")}>Approve and continue</button>
+                )}
+                {props.asksQuestion && <QuestionShortcuts onAnswer={props.onSend} />}
+                {props.asksApproval && <span className="tiny muted" style={{ alignSelf: "center" }}>Or type what you'd like changed.</span>}
+              </div>
+            )}
+          </Message>
+        ))}
+        {turn && !shown.some((m) => m.active) && <TurnStart kind={turn.kind} text={turn.text} />}
+        {turn && (
+          <div className="msg lyra">
+            <div className="bubble">
+              <div className="msg-head"><img className="lyra-face" src="/avatars/app-it.webp" alt="" /> Appling</div>
+              {liveText ? (
+                <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{liveText}</ReactMarkdown></div>
+              ) : null}
+              <span className="typing"><i /><i /><i /></span>
+            </div>
+          </div>
+        )}
+        {live.queued.map((q) => q.kind === "helper_done" ? (
+          <Message key={q.id} item={{ role: "report", text: q.text, proposal: null }} />
+        ) : q.kind !== "user" ? (
+          <Message key={q.id} item={{ role: "note", text: q.display ?? "Appling has an update queued", proposal: null }} />
+        ) : (
+          <div key={q.id} className="msg user queued">
+            <div className="bubble">
+              <div className="msg-head">You · Appling reads this next</div>
+              {q.display ?? q.text}
+            </div>
+          </div>
+        ))}
+        {live.inbox.map((item) => (
+          <NeedCard key={item.id} item={item} onAnswer={(a) => props.onAnswer(item.id, a)}
+            seenPrototype={props.seenPrototype} onOpenPrototype={props.onOpenPrototype}
+            requirementsInterview={props.requirementsInterview} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TurnStart({ kind, text }: { kind: string; text: string }) {
+  if (kind === "user") return <Message item={{ role: "user", text, proposal: null }} />;
+  if (kind === "approval_continue") return <Message item={{ role: "note", text: "Requirements approved — continuing to the next step.", proposal: null }} />;
+  if (kind === "helper_done") return <Message item={{ role: "report", text, proposal: null }} />;
+  const note = kind === "setup" && text.startsWith("Started version ") ? text : kind === "watchdog" ? "Appling kept going on its own." : kind === "team" ? text : kind === "setup" && text !== "Project opened" ? null : "Project opened";
+  if (note === null) return <Message item={{ role: "user", text, proposal: null }} />;
+  return <Message item={{ role: "note", text: note, proposal: null }} />;
+}
+
+function Message({ item, children }: { item: Shown; children?: React.ReactNode }) {
+  const [copied, setCopied] = useState(false);
+  if (item.role === "note") return <div className="note">↻ {item.text}</div>;
+  if (item.role === "report") {
+    return (
+      <details className="report">
+        <summary>An agent reported back</summary>
+        <pre>{item.text}</pre>
+      </details>
+    );
+  }
+  const copy = () => {
+    void navigator.clipboard?.writeText(item.text).then(() => {
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1200);
+    });
+  };
+  return (
+    <div className={`msg ${item.role}`}>
+      <div className="bubble">
+        <div className="msg-head">
+          {item.role === "lyra" && <img className="lyra-face" src="/avatars/app-it.webp" alt="" />}
+          {item.role === "lyra" ? "Appling" : "You"}
+          <button className="copy" onClick={copy} title="Copy" aria-label="Copy message">{copied ? <Check size={13} /> : <Copy size={13} />}</button>
+        </div>
+        {item.role === "lyra" ? (
+          <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{item.text}</ReactMarkdown></div>
+        ) : (
+          item.text
+        )}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+export function agentTaskDescription(goal: string): string {
+  if (/create[^.]*walkthrough at prototypes\/index|create prototypes\/index|producing[^.]*prototype|build(?:ing)? (?:the |your )?(?:clickable )?prototype/i.test(goal)) {
+    return "Creating and checking your clickable prototype";
+  }
+  if (/discovery|prerequisite|advisory review/i.test(goal)) return "Checking requirements and available tools";
+  if (/qa-engineer|test|verify/i.test(goal)) return "Testing the project and checking the results";
+  if (/task-planner|proj-manager/i.test(goal)) return "Preparing the implementation plan";
+  if (/sw-developer|website-builder/i.test(goal)) return "Building the approved project features";
+  return "Working on the assigned project task";
+}
+
+export function teamProposalForText(text: string, agents: Agent[], current: string[]): string[] | null {
+  if (!/(?:confirm[^.\n]*team|proposed[^.\n]*team[^.\n]*panel)/i.test(text)) return null;
+  const mentioned = agents.filter((agent) => {
+    const label = agent.label.toLowerCase();
+    return text.toLowerCase().includes(label) || text.includes(agent.id)
+      || (agent.id === "qa-engineer" && /\bQA\b/.test(text));
+  }).map((agent) => agent.id);
+  return Array.from(new Set([...current, ...mentioned, "req-engineer", "task-planner"]));
+}
+
+function TeamProposal({ agents, proposal, current, onConfirm }: { agents: Agent[]; proposal: string[]; current: string[]; onConfirm: (t: string[]) => void }) {
+  const [draft, setDraft] = useState(() => Array.from(new Set([...proposal, "req-engineer", "task-planner"])));
+  const [more, setMore] = useState(false);
+  const shownAgents = more ? agents : agents.filter((a) => proposal.includes(a.id) || current.includes(a.id) || a.required);
+  const toggle = (agentId: string) => setDraft((d) => (d.includes(agentId) ? d.filter((x) => x !== agentId) : [...d, agentId]));
+  return (
+    <div className="team-proposal" style={{ marginTop: 12 }}>
+      <b style={{ color: "var(--ink)" }}>Appling suggests this team</b>
+      <div className="tiny muted">Untick anyone you don't want, or add more. Nothing changes until you confirm.</div>
+      <TeamPicker agents={shownAgents} selected={draft} recommended={proposal} onToggle={toggle} />
+      <div className="answer-row" style={{ borderTop: 0, paddingTop: 0 }}>
+        <button className="btn primary small" onClick={() => onConfirm(draft)}>Confirm team ({draft.length})</button>
+        <button className="btn ghost small" onClick={() => setMore((m) => !m)}>{more ? "Show fewer" : "Add other agents"}</button>
+      </div>
+    </div>
+  );
+}
+
+const APPROVAL_CHOICES = [
+  { value: "once", label: "Allow once", tone: "primary" },
+  { value: "session", label: "Allow for this chat", tone: "" },
+  { value: "always", label: "Always allow", tone: "" },
+  { value: "deny", label: "Don't allow", tone: "danger" },
+];
+
+export function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype, requirementsInterview = false }: {
+  item: InboxItem;
+  requirementsInterview?: boolean;
+  onAnswer: (a: ReviewAnswer) => void;
+  seenPrototype: string | null;
+  onOpenPrototype: () => void;
+}) {
+  const [text, setText] = useState("");
+  const [planShown, setPlanShown] = useState(false);
+  if (item.kind === "plan") {
+    return (
+      <div className="need-card">
+        <b>Review the implementation plan</b>
+        <p>Read the plan before allowing the development agent to begin.</p>
+        <button className="btn small" onClick={() => setPlanShown(true)}>Show implementation plan</button>
+        {planShown && <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{item.question ?? ""}</ReactMarkdown></div>}
+        <div className="answer-row">
+          <button className="btn primary small" disabled={!planShown || !item.revision}
+            onClick={() => onAnswer({ choice: "Approve implementation plan", revision: item.revision })}>Approve implementation plan</button>
+          <button className="btn small" onClick={() => onAnswer("Request changes")}>Request changes</button>
+        </div>
+      </div>
+    );
+  }
+  if (item.kind === "prototype" || item.kind === "requirements") {
+    const prototype = item.kind === "prototype";
+    const viewed = !!item.revision && seenPrototype === item.revision;
+    const approve = prototype ? "Approve prototype" : "Approve requirements";
+    return (
+      <div className="need-card">
+        <b>{prototype ? "Review the clickable prototype" : "Review the requirements"}</b>
+        <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{item.question ?? ""}</ReactMarkdown></div>
+        {prototype && <p className="small">Try the main flows in <b>Prototype preview</b> beside the chat.</p>}
+        <div className="answer-row">
+          {prototype && <button className="btn small" onClick={onOpenPrototype}>Open prototype</button>}
+          <button className="btn primary small" disabled={prototype && !viewed}
+            onClick={() => onAnswer(prototype && seenPrototype ? { choice: approve, revision: seenPrototype } : approve)}>
+            {approve}
+          </button>
+          <button className="btn small" onClick={() => onAnswer("Request changes")}>Request changes</button>
+        </div>
+      </div>
+    );
+  }
+  if (item.kind === "approval") {
+    return (
+      <div className="need-card">
+        <b>{item.requester?.label ?? "Appling"} wants to run a command</b>
+        {item.requester && <>
+          <span className="small">Requested by {item.requester.label ?? "agent"}{item.requester.model ? ` · ${item.requester.model}` : ""}</span>
+          <span className="small">Assigned task: {item.requester.goal}</span>
+        </>}
+        {item.description && <span className="small">Why it's flagged: {item.description}</span>}
+        <pre>{item.command}</pre>
+        <div className="answer-row" style={{ borderTop: 0, paddingTop: 0, marginTop: 0 }}>
+          {APPROVAL_CHOICES.filter((c) => !item.choices || item.choices.includes(c.value)).map((c) => (
+            <button key={c.value} className={`btn small ${c.tone}`} onClick={() => onAnswer(c.value)}>{c.label}</button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+  const secret = item.kind === "secret";
+  return (
+    <div className="need-card">
+      <b>{secret ? "Appling needs a key or password" : "Appling has a question"}</b>
+      <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{item.question ?? ""}</ReactMarkdown></div>
+      {secret && item.env_var && <span className="tiny muted">Saved privately as {item.env_var}; never shown in the chat.</span>}
+      {!!item.choices?.length && (
+        <div className="answer-row" style={{ borderTop: 0, paddingTop: 0, marginTop: 0 }}>
+          {item.choices.map((c) => <button key={c} className="chip" onClick={() => onAnswer(c)}>{c}</button>)}
+          {!secret && !requirementsInterview && <button className="chip" onClick={() => onAnswer("Decide for me using the safest sensible default.")}>Decide for me</button>}
+        </div>
+      )}
+      {!secret && requirementsInterview && (
+        <div className="answer-row">
+          <QuestionShortcuts onAnswer={onAnswer} />
+        </div>
+      )}
+      <div style={{ display: "flex", gap: 8 }}>
+        <input
+          className="input"
+          type={secret ? "password" : "text"}
+          value={text}
+          placeholder={secret ? "Paste it here" : "Type your answer"}
+          onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && text.trim()) onAnswer(text.trim());
+          }}
+        />
+        <button className="btn primary" disabled={!text.trim()} onClick={() => onAnswer(text.trim())}>{secret ? "Save" : "Send"}</button>
+      </div>
+    </div>
+  );
+}
+
+interface Attachment { key: string; name: string; progress: number; path?: string; error?: string }
+
+function Composer({ busy, inbox, onSend, projectId, dropped, picks, onPicksChange }: {
+  busy: boolean; onSend: (text: string) => Promise<void>; projectId: string; dropped: File[];
+  inbox: InboxItem[];
+  picks: PickedElement[]; onPicksChange: (p: PickedElement[]) => void;
+}) {
+  const [text, setText] = useState("");
+  const [files, setFiles] = useState<Attachment[]>([]);
+  const area = useRef<HTMLTextAreaElement>(null);
+  const picker = useRef<HTMLInputElement>(null);
+  const context = composerContext(inbox, busy);
+  useEffect(() => {
+    const el = area.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
+  }, [text]);
+  const attach = useCallback((list: File[]) => {
+    for (const file of list) {
+      const key = `${file.name}-${file.size}-${Math.random()}`;
+      setFiles((all) => [...all, { key, name: file.name, progress: 0 }]);
+      const update = (patch: Partial<Attachment>) => setFiles((all) => all.map((f) => (f.key === key ? { ...f, ...patch } : f)));
+      uploadFile(projectId, file, (progress) => update({ progress }))
+        .then(({ path }) => update({ path, progress: 1 }))
+        .catch((e: Error) => update({ error: e.message }));
+    }
+  }, [projectId]);
+  useEffect(() => { if (dropped.length) attach(dropped); }, [dropped, attach]);
+  const uploading = files.some((f) => !f.path && !f.error);
+  const ready = files.filter((f) => f.path);
+  const send = async () => {
+    const value = text.trim();
+    if ((!value && !ready.length && !picks.length) || uploading) return;
+    const parts = [value];
+    if (picks.length) parts.push(picks.map(pickNote).join("\n\n"));
+    if (ready.length) parts.push(`Attached: ${ready.map((f) => f.path).join(", ")}`);
+    setText("");
+    setFiles([]);
+    onPicksChange([]);
+    await onSend(parts.filter(Boolean).join("\n\n"));
+  };
+  return (
+    <div className="composer">
+      {(files.length > 0 || picks.length > 0) && (
+        <div className="attachments">
+          {picks.map((p, i) => (
+            <span key={`pick-${i}`} className="attachment pick" title={p.selector}>
+              <Crosshair size={12} /> {pickLabel(p)}
+              <button type="button" aria-label="Remove picked part" onClick={() => onPicksChange(picks.filter((_, j) => j !== i))}><X size={12} /></button>
+            </span>
+          ))}
+          {files.map((f) => (
+            <span key={f.key} className={`attachment ${f.error ? "bad" : f.path ? "done" : ""}`} title={f.error ?? f.path ?? "Uploading…"}>
+              <Paperclip size={12} /> {f.name}
+              {!f.path && !f.error && <i style={{ width: `${Math.round(f.progress * 100)}%` }} />}
+              {f.error && <> — {f.error}</>}
+              <button type="button" aria-label={`Remove ${f.name}`} onClick={() => setFiles((all) => all.filter((x) => x.key !== f.key))}><X size={12} /></button>
+            </span>
+          ))}
+        </div>
+      )}
+      <div className="composer-box">
+        <button type="button" className="attach" aria-label="Attach files" title="Attach a video, frames or pictures" onClick={() => picker.current?.click()}><Paperclip size={18} /></button>
+        <input ref={picker} type="file" multiple hidden onChange={(e) => { attach(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
+        <textarea
+          ref={area}
+          rows={1}
+          value={text}
+          placeholder={context.placeholder}
+          onChange={(e) => setText(e.target.value)}
+          onPaste={(e) => { const pasted = Array.from(e.clipboardData.files); if (pasted.length) { e.preventDefault(); attach(pasted); } }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.shiftKey) {
+              e.preventDefault();
+              void send();
+            }
+          }}
+        />
+        <button className="send" onClick={() => void send()} disabled={(!text.trim() && !ready.length && !picks.length) || uploading} aria-label="Send" title={uploading ? "Wait for the upload to finish" : "Send"}><ArrowUp size={18} /></button>
+      </div>
+      <div className="hint">{context.hint}</div>
+    </div>
+  );
+}

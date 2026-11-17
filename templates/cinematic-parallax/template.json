@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "cinematic-parallax",
+  "name": "Cinematic Parallax",
+  "tagline": "Layered depth, pinned story, a site that feels like a film.",
+  "best_for": "Travel, hospitality, brands, events",
+  "palette": [
+    "#0b1020",
+    "#ff7a45",
+    "#e9dcc7",
+    "#8fa3c7"
+  ],
+  "has_demo": true
+}

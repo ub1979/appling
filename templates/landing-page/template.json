@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "landing-page",
+  "name": "Landing Page",
+  "tagline": "One offer, one button: a bold poster-style page that converts.",
+  "best_for": "Courses, guides, waitlists, launches and service offers",
+  "palette": [
+    "#f6efe3",
+    "#1b1712",
+    "#ec5333",
+    "#efe0c8"
+  ],
+  "has_demo": true
+}

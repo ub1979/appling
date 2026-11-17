@@ -1,0 +1,19 @@
+{
+  "kind": "website",
+  "id": "lunar-parallax",
+  "name": "Lunar Parallax (photo-real)",
+  "tagline": "Six photo layers of depth; a route that inks itself; a film reel.",
+  "best_for": "Expeditions, travel, science, aerospace, documentaries",
+  "palette": [
+    "#030407",
+    "#e9eef6",
+    "#ffb35c",
+    "#9fc3ff"
+  ],
+  "has_demo": true,
+  "media": {
+    "needs": "photos",
+    "ask": "This design is built from layered photos. Attach your own (📎), let Lyra make AI pictures on your ChatGPT plan, or start with placeholders?"
+  },
+  "photoreal": true
+}

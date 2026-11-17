@@ -1,0 +1,25 @@
+{
+  "kind": "video",
+  "id": "video-cinematic-titles",
+  "name": "Cinematic Title Sequence",
+  "tagline": "Film-grade titles: frost, portals, leaves and light.",
+  "best_for": "Brand films, event openers, trailers, channel intros",
+  "palette": [
+    "#050505",
+    "#f2f2f2",
+    "#9fd3ff",
+    "#ffcc66"
+  ],
+  "preview": {
+    "video": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/frost-sequence-camera-orbit.mp4",
+    "poster": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/frost-sequence-camera-orbit.png",
+    "credit": "Preview: HyperFrames block “frost-sequence-camera-orbit” (Apache-2.0)"
+  },
+  "blocks": [
+    "frost-sequence-camera-orbit",
+    "wireframe-portal-title",
+    "canopy-part-title",
+    "glass-shard-title",
+    "light-leak"
+  ]
+}

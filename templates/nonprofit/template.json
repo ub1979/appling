@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "nonprofit",
+  "name": "Charity & Impact",
+  "tagline": "A journey map that draws itself, impact numbers and an easy way to give.",
+  "best_for": "Charities, NGOs, community groups, causes",
+  "palette": [
+    "#0d3b4c",
+    "#f4f1ea",
+    "#f2a541",
+    "#4fb3bf"
+  ],
+  "has_demo": true
+}

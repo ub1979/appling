@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "scroll-story",
+  "name": "Editorial Scroll Story",
+  "tagline": "A long-form story told chapter by chapter.",
+  "best_for": "Stories, reports, case studies, journalism",
+  "palette": [
+    "#f4efe6",
+    "#1d1a16",
+    "#b4432f",
+    "#6f7d5c"
+  ],
+  "has_demo": false
+}

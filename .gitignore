@@ -1,0 +1,14 @@
+.venv/
+node_modules/
+dist/
+__pycache__/
+.pytest_cache/
+*.pyc
+.env
+.appling_c/
+projects/
+playwright-report/
+test-results/
+.DS_Store
+*.log
+.coverage

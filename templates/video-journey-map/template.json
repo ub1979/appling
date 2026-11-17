@@ -1,0 +1,23 @@
+{
+  "kind": "video",
+  "id": "video-journey-map",
+  "name": "Journey Map",
+  "tagline": "A route flown across a real map, with stops and distances.",
+  "best_for": "Travel, logistics, expansion news, event tours",
+  "palette": [
+    "#f4f7fb",
+    "#0f1b2d",
+    "#2f7cf6",
+    "#ffffff"
+  ],
+  "preview": {
+    "video": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/nyc-paris-flight.mp4",
+    "poster": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/blocks/nyc-paris-flight.png",
+    "credit": "Preview: HyperFrames block “nyc-paris-flight” (Apache-2.0)"
+  },
+  "blocks": [
+    "nyc-paris-flight",
+    "world-map",
+    "us-map-bubble"
+  ]
+}

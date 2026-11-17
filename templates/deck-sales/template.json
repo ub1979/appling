@@ -1,0 +1,14 @@
+{
+  "kind": "slides",
+  "id": "deck-sales",
+  "name": "Sales Demo",
+  "tagline": "A customer-first demo: their problem, your product, one next step.",
+  "best_for": "Sales calls, product demos, pilots and renewals",
+  "palette": [
+    "#f3f6f9",
+    "#0f1b2d",
+    "#0b7a5a",
+    "#18c29c"
+  ],
+  "has_demo": true
+}

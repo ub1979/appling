@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "saas-motion",
+  "name": "SaaS Launch",
+  "tagline": "A clean product page where the UI builds itself.",
+  "best_for": "Apps, software, startups",
+  "palette": [
+    "#0b0d12",
+    "#ffffff",
+    "#3b82f6",
+    "#22c55e"
+  ],
+  "has_demo": false
+}

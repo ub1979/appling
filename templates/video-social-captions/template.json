@@ -1,0 +1,25 @@
+{
+  "kind": "video",
+  "id": "video-social-captions",
+  "name": "Social Captions Reel",
+  "tagline": "A vertical reel told in bold, word-by-word captions that work muted.",
+  "best_for": "Reels, TikTok, Shorts, tips, launches, founder updates",
+  "palette": [
+    "#0e0e10",
+    "#ffffff",
+    "#ffd43b",
+    "#ff4d6d"
+  ],
+  "preview": {
+    "video": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-pill-karaoke.mp4",
+    "poster": "https://static.heygen.ai/hyperframes-oss/docs/images/catalog/components/caption-pill-karaoke.png",
+    "credit": "Preview: HyperFrames component “caption-pill-karaoke” (Apache-2.0)"
+  },
+  "blocks": [
+    "caption-pill-karaoke",
+    "caption-kinetic-slam",
+    "caption-emoji-pop",
+    "tiktok-follow",
+    "logo-outro"
+  ]
+}

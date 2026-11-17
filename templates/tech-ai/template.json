@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "tech-ai",
+  "name": "AI / Tech Company",
+  "tagline": "A 3D particle cloud that changes shape as your story unfolds.",
+  "best_for": "AI, software, research and tech companies",
+  "palette": [
+    "#05070d",
+    "#2ee6c5",
+    "#7c9cff",
+    "#e8ecf5"
+  ],
+  "has_demo": true
+}

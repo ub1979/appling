@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "restaurant",
+  "name": "Restaurant & Food",
+  "tagline": "A circle opens onto the table; menus, plates and bookings.",
+  "best_for": "Restaurants, caf\u00e9s, bakeries, food brands",
+  "palette": [
+    "#f3ead8",
+    "#2b1d14",
+    "#c8553d",
+    "#7a8b4f"
+  ],
+  "has_demo": true
+}

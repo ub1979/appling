@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "beauty-shop",
+  "name": "Beauty & Wellness Shop",
+  "tagline": "A product that floats and turns while its ingredients gather round.",
+  "best_for": "Skincare, cosmetics, wellness, small shops",
+  "palette": [
+    "#fbefe9",
+    "#3d2c2e",
+    "#e8a598",
+    "#b8c4a9"
+  ],
+  "has_demo": true
+}

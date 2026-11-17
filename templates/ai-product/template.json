@@ -1,0 +1,14 @@
+{
+  "kind": "website",
+  "id": "ai-product",
+  "name": "AI Product",
+  "tagline": "An editorial page where your assistant answers live, with sources.",
+  "best_for": "AI assistants, copilots, AI tools and agents",
+  "palette": [
+    "#f6f3ec",
+    "#16150f",
+    "#1f5c45",
+    "#e3ddd0"
+  ],
+  "has_demo": true
+}

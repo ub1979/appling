@@ -1,0 +1,14 @@
+{
+  "kind": "slides",
+  "id": "deck-pitch",
+  "name": "Investor Pitch",
+  "tagline": "A crisp 10\u201312 slide pitch: problem, product, traction, the ask.",
+  "best_for": "Startups, fundraising, sales pitches, partnerships",
+  "palette": [
+    "#0e0f13",
+    "#f5f3ee",
+    "#d9431f",
+    "#5566e8"
+  ],
+  "has_demo": true
+}

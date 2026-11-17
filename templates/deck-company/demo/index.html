@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Fernhill — Company Intro deck demo</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reset.min.css" />
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;1,9..144,400&family=Figtree:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  :root { --forest: #16302a; --forest-2: #1f4038; --paper: #f4f0e6; --card: #fbf8f1; --ink: #17201d; --muted: #59605a;
+    --amber: #e0a63a; --ochre: #8a520c; --line: #17201d1f; --mint: #b9cfc2;
+    --r-background-color: var(--paper); --r-main-color: var(--ink); --r-heading-color: var(--ink);
+    --r-main-font: "Figtree", system-ui, sans-serif; --r-heading-font: "Fraunces", Georgia, serif; --r-main-font-size: 28px; }
+  .reveal { font-family: var(--r-main-font); color: var(--ink); font-size: 28px; }
+  .reveal .slides { text-align: left; }
+  .reveal .slides section { height: 100%; padding: 64px 72px !important; box-sizing: border-box; }
+  .reveal h1, .reveal h2 { font-family: "Fraunces", Georgia, serif; font-weight: 400; letter-spacing: -.02em; line-height: 1.04; margin: 0 0 26px; text-transform: none; color: inherit; }
+  .reveal h1 { font-size: 96px; max-width: 980px; }
+  .reveal h2 { font-size: 60px; max-width: 1000px; }
+  .reveal em { font-style: italic; color: var(--ochre); }
+  .reveal p { margin: 0 0 16px; line-height: 1.45; }
+  .kicker { font-size: 18px; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--ochre); margin-bottom: 18px; }
+  .foot { position: absolute; left: 72px; right: 72px; bottom: 34px; display: flex; justify-content: space-between; font-size: 16px; color: var(--muted); }
+  .reveal .dark-slide { color: var(--paper); }
+  .reveal .dark-slide em { color: var(--amber); }
+  .reveal .dark-slide .kicker { color: var(--amber); }
+  .reveal .dark-slide .foot { color: var(--mint); }
+  .lead { font-size: 32px; color: #f4f0e6d9; max-width: 820px; }
+
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 48px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 20px; padding: 30px 30px 34px; min-height: 340px; display: flex; flex-direction: column; }
+  .card .n { font-family: "Fraunces", serif; font-size: 72px; line-height: 1; color: var(--ochre); margin-bottom: auto; }
+  .card b { display: block; font-size: 32px; font-weight: 600; letter-spacing: -.01em; margin: 28px 0 10px; }
+  .card span { font-size: 24px; color: var(--muted); line-height: 1.4; display: block; }
+
+  .split { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center; height: 100%; }
+  .who { list-style: none; margin: 8px 0 0 !important; padding: 0; }
+  .who li { display: flex; gap: 18px; align-items: baseline; padding: 16px 0; border-top: 1px solid var(--line); font-size: 28px; }
+  .who li small { font-size: 20px; color: var(--muted); margin-left: auto; }
+  .photo { position: relative; height: 520px; border-radius: 26px; overflow: hidden; background: linear-gradient(180deg, #cfdccf 0%, #9fb9a6 55%, #6f8f7c 100%); }
+  .photo .label { position: absolute; left: 22px; bottom: 20px; font-size: 18px; background: #f4f0e6e6; color: var(--ink); padding: 8px 14px; border-radius: 99px; }
+
+  .principles { position: absolute; left: 72px; right: 72px; bottom: 80px; display: grid; grid-template-columns: 1fr 1fr; gap: 64px 64px; }
+  .principles div { border-top: 2px solid #e0a63a; padding-top: 22px; }
+  .principles b { display: block; font-family: "Fraunces", serif; font-weight: 400; font-size: 42px; margin-bottom: 10px; }
+  .principles span { font-size: 26px; color: #f4f0e6cc; line-height: 1.4; }
+
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 30px; }
+  .stat .big { font-family: "Fraunces", serif; font-size: 120px; line-height: 1; letter-spacing: -.03em; color: var(--forest); }
+  .stat .big sup { font-size: 52px; vertical-align: top; position: relative; top: 14px; }
+  .stat span { display: block; font-size: 24px; color: var(--muted); margin-top: 12px; max-width: 320px; line-height: 1.35; }
+  .case { margin-top: 36px; display: flex; gap: 22px; align-items: center; background: var(--card); border: 1px solid var(--line); border-radius: 18px; padding: 20px 24px; font-size: 24px; }
+  .case i { flex: 0 0 auto; width: 12px; height: 12px; border-radius: 50%; background: var(--ochre); }
+  .src { position: absolute; left: 72px; bottom: 34px; font-size: 16px; color: var(--muted); }
+
+  .tl { position: absolute; left: 72px; right: 72px; top: 400px; height: 200px; }
+  .tl .rail { position: absolute; left: 0; top: 60px; height: 4px; border-radius: 2px; background: var(--amber); }
+  .tl .rail.bg { width: 100%; background: #f4f0e626; }
+  .tl .pt { position: absolute; top: 44px; width: 36px; height: 36px; margin-left: -18px; border-radius: 50%; background: var(--forest); border: 4px solid var(--amber); }
+  .tl .yr { position: absolute; top: 104px; transform: translateX(-50%); font-size: 22px; font-weight: 600; white-space: nowrap; color: var(--paper); }
+  .tl .yr small { display: block; font-weight: 400; font-size: 18px; color: var(--mint); text-align: center; }
+
+  .team { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 52px; }
+  .person { display: flex; gap: 18px; align-items: center; }
+  .av { flex: 0 0 auto; width: 112px; height: 112px; border-radius: 50%; display: grid; place-items: center; font-family: "Fraunces", serif; font-size: 40px; color: var(--paper); background: var(--forest-2); }
+  .person b { display: block; font-size: 26px; font-weight: 600; }
+  .person span { font-size: 20px; color: var(--muted); }
+  .places { position: absolute; left: 72px; right: 72px; bottom: 64px; display: flex; gap: 16px; }
+  .place { flex: 1; border: 1px solid var(--line); background: var(--card); border-radius: 16px; padding: 26px 26px; font-family: "Fraunces", serif; font-size: 36px; }
+  .place small { display: block; font-family: "Figtree", sans-serif; font-size: 20px; color: var(--muted); margin-top: 6px; }
+
+  .cta { display: inline-block; margin-top: 30px; background: var(--amber); color: var(--forest); font-weight: 700; font-size: 28px; padding: 18px 30px; border-radius: 14px; }
+  .close-sky { opacity: .55; }
+  .contact { margin-top: 34px; display: flex; gap: 48px; font-size: 24px; color: #f4f0e6d9; }
+  .contact b { display: block; font-size: 18px; letter-spacing: .12em; text-transform: uppercase; color: var(--mint); margin-bottom: 6px; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="reveal"><div class="slides">
+
+  <section data-background-color="#16302a" class="dark-slide">
+    <div class="kicker">Fernhill · Company introduction</div>
+    <h1>We turn grey roofs into <em>working landscapes.</em></h1>
+    <p class="lead">Design, engineering and care for green roofs on city buildings — one team from first survey to the tenth spring.</p>
+    <svg viewBox="0 0 1136 170" style="position:absolute;left:72px;bottom:86px;width:1136px" aria-hidden="true">
+      <path d="M0 150 H1136" stroke="#f4f0e633" stroke-width="2"/>
+      <g fill="#1f4038"><rect x="40" y="70" width="180" height="80"/><rect x="250" y="30" width="230" height="120"/><rect x="510" y="90" width="150" height="60"/><rect x="690" y="10" width="200" height="140"/><rect x="920" y="60" width="176" height="90"/></g>
+      <g fill="#e0a63a"><path d="M250 30 q30 -22 60 0 q30 -26 60 0 q30 -20 60 0 q25 -16 50 0z"/><path d="M690 10 q34 -24 66 0 q34 -26 66 0 q34 -22 68 0z"/></g>
+      <g fill="#b9cfc2"><path d="M40 70 q30 -14 60 0 q30 -16 60 0 q10 -6 20 0z"/><path d="M920 60 q30 -16 58 0 q30 -18 60 0 q28 -14 58 0z"/></g>
+    </svg>
+    <div class="foot"><span>Fernhill</span><span>an Appling template (fictional company)</span></div>
+    <aside class="notes">Open with the one line: we turn grey roofs into working landscapes. Pause on the skyline — two roofs are already green; that is the picture of the whole talk.</aside>
+  </section>
+
+  <section>
+    <div class="kicker">What we do</div>
+    <h2>Three services, <em>one team</em> from survey to planting.</h2>
+    <div class="grid3">
+      <div class="card fragment fade-up"><div class="n">01</div><b>Survey &amp; design</b><span>Load, drainage and sun mapped on site.</span></div>
+      <div class="card fragment fade-up"><div class="n">02</div><b>Engineering</b><span>Structural checks and approvals, done for you.</span></div>
+      <div class="card fragment fade-up"><div class="n">03</div><b>Build &amp; care</b><span>Our crews install, then return each season.</span></div>
+    </div>
+    <aside class="notes">Stress that one team owns all three steps, so nothing is lost between designer, engineer and installer. The care contract is what most clients remember.</aside>
+  </section>
+
+  <section>
+    <div class="split">
+      <div>
+        <div class="kicker">Who we serve</div>
+        <h2>We work for the people who <em>own and run</em> city buildings.</h2>
+        <ul class="who">
+          <li>Housing associations <small>21 roofs</small></li>
+          <li>Schools and universities <small>15 roofs</small></li>
+          <li>Commercial landlords <small>12 roofs</small></li>
+        </ul>
+      </div>
+      <div class="photo" role="img" aria-label="Placeholder for a photo of a finished green roof">
+        <svg viewBox="0 0 520 520" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+          <circle cx="400" cy="110" r="54" fill="#f4f0e6" opacity=".7"/>
+          <path d="M0 330 Q130 270 260 320 T520 300 V520 H0z" fill="#5d7f6b"/>
+          <path d="M0 390 Q150 340 300 380 T520 370 V520 H0z" fill="#3f6352"/>
+          <g fill="#e0a63a"><circle cx="90" cy="372" r="9"/><circle cx="150" cy="360" r="7"/><circle cx="340" cy="388" r="8"/><circle cx="420" cy="376" r="10"/></g>
+          <path d="M0 450 H520 V520 H0z" fill="#16302a"/>
+        </svg>
+        <span class="label">Your photo: a finished roof</span>
+      </div>
+    </div>
+    <aside class="notes">Name one client of each kind if you can. The numbers show where the work comes from today — housing is the biggest share.</aside>
+  </section>
+
+  <section data-background-color="#16302a" class="dark-slide">
+    <div class="kicker">How we work</div>
+    <h2>Four promises on <em>every roof.</em></h2>
+    <div class="principles">
+      <div class="fragment"><b>We walk it first</b><span>No quote before we measure the roof.</span></div>
+      <div class="fragment"><b>Native plants only</b><span>Local species, chosen for wind and drought.</span></div>
+      <div class="fragment"><b>Water is measured</b><span>A flow sensor on every roof.</span></div>
+      <div class="fragment"><b>Ten springs of care</b><span>Seasonal visits included in the price.</span></div>
+    </div>
+    <aside class="notes">Read each promise as a commitment the client can hold us to. The sensor data is the proof behind the next slide.</aside>
+  </section>
+
+  <section>
+    <div class="kicker">Results</div>
+    <h2>Our roofs hold water, cool buildings and <em>stay green.</em></h2>
+    <div class="stats">
+      <div class="stat"><div class="big">48</div><span>roofs built and in our care</span></div>
+      <div class="stat"><div class="big">61<sup>%</sup></div><span>of rainfall held back on average</span></div>
+      <div class="stat"><div class="big">4.2<sup>°C</sup></div><span>cooler top floors on the hottest day</span></div>
+    </div>
+    <div class="case"><i></i>Kirkgate Housing, Leeds: six roofs in 11 weeks.</div>
+    <div class="src">Sample figures (fictional): replace with yours.</div>
+    <aside class="notes">Lead with 61 percent: it is the number councils care about. Then the temperature, which tenants feel. Offer the Kirkgate case study as a follow-up.</aside>
+  </section>
+
+  <section data-background-color="#16302a" class="dark-slide" data-auto-animate>
+    <div class="kicker">Our story</div>
+    <h2>We started with <em>one roof</em> in Leeds in 2019.</h2>
+    <div class="tl">
+      <div class="rail bg"></div>
+      <div class="rail" data-id="rail" style="width:12%"></div>
+      <div class="pt" data-id="p1" style="left:4%"></div><div class="yr" data-id="y1" style="left:4%">2019<small>first roof</small></div>
+    </div>
+    <aside class="notes">Tell the founding story in one breath: a school roof in Leeds that flooded every winter. Then advance — the timeline grows on the next slide.</aside>
+  </section>
+
+  <section data-background-color="#16302a" class="dark-slide" data-auto-animate>
+    <div class="kicker">Our story</div>
+    <h2>Today: <em>48 roofs</em> across three cities.</h2>
+    <div class="tl">
+      <div class="rail bg"></div>
+      <div class="rail" data-id="rail" style="width:96%"></div>
+      <div class="pt" data-id="p1" style="left:4%"></div><div class="yr" data-id="y1" style="left:4%">2019<small>first roof</small></div>
+      <div class="pt" style="left:34%"></div><div class="yr" style="left:34%">2021<small>Manchester office</small></div>
+      <div class="pt" style="left:64%"></div><div class="yr" style="left:64%">2023<small>25th roof</small></div>
+      <div class="pt" style="left:94%"></div><div class="yr" style="left:94%">2026<small>Bristol, 48 roofs</small></div>
+    </div>
+    <aside class="notes">Let the line grow, then name the three cities. The point: we are small enough to know every roof, big enough to cover the North and the South West.</aside>
+  </section>
+
+  <section>
+    <div class="kicker">Team and locations</div>
+    <h2>Twenty-two people in <em>three studios.</em></h2>
+    <div class="team">
+      <div class="person"><div class="av" aria-hidden="true">MO</div><div><b>Maya Okafor</b><span>Founder · landscape architect</span></div></div>
+      <div class="person"><div class="av" aria-hidden="true">TL</div><div><b>Tom Lindqvist</b><span>Structural engineer</span></div></div>
+      <div class="person"><div class="av" aria-hidden="true">RS</div><div><b>Rina Shah</b><span>Head of care crews</span></div></div>
+    </div>
+    <div class="places">
+      <div class="place">Leeds<small>Head office · 10 people</small></div>
+      <div class="place">Manchester<small>Design studio · 7 people</small></div>
+      <div class="place">Bristol<small>Crew base · 5 people</small></div>
+    </div>
+    <aside class="notes">Introduce the three people the client will actually meet. Swap the initials for real portraits when you have them.</aside>
+  </section>
+
+  <section data-background-color="#16302a" class="dark-slide">
+    <div class="kicker">Next step</div>
+    <h2>Let's walk <em>one of your roofs</em> together.</h2>
+    <p class="lead">A 45-minute site walk, free. You get a short note on what your roof can hold and what it would cost.</p>
+    <span class="cta">Book a site walk</span>
+    <div class="contact">
+      <div><b>Email</b>hello@fernhill.example</div>
+      <div><b>Phone</b>0113 000 0000</div>
+      <div><b>Studios</b>Leeds · Manchester · Bristol</div>
+    </div>
+    <svg class="close-sky" viewBox="0 0 1136 170" style="position:absolute;left:72px;bottom:40px;width:1136px" aria-hidden="true">
+      <path d="M0 150 H1136" stroke="#f4f0e633" stroke-width="2"/>
+      <g fill="#1f4038"><rect x="40" y="70" width="180" height="80"/><rect x="250" y="30" width="230" height="120"/><rect x="510" y="90" width="150" height="60"/><rect x="690" y="10" width="200" height="140"/><rect x="920" y="60" width="176" height="90"/></g>
+      <g fill="#e0a63a"><path d="M250 30 q30 -22 60 0 q30 -26 60 0 q30 -20 60 0 q25 -16 50 0z"/><path d="M690 10 q34 -24 66 0 q34 -26 66 0 q34 -22 68 0z"/></g>
+      <g fill="#b9cfc2"><path d="M40 70 q30 -14 60 0 q30 -16 60 0 q10 -6 20 0z"/><path d="M920 60 q30 -16 58 0 q30 -18 60 0 q28 -14 58 0z"/></g>
+    </svg>
+    <aside class="notes">Close on one action: the site walk. Hand over the card and agree a date before leaving the room.</aside>
+  </section>
+
+</div></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/reveal.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/reveal.js/5.2.1/plugin/notes/notes.min.js"></script>
+<script>
+  Reveal.initialize({ hash: true, width: 1280, height: 720, margin: 0, transition: "slide", backgroundTransition: "fade",
+    controls: true, progress: true, center: false, plugins: [RevealNotes] });
+</script>
+</body>
+</html>

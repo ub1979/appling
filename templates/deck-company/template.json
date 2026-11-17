@@ -1,0 +1,14 @@
+{
+  "kind": "slides",
+  "id": "deck-company",
+  "name": "Company Intro",
+  "tagline": "Who you are, what you do and why to call — in nine calm slides.",
+  "best_for": "New companies, studios, agencies, sales and partner meetings",
+  "palette": [
+    "#16302a",
+    "#f4f0e6",
+    "#e0a63a",
+    "#8a520c"
+  ],
+  "has_demo": true
+}
