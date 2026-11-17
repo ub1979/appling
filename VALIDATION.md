@@ -2,7 +2,7 @@
 
 ## Automated coverage
 
-Latest local result: **48 backend tests passed; 48 frontend tests passed**.
+Latest local result: **51 backend tests passed; 48 frontend tests passed**.
 TypeScript checks and the Vite production build passed. The stylesheet was
 initially copied from the original interface; the composer now has six visible
 lines and grows to ten, as requested. Ordinary questions use normal chat bubbles.
@@ -12,6 +12,9 @@ lines and grows to ten, as requested. Ordinary questions use normal chat bubbles
   interruption/restart, follow-up changes, API authentication and settings.
 - Launcher checks cover occupied-port fallback, strict explicit ports, permission
   failures, and keeping the browser URL aligned with the reserved server socket.
+- Real subprocess lifecycle checks cover detached startup, reusing an existing
+  instance, checkout-local graceful stop, ignoring stale PIDs, and immediate
+  reporting when a background child fails to start. These do not bind HTTP ports.
 - Connection checks cover live RPC-shaped model catalogues, pagination, Claude
   alias/login distinction, authenticated API model discovery, discovery cache
   refresh, selected-model inference requests, and visible failure messages using

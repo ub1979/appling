@@ -28,6 +28,7 @@ def main():
     parser.add_argument('--port',type=int,help='Use this exact port; otherwise try 9210 and the next available ports')
     parser.add_argument('--home',help='Separate studio settings and state directory')
     parser.add_argument('--no-open',action='store_true')
+    parser.add_argument('--managed',action='store_true',help=argparse.SUPPRESS)
     args=parser.parse_args()
     port=9210 if args.port is None else args.port
     if not 0<=port<=65535:
@@ -45,6 +46,10 @@ def main():
             print(f'Port {port} is occupied; using {actual_port}.',flush=True)
         print(f'Open Appling: {url}',flush=True)
         app=create_app(args.home)
+        if args.managed:
+            from .service import serve_managed
+            serve_managed(app,listener,actual_port,args.no_open)
+            return
         if not args.no_open:
             threading.Timer(1.2,lambda:webbrowser.open(url)).start()
         uvicorn.run(app,host='127.0.0.1',port=actual_port,fd=listener.fileno(),log_level='info')

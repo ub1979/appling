@@ -17,7 +17,19 @@ to use, or run Ollama locally.
 The launcher creates its own Python environment, installs dependencies, builds
 the interface and opens **http://127.0.0.1:9210**, or the next available port if
 9210 is occupied. The actual URL is printed in the terminal and opened in the
-browser. Other applications keep running. Stop this server with Ctrl+C.
+browser. Appling runs in the background and returns your terminal prompt after
+startup. Other applications keep running. Starting it again reopens the existing
+instance instead of launching another copy.
+
+```bash
+./status.sh    # Show the running URL
+./stop.sh      # Gracefully stop this checkout's background server
+```
+
+Logs are saved in `.appling_c/run/server.log`. For foreground debugging, use
+`./start.sh --foreground` and stop that foreground process with Ctrl+C. If an
+older foreground copy is already running, stop it with Ctrl+C once before using
+the new background launcher.
 
 ```bash
 ./start.sh --no-open --port 9211
