@@ -83,6 +83,14 @@ def dependency_gaps(result, depends_on):
         named=[b['block']] if b.get('block') in depends_on else [d for d in depends_on if d in detail]
         for dep in named:
             gaps.setdefault(dep,[]).append(detail[:600])
+    if gaps:
+        # A block that names what its dependencies lack sends its other unnamed requests along too.
+        for b in result.get('blockers') or []:
+            if isinstance(b,dict) and b.get('kind') in {'integration','implementation'} and not b.get('block'):
+                detail=str(b.get('detail',''))[:600]
+                if not any(d in detail for d in depends_on):
+                    for dep in gaps:
+                        if detail not in gaps[dep]:gaps[dep].append(detail)
     return gaps
 
 
