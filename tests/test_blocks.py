@@ -487,3 +487,160 @@ def test_block_builder_only_gets_release_one_checks():
     plan = blocks.validate(plan_for(), acceptance.normalize(CRITERIA, PREREQS, REQUIREMENTS))
     goal = blocks.builder_goal(plan['blocks'][1], plan, spec)
     assert 'AC-FR-3-1' not in goal.split('Out of scope')[0] and 'Out of scope for now' in goal
+
+
+def test_requirements_change_during_build_keeps_design_and_plan_and_reopens_only_the_owning_block(tmp_path):
+    engine = Engine(); engine.stuck = {'poster'}
+    added = dict(id='AC-FR-2-2', requirement='FR-2', description='The notification includes the new number',
+                 release='1', live=False, prerequisites=[])
+    state = dict(update_prompts=[], notifier_goals=[])
+    orig = Engine.__call__
+    def call(self, connection, run):
+        role = self.role(run); brief = json.loads(run.prompt)
+        if role == 'req-engineer' and 'Owner change request' in run.prompt:
+            state['update_prompts'].append(run.prompt)
+            spec = json.loads((run.root / acceptance.SPEC).read_text())
+            return dict(summary='Added AC-FR-2-2', requirements=REQUIREMENTS,
+                        acceptance_criteria=[*spec['criteria'], added], prerequisites=PREREQS)
+        if role == 'sw-developer' and brief.get('worker') and 'in blocks/notifier/ only' in brief['goal']:
+            state['notifier_goals'].append(brief['goal'])
+        return orig(self, connection, run)
+    engine.__class__ = type('Update', (Engine,), {'__call__': call})
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
+        workflow.answer(pid, question['id'], LEAVE); wait_idle(workflow, pid)
+        before = engine.calls.count('ui-designer')
+        review = next(i for i in store.inbox(pid) if i['kind'] == 'requirements')
+        workflow.answer(pid, review['id'], dict(choice='Request changes', feedback='Add a check that the notification shows the number'))
+        wait_idle(workflow, pid)
+        current = store.get(pid)
+        assert current['phase'] == 'requirements_review' and state['update_prompts']
+        assert current['approvals'].get('prototype') and current['approvals'].get('blocks')   # design and plan kept
+        assert engine.calls.count('ui-designer') == before and engine.calls.count('sw-architect') == 1
+        approve(store, workflow, pid, 'requirements')
+        root = Path(store.get(pid)['root'])
+        plan = blocks.load(root)
+        assert 'AC-FR-2-2' in next(b for b in plan['blocks'] if b['id'] == 'notifier')['criteria']
+        assert engine.calls.count('sw-architect') == 1                      # no replan
+        assert engine.calls.count('block:notifier') == 2 and engine.calls.count('block:poster') == 1
+        assert 'AC-FR-2-2' in state['notifier_goals'][-1]
+        assert 'body' in engine.calls
+    finally:
+        workflow.shutdown()
+
+
+def test_requirements_update_cannot_add_requirements_or_drop_checks(tmp_path):
+    engine = Engine(); engine.stuck = {'poster'}
+    replies = []
+    orig = Engine.__call__
+    def call(self, connection, run):
+        if self.role(run) == 'req-engineer' and 'Owner change request' in run.prompt:
+            return replies.pop(0)
+        return orig(self, connection, run)
+    engine.__class__ = type('Strict', (Engine,), {'__call__': call})
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
+        workflow.answer(pid, question['id'], LEAVE); wait_idle(workflow, pid)
+        root = Path(store.get(pid)['root']); original = (root / 'requirements.md').read_text()
+        replies.append(dict(requirements=REQUIREMENTS + '- FR-4: Brand new feature.\n', acceptance_criteria=CRITERIA, prerequisites=PREREQS))
+        review = next(i for i in store.inbox(pid) if i['kind'] == 'requirements')
+        workflow.answer(pid, review['id'], dict(choice='Request changes', feedback='add a new feature')); wait_idle(workflow, pid)
+        assert (root / 'requirements.md').read_text() == original
+        assert store.get(pid)['approvals'].get('blocks')
+        assert any(i['kind'] == 'requirements' for i in store.inbox(pid))   # the owner can still approve the current version
+        assert store.get(pid)['phase'] == 'requirements_review'
+    finally:
+        workflow.shutdown()
+
+
+def test_adopt_criteria_gives_new_checks_to_requirement_owners_or_the_body():
+    spec = acceptance.normalize([*CRITERIA,
+        dict(id='AC-FR-2-2', requirement='FR-2', description='n', release='1', live=False, prerequisites=[]),
+        dict(id='AC-FR-1-2', requirement='FR-1', description='n', release='1', live=False, prerequisites=[])], PREREQS, REQUIREMENTS)
+    plan = blocks.validate(plan_for(), acceptance.normalize(CRITERIA, PREREQS, REQUIREMENTS))
+    fitted, added = blocks.adopt_criteria(plan, spec)
+    assert added == {'AC-FR-2-2': ['notifier'], 'AC-FR-1-2': ['body']}
+    blocks.validate(fitted, spec)
+
+
+def test_a_later_block_failure_does_not_repeat_old_extend_requests(tmp_path):
+    from appling.blockbuild import EXTEND
+    plan = plan_for(); plan['blocks'][1]['depends_on'] = ['notifier']
+    attempts = []
+    orig = Engine.__call__
+    def call(self, connection, run):
+        role = self.role(run); brief = json.loads(run.prompt)
+        if role == 'sw-architect':
+            with self.lock: self.calls.append('sw-architect')
+            return plan
+        if role == 'sw-developer' and brief.get('worker') and 'in blocks/poster/ only' in brief['goal']:
+            attempts.append(1)
+            blocker = (dict(kind='integration', detail='notifier must return a message id', block='notifier') if len(attempts) == 1
+                       else dict(kind='implementation', detail='The poster still lacks drafts'))
+            return dict(status='blocked', summary='not finished', checks=[], blockers=[blocker])
+        return orig(self, connection, run)
+    engine = type('Stale', (Engine,), {'__call__': call})(); engine.barrier_parties = lambda: []
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
+        assert question['choices'][0] == EXTEND
+        workflow.answer(pid, question['id'], EXTEND); wait_idle(workflow, pid)
+        question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
+        assert EXTEND not in question['choices'] and 'message id' not in question['question']
+        assert not store.get(pid)['block_status']['poster'].get('needs')
+    finally:
+        workflow.shutdown()
+
+
+def _big_spec(n=10):
+    reqs = '# App\n\n' + ''.join(f'- FR-{i}: Feature {i}.\n' for i in range(1, n + 1))
+    crit = [dict(id=f'AC-FR-{i}-1', requirement=f'FR-{i}', description=f'Feature {i} works', release='1', live=False, prerequisites=[])
+            for i in range(1, n + 1)]
+    return reqs, crit
+
+
+def test_body_heavy_plan_is_sent_back_once_and_the_review_warns_when_it_stays_heavy(tmp_path):
+    reqs, crit = _big_spec()
+    heavy = dict(summary='s', blocks=[dict(id='notifier', name='Notifier', purpose='p', interface='i', criteria=['AC-FR-1-1'],
+                                           test=block_test('notifier'))],
+                 body=dict(purpose='Everything else', criteria=[c['id'] for c in crit], files=[]))
+    thin = dict(summary='s', blocks=[dict(id=f'feature-{i}', name=f'Feature {i}', purpose='p', interface='i',
+                                          criteria=[f'AC-FR-{i}-1'], test=block_test(f'feature-{i}')) for i in range(1, 11)],
+                body=dict(purpose='Wiring', criteria=['AC-FR-1-1'], files=[]))
+    prompts, replies = [], []
+    orig = Engine.__call__
+    def call(self, connection, run):
+        role = self.role(run)
+        if role == 'req-engineer':
+            return dict(requirements=reqs, acceptance_criteria=crit, prerequisites=[])
+        if role == 'sw-architect':
+            prompts.append(run.prompt)
+            return replies.pop(0)
+        return orig(self, connection, run)
+    for name, answers, expect_warning in (('thin', [heavy, thin], False), ('heavy', [heavy, heavy], True)):
+        prompts.clear(); replies[:] = answers
+        engine = type('Heavy', (Engine,), {'__call__': call})()
+        store, workflow, pid = make(tmp_path, engine, name)
+        try:
+            to_blocks_review(store, workflow, pid)
+            assert len(prompts) == 2 and 'keep the body to wiring' in prompts[1]
+            doc = (Path(store.get(pid)['root']) / 'blocks.md').read_text()
+            assert ('Warning: the app body alone covers 9 of 10' in doc) is expect_warning
+            assert any(i['kind'] == 'blocks' for i in store.inbox(pid))
+        finally:
+            workflow.shutdown()
+
+
+def test_body_heavy_ignores_tiny_apps_and_block_owned_checks():
+    reqs, crit = _big_spec()
+    spec = acceptance.normalize(crit, [], reqs)
+    plan = dict(blocks=[dict(id='a', criteria=[f'AC-FR-{i}-1' for i in range(1, 9)])],
+                body=dict(criteria=[c['id'] for c in crit]))
+    assert blocks.body_only(plan, spec) == ['AC-FR-9-1', 'AC-FR-10-1'] and not blocks.body_heavy(plan, spec)
+    small = acceptance.normalize(CRITERIA, PREREQS, REQUIREMENTS)
+    assert not blocks.body_heavy(dict(blocks=[], body=dict(criteria=[c['id'] for c in CRITERIA])), small)

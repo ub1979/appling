@@ -41,7 +41,8 @@ def publish_due(store, pid, *, now=None, interval=INTERVAL):
         labels = {'blocks_plan':'planning the blocks','blocks_build':'building blocks in parallel','body':'merging the blocks into the app',
                   'build':'building and testing the app','qa':'independently checking the app','security':'reviewing security',
                   'prototype':'designing the prototype','requirements':'writing the requirements','plan':'planning the build',
-                  'code-review':'reviewing the code','accessibility':'checking accessibility','criteria':'drafting acceptance checks'}
+                  'code-review':'reviewing the code','accessibility':'checking accessibility','criteria':'drafting acceptance checks',
+                  'requirements_update':'updating the requirements','rescope':'updating what is in this release'}
         lines = [f"Still working on {state.get('name','your project')}: {labels.get(state['phase'],state['phase'])}."]
         reports = [e for e in recent if e['type']=='worker_commentary' and isinstance(e.get('text'),str)]
         if reports:

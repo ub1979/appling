@@ -20,8 +20,14 @@ blocks plus one project-specific body. A block is a generic package in
 `block.json`, usable by another project unchanged: AI-provider connectors,
 messaging integrations, admin panels, authentication, schedulers, speech engines.
 Prefer a compatible block from the supplied library catalogue. Keep blocks
-independent; declare `depends_on` only for real interface use. Put screens,
-project data and wiring in the body (`app/`). Every release-1 criterion must be
+independent; declare `depends_on` only for real interface use. Keep the body
+(`app/`) thin: it is built by one agent after all blocks finish, so nothing in it
+runs in parallel. The body only connects blocks (entry point, configuration,
+routing, wiring). Make each feature area its own block with a clean interface,
+even when it serves this app (screens/UI package taking data and callbacks, task
+engine, report or briefing builder, sign-in flow), kept generic through settings.
+Nearly every release-1 criterion should be owned by a block; the controller warns
+the owner when the body alone owns many. Every release-1 criterion must be
 covered. Give each block one self-contained test command run from the project
 root. Use a separate service only for parts that must run as their own process.
 Return only the requested JSON; the controller writes and validates the plan.

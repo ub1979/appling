@@ -347,12 +347,17 @@ class Workflow:
                     elif kind=='requirements' and state.get('execution_mode')=='blocks':
                         valid=approvals.get('blocks') and approvals['blocks']==artifact_revision(root,'blocks')
                         if valid:
-                            # A still-approved plan must cover the current criteria (a rescope only changes Release tags).
+                            # A still-approved plan must cover the current criteria. New or removed checks are fitted to the
+                            # blocks that own that requirement instead of replanning; built blocks stay built.
                             from . import blocks as block_plan
                             plan_=block_plan.load(root);spec=acceptance.load(root)
                             ids={c['id'] for c in spec['criteria']}
                             owned=set(plan_['body']['criteria']).union(*(set(b['criteria']) for b in plan_['blocks']))
-                            valid=owned<=ids and all(c['id'] in owned for c in acceptance.release_one(spec))
+                            if not (owned<=ids and all(c['id'] in owned for c in acceptance.release_one(spec))):
+                                from .blockbuild import adopt_new_criteria
+                                fitted=adopt_new_criteria(self,pid,root)
+                                valid=bool(fitted)
+                                if fitted:approvals['blocks']=fitted
                         phase='blocks_build' if valid else 'blocks_plan'
                     elif kind=='requirements' and approvals.get('plan') and approvals['plan']==artifact_revision(root,'plan'):phase='build'
                     self.store.update(pid,approvals=approvals,phase=phase)
@@ -368,6 +373,12 @@ class Workflow:
                         feedback=('Prototype feedback from the owner: '+feedback+'\nRecord this change in requirements.md '
                                   '(keep requirement IDs stable) and return the complete updated requirements.')
                     approvals=dict(state['approvals'])
+                    if kind=='requirements' and state.get('execution_mode')=='blocks' and approvals.get('blocks'):
+                        # Building has started: edit the requirements in place and keep the approved design and block plan.
+                        approvals.pop('requirements',None)
+                        self.store.update(pid,phase='requirements_update',approvals=approvals)
+                        self.store.message(pid,'user',feedback)
+                        self.submit(pid,feedback,kind='auto');return dict(ok=True)
                     for k in list(approvals):
                         if kind=='requirements' or k==kind or k in ('plan','blocks'):
                             approvals.pop(k,None)
@@ -706,6 +717,38 @@ class Workflow:
                     text='Continue building; the release scope did not change.';continue
                 approvals={k:v for k,v in state['approvals'].items() if k!='requirements'}
                 self.store.update(pid,phase='requirements_review',approvals=approvals,rescope=None)
+                self.review(pid,'requirements');return
+            elif phase=='requirements_update':
+                root=Path(state['root']);old_requirements=safe_path(root,'requirements.md').read_text()
+                old_spec=acceptance.load(root)
+                result=self.invoke(pid,'req-engineer',f'Owner change request: {text}\nThe prototype and block plan are approved and building has started. '
+                    'Apply only this change to requirements.md and the acceptance criteria. You may reword requirements and add or edit '
+                    'acceptance criteria and owner prerequisites. Keep every requirement ID; do not add or remove requirements. '
+                    'Keep every existing criterion ID and Release tag unless the owner asked to change it; give new criteria new IDs. '
+                    'If the change needs a new requirement or a design change, ask one question explaining that. '
+                    'Return {"summary":"...","question":"only if needed","choices":["..."]} or {"summary":"plain list of what changed",'
+                    '"requirements":"complete updated Markdown","acceptance_criteria":[...all criteria...],"prerequisites":[...]}.',readonly=True)
+                if result.get('question'):
+                    self.store.ask(pid,'question',result['question'],result.get('choices',[]));return
+                if not isinstance(result.get('requirements'),str) or not result.get('acceptance_criteria'):
+                    raise ValueError('The requirements update is incomplete. Send your change request again.')
+                problem=''
+                if set(acceptance.requirement_ids(result['requirements']))!=set(acceptance.requirement_ids(old_requirements)):
+                    problem=('That change would add or remove requirements, which needs a new design and block plan, so nothing was changed. '
+                             'Approve the current requirements or request a smaller change.')
+                else:
+                    spec=acceptance.normalize(result['acceptance_criteria'],result.get('prerequisites',[]),result['requirements'])
+                    dropped=sorted({c['id'] for c in old_spec['criteria']}-{c['id'] for c in spec['criteria']})
+                    if dropped:
+                        problem=('The update removed checks ('+', '.join(dropped)+'), so nothing was changed. '
+                                 'Request the change again and say which checks to keep.')
+                if problem:
+                    self.store.message(pid,'assistant',problem,'status')
+                    self.store.update(pid,phase='requirements_review');self.review(pid,'requirements');return
+                if old_spec.get('deferred_blocks'):spec['deferred_blocks']=old_spec['deferred_blocks']
+                self._write(pid,'requirements.md',result['requirements']);acceptance.write(root,spec)
+                if result.get('summary'):self.store.message(pid,'assistant',str(result['summary'])[:1200],'status')
+                self.store.update(pid,phase='requirements_review')
                 self.review(pid,'requirements');return
             elif phase=='criteria':
                 root=Path(state['root']);requirements=safe_path(root,'requirements.md').read_text()

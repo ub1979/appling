@@ -225,7 +225,7 @@ def create_app(home=None,execute=None):
         names=(['requirements','prototype','blocks','blocks_build','body','qa'] if mode=='blocks' else
                ['requirements','prototype',*(['plan'] if mode=='planned' else []),'build','qa'])
         names += [name for name,role in [('code-review','code-reviewer'),('security','security-auditor'),('accessibility','a11y-auditor')] if role in p['team']]
-        stage={'criteria':'requirements','rescope':'requirements','implementation_verified':'qa','blocks_plan':'blocks'}.get(phase,phase.replace('_review',''))
+        stage={'criteria':'requirements','rescope':'requirements','requirements_update':'requirements','implementation_verified':'qa','blocks_plan':'blocks'}.get(phase,phase.replace('_review',''))
         position=names.index(stage) if stage in names else len(names)
         role_map={'requirements':'req-engineer','prototype':'ui-designer','plan':'task-planner','build':'sw-developer','qa':'qa-engineer','security':'security-auditor','code-review':'code-reviewer','accessibility':'a11y-auditor'}
         stage_labels={'blocks':'Block plan','blocks_build':'Building blocks','body':'Merging into the app'}

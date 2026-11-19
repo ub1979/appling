@@ -34,7 +34,12 @@ def plan(workflow, pid, text):
             'Prefer reusing a compatible library block from this catalogue (source "library:<name>@<version>"): '
             + json.dumps([{k: b[k] for k in ('name', 'version', 'status', 'purpose', 'interface')} for b in catalogue]) + '. '
             'Keep blocks independent; use depends_on only when a block truly needs another block\'s interface. '
-            'Put project-specific screens, data and wiring in the body (app/). Every release-1 criterion must be covered by a block or the body. '
+            'Keep the body (app/) thin: it is built by one agent after every block finishes, so anything in it is not parallel. '
+            'The body only connects blocks: app entry point, configuration, routing and wiring blocks to each other. '
+            'Turn each feature area into its own block with a clean interface, even when it serves this app: '
+            'e.g. a screens/UI package that takes data and callbacks, a task engine, a report or briefing builder, a sign-in flow. '
+            'Keep such blocks generic (settings instead of project names). The body may also list the end-to-end checks it wires, '
+            'but nearly every release-1 criterion should be owned by a block. Every release-1 criterion must be covered by a block or the body. '
             'Use runtime "service" only for parts that must run as their own process (another language runtime or long-lived bridge). '
             'Each block needs one self-contained test command run from the project root (and an optional setup command), '
             'for example "cd blocks/telegram-bot && npm install && npm test". '
@@ -42,7 +47,7 @@ def plan(workflow, pid, text):
             '"interface":"exported functions/routes/events with types","runtime":"in-process|service","criteria":["AC-..."],'
             '"depends_on":[],"prerequisites":["P-..."],"source":"new","setup":"","test":"..."}],'
             '"body":{"purpose":"...","criteria":["AC-..."],"files":["package.json"],"test":"..."}}.')
-    error = None
+    error = None; fallback = None
     for attempt in range(2):
         result = workflow.invoke(pid, 'sw-architect', goal + (f'\nCorrect this problem in the previous proposal: {error}' if error else ''),
                                  readonly=True, session_scope='blocks-plan-' + uuid.uuid4().hex[:8])
@@ -50,9 +55,20 @@ def plan(workflow, pid, text):
             checked = blocks.validate(result, spec, catalogue)
         except ValueError as exc:
             error = str(exc)
-            if attempt:
+            if attempt and fallback is None:
                 raise ValueError('The block plan is not valid yet: ' + error) from exc
+            if attempt:
+                checked = fallback   # the earlier valid plan; its review shows the body-size warning
+            else:
+                continue
+        if not attempt and blocks.body_heavy(checked, spec):
+            alone = blocks.body_only(checked, spec)
+            fallback = checked
+            error = (f'The body alone covers {len(alone)} release-1 checks ({", ".join(alone)}). The body is built by one agent '
+                     'after the blocks, so it is not parallel. Move those feature areas into blocks and keep the body to wiring.')
             continue
+        if attempt and fallback is not None and len(blocks.body_only(checked, spec)) > len(blocks.body_only(fallback, spec)):
+            checked = fallback
         blocks.write(root, checked, spec)
         workflow.store.update(pid, phase='blocks_review', block_status={}, tasks=blocks.block_tasks(checked, spec))
         workflow.review(pid, 'blocks')
@@ -189,7 +205,8 @@ def build(workflow, pid, feedback=''):
                         _set_status(workflow, pid, task['id'], status='blocked', reason=stuck[task['id']], needs=gaps)
                     else:
                         stuck[task['id']] = str(exc)
-                        _set_status(workflow, pid, task['id'], status='blocked', reason=str(exc)[:600])
+                        # Clear requests from an earlier attempt, or the owner is offered a stale "extend" choice.
+                        _set_status(workflow, pid, task['id'], status='blocked', reason=str(exc)[:600], needs=None)
                     continue
                 try:
                     swarm.integrate_worker(workflow, pid, task, worker)
@@ -208,7 +225,7 @@ def build(workflow, pid, feedback=''):
                          if isinstance(b, dict) and b.get('kind') == 'integration']
                 test = _test_and_record(workflow, pid, root, block)
                 if test['passed']:
-                    _set_status(workflow, pid, block['id'], status='tested', test=test, reason=None, host_notes=notes)
+                    _set_status(workflow, pid, block['id'], status='tested', test=test, reason=None, host_notes=notes, needs=None)
                     save_checkpoint(workflow, pid, f"Appling checkpoint: block {block['name']} built and tested")
                     try:
                         swarm.workspaces.remove(root, worker['workspace'])
@@ -359,6 +376,45 @@ def publish_passed(workflow, pid):
     if published:
         workflow.store.message(pid, 'assistant', 'Saved to your block library: ' + ', '.join(published) + '.', 'status')
     return published
+
+
+def adopt_new_criteria(workflow, pid, root):
+    """After the owner approves updated requirements, give new checks to the blocks that own that requirement.
+    Finished blocks that receive a check are reopened with a change request. Returns the new plan revision
+    owner-approved by the requirements approval, or None when the plan cannot be fitted (it is then replanned)."""
+    plan_ = blocks.load(root); spec = acceptance.load(root)
+    if not plan_:
+        return None
+    fitted, added = blocks.adopt_criteria(plan_, spec)
+    try:
+        # Library sources were checked when the plan was approved; only coverage and structure are rechecked.
+        pinned = [dict(zip(('name', 'version'), b['source'][8:].rsplit('@', 1))) for b in fitted['blocks']
+                  if b['source'].startswith('library:') and '@' in b['source']]
+        fitted = blocks.validate(fitted, spec, pinned)
+    except ValueError:
+        return None
+    blocks.write(root, fitted, spec)
+    status = workflow.store.get(pid).get('block_status') or {}
+    described = {c['id']: c['description'] for c in spec['criteria']}
+    notes = dict(workflow.store.get(pid).get('block_change_requests') or {})
+    reopened = []
+    for cid, owners in added.items():
+        for ident in owners:
+            if ident == 'body':
+                continue
+            notes.setdefault(ident, []).append(f'New release-1 check {cid}: {described[cid]}')
+            if status.get(ident, {}).get('status') in FINISHED:
+                _set_status(workflow, pid, ident, status='planned', local=True, reason=f'New check {cid} added by the owner')
+                reopened.append(ident)
+    workflow.store.update(pid, block_change_requests=notes)
+    if added:
+        names = {b['id']: b['name'] for b in fitted['blocks']}
+        parts = [f"{cid} → " + ', '.join(names.get(o, 'the app body') for o in owners) for cid, owners in added.items()]
+        workflow.store.message(pid, 'assistant', 'New checks added to the block plan: ' + '; '.join(parts) + '. '
+                               + (f"Reopening finished blocks to add them: {', '.join(names[i] for i in dict.fromkeys(reopened))}. " if reopened else '')
+                               + 'Other blocks stay built.', 'status')
+    from .workflow import artifact_revision
+    return artifact_revision(root, 'blocks')
 
 
 def reopen_blocks(workflow, pid, blockers):

@@ -120,6 +120,45 @@ def deferred(plan, spec):
             if b['id'] in left or (b['criteria'] and all(release.get(c) == 'later' for c in b['criteria']))}
 
 
+def adopt_criteria(plan, spec):
+    """Fit an approved plan to updated criteria without replanning.
+
+    A new release-1 check goes to every kept block (and the body) that already owns a check for the same
+    requirement; with no such owner it goes to the body. Checks that no longer exist are dropped.
+    Returns (plan, {criterion_id: [owner ids, 'body' for the body]})."""
+    plan = json.loads(json.dumps(plan))
+    criteria = {c['id']: c for c in spec['criteria']}
+    later = deferred(plan, spec)
+    for owner in [*plan['blocks'], plan['body']]:
+        owner['criteria'] = [c for c in owner['criteria'] if c in criteria]
+    owned = set(plan['body']['criteria']).union(*(set(b['criteria']) for b in plan['blocks']))
+    added = {}
+    for c in acceptance.release_one(spec):
+        if c['id'] in owned:
+            continue
+        owners = [b for b in plan['blocks'] if b['id'] not in later
+                  and any(criteria[o]['requirement'] == c['requirement'] for o in b['criteria'])]
+        body = plan['body']
+        if not owners or any(criteria[o]['requirement'] == c['requirement'] for o in body['criteria']):
+            owners.append(body)
+        for owner in owners:
+            owner['criteria'].append(c['id'])
+        added[c['id']] = [o.get('id', 'body') for o in owners]
+    return plan, added
+
+
+def body_only(plan, spec):
+    """Release-1 checks only the body covers. The body is built by one agent after the blocks, so this work is not parallel."""
+    owned = set().union(*(set(b['criteria']) for b in plan['blocks'])) if plan['blocks'] else set()
+    return [c['id'] for c in acceptance.release_one(spec) if c['id'] in plan['body']['criteria'] and c['id'] not in owned]
+
+
+def body_heavy(plan, spec):
+    """True when the body alone owns more than a small share of release 1 (tiny apps may be body-only)."""
+    total = len(acceptance.release_one(spec))
+    return total > 6 and len(body_only(plan, spec)) > max(3, total // 7)
+
+
 def markdown(plan, spec):
     setup = {p['id']: p['description'] for p in spec['prerequisites']}
     later = deferred(plan, spec)
@@ -132,7 +171,15 @@ def markdown(plan, spec):
         lines.append(f"| **{b['name']}** (`{b['id']}`) | {b['purpose'].replace('|', '/')} | {source} | "
                      f"{', '.join(b['depends_on']) or '-'} | {', '.join(setup.get(p, p) for p in b['prerequisites']) or '-'} | "
                      f"{'later' if b['id'] in later else '1'} |")
-    lines += ['', f"**App body** (`app/`): {plan['body']['purpose']}", '', '## Build order', '']
+    lines += ['', f"**App body** (`app/`): {plan['body']['purpose']}", '']
+    alone = body_only(plan, spec); total = len(acceptance.release_one(spec))
+    if body_heavy(plan, spec):
+        lines += [f"**Warning: the app body alone covers {len(alone)} of {total} release-1 checks** ({', '.join(alone)}). "
+                  'The body is built by one agent after all blocks finish, so this work is not parallel and the merge step '
+                  'will be long. Request changes to move feature areas into blocks.', '']
+    elif plan['blocks']:
+        lines += [f"The app body only connects the blocks; it alone covers {len(alone)} of {total} release-1 checks.", '']
+    lines += ['## Build order', '']
     lines += [f'{i}. ' + ', '.join(wave) + (' (in parallel)' if len(wave) > 1 else '') for i, wave in enumerate(plan['waves'], 1)]
     lines += ['', '## Interfaces', '']
     for b in plan['blocks']:
