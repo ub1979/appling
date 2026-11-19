@@ -154,7 +154,7 @@ def build(workflow, pid, feedback=''):
                 for task in ready:
                     block = by_id[task['id']]
                     changes = (current.get('block_change_requests') or {}).get(task['id'])
-                    note = repairs.get(task['id']) or ('Interface change requested by the app body: ' + '; '.join(changes) if changes else '')
+                    note = repairs.get(task['id']) or ('Requested changes for this block (keep everything that already works): ' + '; '.join(changes) if changes else '')
                     # The note is part of the goal, so a repair gets a fresh worker that sees it.
                     task = dict(task, goal=blocks.builder_goal(block, plan_, spec) + (f'\n{note}' if note else ''))
                     attempted.add(task['id'])
