@@ -446,7 +446,7 @@ export function Studio({ id }: { id: string }) {
               Your team
               <button className="mini-icon" onClick={() => setShowTeam(true)} title="Change the team" aria-label="Change the team"><UsersRound size={15} /></button>
             </h3>
-            {orderedTeamAgents(agents, team).map((a) => {
+            {orderedTeamAgents(agents, Array.from(new Set([...team, ...(map?.phases ?? []).map((p) => p.role).filter((r): r is string => !!r)]))).map((a) => {
               // Status comes from the controller's stage list, never from chat text.
               const status = agentStatus(a.id, map?.phases ?? [], !!detail.running);
               const working = status.working || workingIds.has(a.id);
