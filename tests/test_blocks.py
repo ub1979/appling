@@ -295,6 +295,7 @@ def test_typed_feedback_on_block_plan_replans_instead_of_queueing(tmp_path):
 def test_leave_for_later_defers_a_block_even_when_its_check_is_shared(tmp_path):
     engine = Engine(); engine.stuck = {'poster'}
     shared = plan_for(); shared['body']['criteria'] = ['AC-FR-1-1', 'AC-FR-3-1']
+    shared['blocks'][0]['criteria'] = ['AC-FR-2-1', 'AC-FR-3-1']   # another block that stays also implements FR-3
     engine.__class__ = type('Shared', (Engine,), {})
     orig = Engine.__call__
     def call(self, connection, run):
@@ -311,7 +312,7 @@ def test_leave_for_later_defers_a_block_even_when_its_check_is_shared(tmp_path):
         root = Path(store.get(pid)['root'])
         spec = acceptance.load(root)
         assert spec['deferred_blocks'] == ['poster']
-        assert next(c for c in spec['criteria'] if c['id'] == 'AC-FR-3-1')['release'] == '1'   # body still covers it
+        assert next(c for c in spec['criteria'] if c['id'] == 'AC-FR-3-1')['release'] == '1'   # the notifier still implements it
         approve(store, workflow, pid, 'requirements')
         assert engine.calls.count('block:poster') == 1 and 'body' in engine.calls
     finally:
@@ -453,5 +454,26 @@ def test_dependency_gap_can_be_extended_then_dependent_rebuilt_and_host_notes_re
         assert engine.calls.count('block:notifier') == 2 and engine.calls.count('block:poster') == 2
         assert store.get(pid)['block_status']['poster']['status'] in {'tested', 'merged'}
         assert any('Telegram bot token store' in g for g in state['body_goals'])
+    finally:
+        workflow.shutdown()
+
+
+def test_leaving_a_block_moves_its_checks_even_when_the_body_lists_them(tmp_path):
+    engine = Engine(); engine.stuck = {'poster'}
+    everything = plan_for(); everything['body']['criteria'] = ['AC-FR-1-1', 'AC-FR-2-1', 'AC-FR-3-1']
+    orig = Engine.__call__
+    def call(self, connection, run):
+        if self.role(run) == 'sw-architect':
+            with self.lock: self.calls.append('sw-architect')
+            return everything
+        return orig(self, connection, run)
+    engine.__class__ = type('Everything', (Engine,), {'__call__': call})
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
+        workflow.answer(pid, question['id'], LEAVE); wait_idle(workflow, pid)
+        spec = acceptance.load(Path(store.get(pid)['root']))
+        assert next(c for c in spec['criteria'] if c['id'] == 'AC-FR-3-1')['release'] == 'later'
     finally:
         workflow.shutdown()

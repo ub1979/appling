@@ -293,10 +293,12 @@ def answer(workflow, pid, item, choice):
                                'Nothing will run until then.', 'status')
     elif choice == LEAVE:
         plan_ = blocks.load(root); spec = acceptance.load(root)
-        # Record the owner's choice itself; criteria shared with the body or other blocks stay in release 1.
+        # Record the owner's choice itself. A deferred block's checks move to later unless another block that stays
+        # also implements them; the body's integration coverage does not keep a feature nobody will build.
         spec['deferred_blocks'] = sorted(set(spec.get('deferred_blocks') or []) | set(ids))
+        left = set(spec['deferred_blocks'])
         moving = {c for b in plan_['blocks'] if b['id'] in ids for c in b['criteria']}
-        keep = set(plan_['body']['criteria']).union(*(set(b['criteria']) for b in plan_['blocks'] if b['id'] not in ids))
+        keep = set().union(*(set(b['criteria']) for b in plan_['blocks'] if b['id'] not in left))
         for criterion in spec['criteria']:
             if criterion['id'] in moving - keep:
                 criterion['release'] = 'later'
