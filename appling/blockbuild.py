@@ -66,23 +66,37 @@ def _set_status(workflow, pid, ident, **fields):
         workflow.store.event(pid, 'block', id=ident, **fields)
 
 
+FINISHED = {'tested', 'merged'}
+
+
 def _tasks(workflow, pid, plan_, spec):
-    """Keep finished task records across resumes; add new blocks; drop deferred ones."""
+    """Rebuild block tasks from the plan. block_status, not the shared task list, records finished blocks
+    (the body builder replaces the task list with its own)."""
+    state = workflow.store.get(pid)
+    status = state.get('block_status') or {}
     wanted = {t['id']: t for t in blocks.block_tasks(plan_, spec)}
-    current = {t['id']: t for t in workflow.store.get(pid).get('tasks', []) if t.get('block')}
+    current = {t['id']: t for t in state.get('tasks', []) if t.get('block')}
     tasks = []
     for ident, task in wanted.items():
         old = current.get(ident)
-        if old and old.get('status') == 'done':
+        if status.get(ident, {}).get('status') in FINISHED or (old and old.get('status') == 'done' and ident not in status):
             task['status'] = 'done'
         tasks.append(task)
     workflow.store.update(pid, tasks=tasks)
     return tasks
 
 
+def _test_and_record(workflow, pid, root, block):
+    """Controller-run block test; any crash is a failed test, never an untested pass."""
+    try:
+        return blocks.run_block_tests(root, block)
+    except Exception as exc:
+        return dict(passed=False, exit_code=-1, evidence=None, error=str(exc)[:600])
+
+
 def build(workflow, pid, feedback=''):
     """Build every pending release-1 block, in parallel where independent."""
-    from .direct import save_checkpoint
+    from .direct import save_checkpoint, _folder_digest
     from .planning import agent_limit
     from .workflow import WorkWaiting
     workflow.authorized(pid)
@@ -95,22 +109,43 @@ def build(workflow, pid, feedback=''):
         _set_status(workflow, pid, ident, status='later')
     tasks = _tasks(workflow, pid, plan_, spec)
     save_checkpoint(workflow, pid, 'Appling checkpoint before building blocks')
-    # Library blocks are installed and tested, not rebuilt.
+    state = workflow.store.get(pid)
+    status_now = state.get('block_status') or {}
+    changes_now = state.get('block_change_requests') or {}
     for task in tasks:
         block = by_id[task['id']]
-        if task['status'] != 'done' and block['source'].startswith('library:'):
+        info = status_now.get(block['id'], {})
+        # A block integrated before a restart but never tested by the controller is tested now.
+        if task['status'] == 'done' and info.get('status') not in FINISHED and not block['source'].startswith('library:'):
+            test = _test_and_record(workflow, pid, root, block)
+            _set_status(workflow, pid, block['id'], status='tested' if test['passed'] else 'failed', test=test)
+            if not test['passed']:
+                swarm._task_status(workflow, pid, block['id'], 'pending')
+            continue
+        if not block['source'].startswith('library:'):
+            continue
+        if info.get('local') or info.get('library_failed') or block['id'] in changes_now:
+            # Already rebuilt here, failed as a library copy, or needs a change: never reinstall over it.
+            block['source'] = 'new'
+            continue
+        if task['status'] == 'done':
+            continue
+        try:
             blocks.install(root, block)
-            test = blocks.run_block_tests(root, block)
-            _set_status(workflow, pid, block['id'], status='tested' if test['passed'] else 'failed', test=test, library=block['source'][8:])
-            if test['passed']:
-                swarm._task_status(workflow, pid, block['id'], 'done')
-            else:
-                # A library version that fails here is rebuilt as new work in this project.
-                block['source'] = 'new'
-    stuck, attempted, repairs = {}, set(), {}
+            test = _test_and_record(workflow, pid, root, block)
+        except (ValueError, OSError) as exc:
+            test = dict(passed=False, exit_code=-1, evidence=None, error=str(exc)[:600])
+        _set_status(workflow, pid, block['id'], status='tested' if test['passed'] else 'failed', test=test,
+                    library=block['source'][8:], library_failed=not test['passed'])
+        if test['passed']:
+            swarm._task_status(workflow, pid, block['id'], 'done')
+        else:
+            block['source'] = 'new'   # rebuilt as new work in this project
+    stuck, attempted, repairs, counts = {}, set(), {}, {}
     with ThreadPoolExecutor(max_workers=6, thread_name_prefix='appling-block') as pool:
         futures = {}
         while True:
+            ready = []
             if not workflow.cancelled[pid].is_set():
                 current = workflow.store.get(pid)
                 ready = swarm.ready_batch(current['tasks'], agent_limit(workflow.settings()) - len(futures),
@@ -127,9 +162,11 @@ def build(workflow, pid, feedback=''):
                     except Exception as exc:
                         stuck[task['id']] = str(exc); _set_status(workflow, pid, task['id'], status='blocked', reason=str(exc)[:600])
                         continue
-                    _set_status(workflow, pid, task['id'], status='building', worker=worker['id'])
+                    _set_status(workflow, pid, task['id'], status='building', worker=worker['id'], local=True)
                     futures[pool.submit(swarm.run_worker, workflow, pid, task, worker)] = (task, worker)
             if not futures:
+                if ready and not workflow.cancelled[pid].is_set():
+                    continue   # failed setup must not hide other eligible blocks
                 break
             finished, _ = wait(futures, return_when=FIRST_COMPLETED)
             for future in finished:
@@ -138,19 +175,30 @@ def build(workflow, pid, feedback=''):
                     future.result()
                     if workflow.cancelled[pid].is_set():
                         raise InterruptedError('Stopped.')
+                except InterruptedError:
+                    swarm._task_status(workflow, pid, task['id'], 'pending')
+                    continue
+                except Exception as exc:   # run_worker already saved the worker as blocked
+                    swarm._task_status(workflow, pid, task['id'], 'pending')
+                    stuck[task['id']] = str(exc)
+                    _set_status(workflow, pid, task['id'], status='blocked', reason=str(exc)[:600])
+                    continue
+                try:
                     swarm.integrate_worker(workflow, pid, task, worker)
                 except InterruptedError:
                     swarm._task_status(workflow, pid, task['id'], 'pending')
                     continue
                 except Exception as exc:
+                    # As in build_ready: the next attempt gets a fresh worker with a recovery patch, not a replay.
+                    swarm.save_worker(workflow, pid, worker, status='conflict', error=str(exc))
                     swarm._task_status(workflow, pid, task['id'], 'pending')
-                    stuck[task['id']] = str(exc)
-                    _set_status(workflow, pid, task['id'], status='blocked', reason=str(exc)[:600])
+                    stuck[task['id']] = 'Its changes could not be merged: ' + str(exc)
+                    _set_status(workflow, pid, task['id'], status='blocked', reason=stuck[task['id']][:600])
                     continue
                 block = by_id[task['id']]
-                test = blocks.run_block_tests(root, block)
+                test = _test_and_record(workflow, pid, root, block)
                 if test['passed']:
-                    _set_status(workflow, pid, block['id'], status='tested', test=test)
+                    _set_status(workflow, pid, block['id'], status='tested', test=test, reason=None)
                     save_checkpoint(workflow, pid, f"Appling checkpoint: block {block['name']} built and tested")
                     try:
                         swarm.workspaces.remove(root, worker['workspace'])
@@ -159,10 +207,11 @@ def build(workflow, pid, feedback=''):
                     continue
                 # Integrated but its own tests fail when the controller runs them: one repair round.
                 swarm._task_status(workflow, pid, block['id'], 'pending')
-                count = repairs.setdefault('_count_' + block['id'], 0)
-                log = (root / test['evidence']).read_text(errors='replace')[-3000:]
+                count = counts.get(block['id'], 0)
+                evidence = test.get('evidence')
+                log = (root / evidence).read_text(errors='replace')[-3000:] if evidence and (root / evidence).is_file() else test.get('error', '')
                 if count < MAX_TEST_REPAIRS:
-                    repairs['_count_' + block['id']] = count + 1
+                    counts[block['id']] = count + 1
                     repairs[block['id']] = 'The controller ran the approved test command and it failed. Fix the block. Output:\n' + log
                     attempted.discard(block['id'])
                     _set_status(workflow, pid, block['id'], status='failed', test=test)
@@ -179,7 +228,8 @@ def build(workflow, pid, feedback=''):
         raise WorkWaiting('Some blocks could not be finished. The others are built and tested. Decide what to do with:\n'
                           + '\n'.join('- ' + p for p in parts), reason='blocks', blockers=[dict(kind='implementation', detail=p, owner='you',
                                                                                                  next_action='Choose: leave for later, try again, or provide access') for p in parts])
-    workflow.store.update(pid, phase='body', block_change_requests={})
+    # The body may not change blocks; remember exactly what the tested blocks looked like.
+    workflow.store.update(pid, phase='body', block_change_requests={}, blocks_digest=_folder_digest(root, ['blocks/']))
 
 
 def ask_blocks(workflow, pid, ids, parts):
@@ -210,17 +260,22 @@ def answer(workflow, pid, item, choice):
                                'Nothing will run until then.', 'status')
     elif choice == LEAVE:
         plan_ = blocks.load(root); spec = acceptance.load(root)
+        # Record the owner's choice itself; criteria shared with the body or other blocks stay in release 1.
+        spec['deferred_blocks'] = sorted(set(spec.get('deferred_blocks') or []) | set(ids))
         moving = {c for b in plan_['blocks'] if b['id'] in ids for c in b['criteria']}
-        # Criteria shared with blocks or the body that stay in release 1 must remain.
         keep = set(plan_['body']['criteria']).union(*(set(b['criteria']) for b in plan_['blocks'] if b['id'] not in ids))
         for criterion in spec['criteria']:
             if criterion['id'] in moving - keep:
                 criterion['release'] = 'later'
         acceptance.write(root, spec)
+        for ident in ids:
+            _set_status(workflow, pid, ident, status='later')
         approvals = {k: v for k, v in state['approvals'].items() if k != 'requirements'}
         workflow.store.update(pid, phase='requirements_review', approvals=approvals)
-        workflow.store.message(pid, 'assistant', 'Moved the checks for ' + ', '.join(ids) + ' to a later release. '
-                               'Review the updated requirements; the other blocks stay built.', 'status')
+        shared = sorted(moving & keep)
+        workflow.store.message(pid, 'assistant', 'Left for later: ' + ', '.join(ids) + '. '
+                               + (f'Checks shared with other parts stay in this release: {", ".join(shared)}. ' if shared else '')
+                               + 'Review the updated requirements; the other blocks stay built.', 'status')
         workflow.review(pid, 'requirements')
     else:
         workflow.store.update(pid, phase='rescope', rescope=dict(choice=choice, parts=ids))
@@ -258,7 +313,9 @@ def publish_passed(workflow, pid):
             continue
         if any(results.get(c, {}).get('status') == 'failed' for c in block['criteria']):
             continue
-        meta = blocks.publish(root, block, state.get('name') or pid, commit=commit, evidence=(info.get('test') or {}).get('evidence'))
+        fully = all(results.get(c, {}).get('status') == 'passed' for c in block['criteria'])
+        meta = blocks.publish(root, block, state.get('name') or pid, commit=commit, evidence=(info.get('test') or {}).get('evidence'),
+                              verified=fully)
         if meta:
             published.append(f"{meta['name']} {meta['version']} ({meta['status']})")
             _set_status(workflow, pid, block['id'], status='merged', library=f"{meta['name']}@{meta['version']}")
@@ -268,19 +325,21 @@ def publish_passed(workflow, pid):
 
 
 def reopen_blocks(workflow, pid, blockers):
-    """The body needs a block interface change: send that block back to its own builder."""
-    state = workflow.store.get(pid)
-    known = {t['id'] for t in state.get('tasks', []) if t.get('block')}
+    """The body needs a block interface change: send that block back to its own builder. Returns True if any reopened."""
+    state = workflow.store.get(pid); root = Path(state['root'])
+    plan_ = blocks.load(root); spec = acceptance.load(root)
+    if not plan_:
+        return False
+    known = {b['id'] for b in plan_['blocks']} - set(blocks.deferred(plan_, spec))
     notes = {}
     for b in blockers:
         if b.get('block') in known:
             notes.setdefault(b['block'], []).append(str(b.get('detail', ''))[:600])
     if not notes:
-        return
-    tasks = state['tasks']
-    for task in tasks:
-        if task['id'] in notes:
-            task['status'] = 'pending'
-    workflow.store.update(pid, tasks=tasks, phase='blocks_build', block_change_requests=notes)
+        return False
     for ident, details in notes.items():
-        _set_status(workflow, pid, ident, status='planned', reason='Interface change requested by the app body: ' + '; '.join(details))
+        _set_status(workflow, pid, ident, status='planned', local=True,
+                    reason='Interface change requested by the app body: ' + '; '.join(details))
+    workflow.store.update(pid, phase='blocks_build', block_change_requests=notes)
+    _tasks(workflow, pid, plan_, spec)
+    return True

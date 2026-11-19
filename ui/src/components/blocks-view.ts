@@ -35,14 +35,17 @@ export function blocksHeadline(status: BlocksStatus): string {
   if (!status.approved && status.phase === "blocks_review") return `${list.length} blocks planned. Review the block plan to start building.`;
   const parts = [`${done} of ${list.length - later} blocks done`];
   if (building) parts.push(`${building} being built`);
-  if (waiting) parts.push(`${waiting} need${waiting === 1 ? "s" : ""} your decision`);
+  if (waiting) parts.push(building ? `${waiting} stuck (you'll be asked when the others finish)` : `${waiting} need${waiting === 1 ? "s" : ""} your decision`);
   if (later) parts.push(`${later} left for later`);
   return parts.join(" · ");
 }
 
-export function blockLine(row: BlockRow): string {
+export function blockLine(row: BlockRow, othersBuilding = false): string {
   const from = row.library ? ` · from library ${row.library}` : "";
-  if (row.status === "blocked") return `Needs your decision${row.reason ? `: ${row.reason}` : ""}`;
+  if (row.status === "blocked")
+    return othersBuilding
+      ? `Stuck · Appling will ask you what to do when the blocks still building finish${row.reason ? ` (${row.reason.slice(0, 160)})` : ""}`
+      : `Needs your decision${row.reason ? `: ${row.reason.slice(0, 200)}` : ""}`;
   return `${row.label}${row.agent ? " · agent working" : ""}${from}`;
 }
 

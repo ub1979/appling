@@ -49,6 +49,9 @@ class Engine:
         self.body_edits_block = False
         self.sources = {}
         self.ready = False
+        self.root_file_once = set()     # block ids whose first attempt writes outside the block folder
+        self.body_blocker_once = None   # block id the body asks to change on its first run
+        self.body_output = False        # body leaves build output inside blocks/
 
     def role(self, run):
         return run.instructions.split('Role: ', 1)[1].splitlines()[0]
@@ -78,6 +81,9 @@ class Engine:
                 return dict(status='blocked', summary='Needs the real site', checks=[],
                             blockers=[dict(kind='implementation', detail='Posting needs the real website to finish')])
             folder = root / 'blocks' / ident; folder.mkdir(parents=True, exist_ok=True)
+            if ident in self.root_file_once:
+                self.root_file_once.discard(ident)
+                (root / 'package-lock.json').write_text('{}')   # outside its ownership
             (folder / 'ok').write_text('ok')
             (folder / 'README.md').write_text(f'# {ident}\n')
             (folder / 'block.json').write_text(json.dumps(dict(name=ident, test=block_test(ident))))
@@ -91,6 +97,12 @@ class Engine:
             with self.lock:
                 self.calls.append('body')
             (root / 'app').mkdir(exist_ok=True); (root / 'app/main.txt').write_text('42 uses notifier')
+            if self.body_blocker_once:
+                ident, self.body_blocker_once = self.body_blocker_once, None
+                return dict(status='blocked', summary='needs a block change', checks=[],
+                            blockers=[dict(kind='implementation', detail='notify() must return a message id', block=ident)])
+            if self.body_output:
+                out = root / 'blocks/notifier/dist'; out.mkdir(parents=True, exist_ok=True); (out / 'bundle.js').write_text('x')
             if self.body_edits_block:
                 (root / 'blocks/notifier/ok').write_text('changed by body')
             ev = root / '.sdlc/evidence/direct-build/body.txt'; ev.parent.mkdir(parents=True, exist_ok=True)
@@ -229,3 +241,177 @@ def test_body_cannot_edit_block_files(tmp_path):
         assert any(e['type'] == 'problem' and 'changed files inside blocks/' in e['text'] for e in store.events(pid))
     finally:
         workflow.shutdown()
+
+
+def test_retry_after_rejected_merge_runs_a_fresh_builder(tmp_path):
+    from appling.blockbuild import RETRY
+    engine = Engine(); engine.root_file_once = {'notifier'}; engine.barrier_parties = lambda: []
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        assert store.get(pid)['block_status']['notifier']['status'] == 'blocked'
+        assert 'could not be merged' in store.get(pid)['block_status']['notifier']['reason']
+        (Path(store.get(pid)['root']) / 'package-lock.json').unlink(missing_ok=True)
+        question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
+        workflow.answer(pid, question['id'], RETRY); wait_idle(workflow, pid)
+        assert engine.calls.count('block:notifier') == 2
+        assert store.get(pid)['block_status']['notifier']['status'] in {'tested', 'merged'}
+    finally:
+        workflow.shutdown()
+
+
+def test_block_integrated_but_untested_before_restart_is_tested_on_resume(tmp_path):
+    from appling.blockbuild import build
+    engine = Engine(); store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        root = Path(store.get(pid)['root'])
+        status = store.get(pid)['block_status']; status['notifier'] = dict(status='building')
+        (root / 'blocks/notifier/ok').write_text('broken')
+        store.update(pid, block_status=status, phase='blocks_build',
+                     tasks=[dict(t, status='done') for t in blocks.block_tasks(blocks.load(root), acceptance.load(root))])
+        workflow.cancelled[pid] = threading.Event()
+        calls = engine.calls.count('block:notifier')
+        try:
+            build(workflow, pid)
+        except Exception:
+            pass
+        assert store.get(pid)['block_status']['notifier']['test']['passed'] is False or engine.calls.count('block:notifier') > calls
+    finally:
+        workflow.shutdown()
+
+
+def test_typed_feedback_on_block_plan_replans_instead_of_queueing(tmp_path):
+    engine = Engine(); store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid)
+        workflow.submit(pid, 'Split the poster into its own two blocks'); wait_idle(workflow, pid)
+        assert engine.calls.count('sw-architect') == 2
+        assert store.get(pid)['queue'] == [] and store.inbox(pid)[0]['kind'] == 'blocks'
+    finally:
+        workflow.shutdown()
+
+
+def test_leave_for_later_defers_a_block_even_when_its_check_is_shared(tmp_path):
+    engine = Engine(); engine.stuck = {'poster'}
+    shared = plan_for(); shared['body']['criteria'] = ['AC-FR-1-1', 'AC-FR-3-1']
+    engine.__class__ = type('Shared', (Engine,), {})
+    orig = Engine.__call__
+    def call(self, connection, run):
+        if self.role(run) == 'sw-architect':
+            with self.lock: self.calls.append('sw-architect')
+            return shared
+        return orig(self, connection, run)
+    engine.__class__.__call__ = call
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
+        workflow.answer(pid, question['id'], LEAVE); wait_idle(workflow, pid)
+        root = Path(store.get(pid)['root'])
+        spec = acceptance.load(root)
+        assert spec['deferred_blocks'] == ['poster']
+        assert next(c for c in spec['criteria'] if c['id'] == 'AC-FR-3-1')['release'] == '1'   # body still covers it
+        approve(store, workflow, pid, 'requirements')
+        assert engine.calls.count('block:poster') == 1 and 'body' in engine.calls
+    finally:
+        workflow.shutdown()
+
+
+def test_body_interface_request_reopens_the_block_then_merges(tmp_path):
+    engine = Engine(); engine.body_blocker_once = 'notifier'; engine.barrier_parties = lambda: []
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        assert engine.calls.count('block:notifier') == 2 and engine.calls.count('block:poster') == 1
+        assert engine.calls.count('body') == 2
+        assert store.get(pid)['phase'] == 'implementation_verified'
+    finally:
+        workflow.shutdown()
+
+
+def test_unknown_block_in_body_request_does_not_loop(tmp_path):
+    engine = Engine(); engine.body_blocker_once = 'no-such-block'
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        assert engine.calls.count('body') <= 4   # bounded continuation, not 100 silent reruns
+    finally:
+        workflow.shutdown()
+
+
+def test_body_edit_to_blocks_stays_rejected_on_resume_but_build_output_is_fine(tmp_path):
+    engine = Engine(); engine.body_edits_block = True
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        engine.body_edits_block = False
+        workflow.submit(pid, 'Continue'); wait_idle(workflow, pid)
+        assert store.get(pid)['phase'] == 'body'   # the earlier edit is still detected
+    finally:
+        workflow.shutdown()
+    engine = Engine(); engine.body_output = True
+    store, workflow, pid = make(tmp_path, engine, 'output')
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        assert store.get(pid)['phase'] == 'implementation_verified'
+    finally:
+        workflow.shutdown()
+
+
+def test_plan_shows_every_command_and_runner_survives_background_processes(tmp_path):
+    spec = acceptance.normalize(CRITERIA, PREREQS, REQUIREMENTS)
+    plan = plan_for(); plan['blocks'][0]['setup'] = 'npm install'
+    assert 'Setup: `npm install`' in blocks.markdown(blocks.validate(plan, spec), spec)
+    import time as _t
+    started = _t.time()
+    code = blocks._run('sleep 30 & echo started', tmp_path, tmp_path / 'log.txt', timeout=20)
+    assert code == 0 and _t.time() - started < 10 and 'started' in (tmp_path / 'log.txt').read_text()
+
+
+def test_reused_block_with_pending_live_check_is_not_marked_verified(tmp_path, library):
+    first = Engine(); store, workflow, pid = make(tmp_path, first, 'first')
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+    finally:
+        workflow.shutdown()
+    second = Engine(); second.sources = {'poster': 'library:poster@v1'}
+    orig_plan = plan_for
+    second.barrier_parties = lambda: []
+    def call(self, connection, run):
+        if self.role(run) == 'sw-architect':
+            with self.lock: self.calls.append('sw-architect')
+            p = orig_plan(); p['blocks'][1]['source'] = 'library:poster@v1'; return p
+        return Engine.__call__(self, connection, run)
+    second.__class__ = type('Reuse', (Engine,), {'__call__': call})
+    store, workflow, pid = make(tmp_path, second, 'second')
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        meta = next(b for b in blocks.catalogue(library) if b['name'] == 'poster')
+        assert meta['status'] == 'candidate'   # its live check is still waiting on the owner
+    finally:
+        workflow.shutdown()
+
+
+def test_switching_an_existing_project_to_blocks_starts_block_planning(tmp_path):
+    from appling.direct import set_mode
+    engine = Engine(); store = Store(tmp_path / 'state'); state = store.add(tmp_path / 'legacy', execution_mode='direct')
+    workflow = Workflow(store, engine)
+    try:
+        store.update(state['id'], phase='build', paused=True)
+        set_mode(workflow, state['id'], 'blocks')
+        assert store.get(state['id'])['phase'] == 'blocks_plan'
+    finally:
+        workflow.shutdown()
+
+
+def test_block_with_red_test_history_and_live_parts_pending_is_not_stuck(tmp_path):
+    from appling.swarm import validate_checks
+    task = dict(id='speech', block='speech', acceptance=[dict(command='npm test')])
+    worker = dict(evidence='.sdlc/evidence/workers/w/')
+    live = dict(status='blocked', summary='36 tests pass; live acceptance needs the owner',
+                blockers=[dict(kind='live_acceptance', detail='needs a real meeting')],
+                checks=[dict(command='node --test red', exit_code=1, evidence='x'), dict(command='npm test', exit_code=0, evidence='y')])
+    validate_checks(tmp_path, task, worker, live)   # does not raise
+    with pytest.raises(RuntimeError, match='blocker'):
+        validate_checks(tmp_path, task, worker, dict(live, blockers=[dict(kind='implementation', detail='adapter unfinished')]))

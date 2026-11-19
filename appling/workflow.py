@@ -143,7 +143,7 @@ class Workflow:
         if kind=='user' and text.split(maxsplit=1)[0]=='/criteria':
             return self.propose_criteria(pid,text)
         with self.lock:
-            pending=[i for i in self.store.inbox(pid) if i['kind'] in {'question','prototype','requirements','plan'}
+            pending=[i for i in self.store.inbox(pid) if (i['kind']=='question' or i['kind'] in ARTIFACTS)
                      and not (i.get('runtime') and self.cancelled.get(pid,threading.Event()).is_set())]
             if len(pending)==1:
                 item=pending[0]
@@ -346,6 +346,13 @@ class Workflow:
                     if kind=='requirements' and state.get('execution_mode')=='direct':phase='build'
                     elif kind=='requirements' and state.get('execution_mode')=='blocks':
                         valid=approvals.get('blocks') and approvals['blocks']==artifact_revision(root,'blocks')
+                        if valid:
+                            # A still-approved plan must cover the current criteria (a rescope only changes Release tags).
+                            from . import blocks as block_plan
+                            plan_=block_plan.load(root);spec=acceptance.load(root)
+                            ids={c['id'] for c in spec['criteria']}
+                            owned=set(plan_['body']['criteria']).union(*(set(b['criteria']) for b in plan_['blocks']))
+                            valid=owned<=ids and all(c['id'] in owned for c in acceptance.release_one(spec))
                         phase='blocks_build' if valid else 'blocks_plan'
                     elif kind=='requirements' and approvals.get('plan') and approvals['plan']==artifact_revision(root,'plan'):phase='build'
                     self.store.update(pid,approvals=approvals,phase=phase)
@@ -362,7 +369,7 @@ class Workflow:
                                   '(keep requirement IDs stable) and return the complete updated requirements.')
                     approvals=dict(state['approvals'])
                     for k in list(approvals):
-                        if kind=='requirements' or k==kind or k=='plan':
+                        if kind=='requirements' or k==kind or k in ('plan','blocks'):
                             approvals.pop(k,None)
                     self.store.update(pid,phase=phase,approvals=approvals)
                     self.store.message(pid,'user',feedback)
@@ -690,6 +697,8 @@ class Workflow:
                 if set(acceptance.requirement_ids(result['requirements']))!=set(acceptance.requirement_ids(old_requirements)):
                     raise ValueError('A scope change may move requirements to later but cannot add or remove them.')
                 spec=acceptance.normalize(result['acceptance_criteria'],result.get('prerequisites',[]),result['requirements'])
+                old_spec=acceptance.load(root)
+                if old_spec.get('deferred_blocks'):spec['deferred_blocks']=old_spec['deferred_blocks']
                 before=artifact_revision(root,'requirements')
                 self._write(pid,'requirements.md',result['requirements']);acceptance.write(root,spec)
                 if artifact_revision(root,'requirements')==before:

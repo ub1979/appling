@@ -121,10 +121,19 @@ def set_mode(workflow, pid, mode):
         workflow.store.checkpoint(pid, 'execution-history:'+uuid.uuid4().hex,
             {k:state.get(k) for k in ('phase','tasks','workers','approvals','execution_mode')})
         phase = state['phase']
-        if phase in {'build','plan','plan_review','qa','security','code-review','accessibility','delivered'}:
+        coding = {'build','plan','plan_review','qa','security','code-review','accessibility','delivered',
+                  'blocks_plan','blocks_review','blocks_build','body','implementation_verified'}
+        if phase in coding:
             for item in workflow.store.inbox(pid):
-                if item['kind'] == 'plan':workflow.store.close(pid, item['id'])
-            phase = 'build' if mode == 'direct' else 'plan'
+                if item['kind'] in {'plan','blocks'}:workflow.store.close(pid, item['id'])
+            if mode == 'direct':
+                phase = 'build'
+            elif mode == 'planned':
+                phase = 'plan'
+            else:
+                from .workflow import artifact_revision
+                ok = state['approvals'].get('blocks') and state['approvals']['blocks'] == artifact_revision(Path(state['root']), 'blocks')
+                phase = 'blocks_build' if ok else 'blocks_plan'
         workflow.store.update(pid, execution_mode=mode, phase=phase, tasks=[], paused=True,
                               queue=[], plan_draft=None)
         workflow.store.message(pid, 'assistant',
@@ -132,12 +141,16 @@ def set_mode(workflow, pid, mode):
 
 
 def _folder_digest(root, folders):
+    """Source content only: build output, caches, dependencies and virtual environments are ignored."""
     digest = hashlib.sha256()
     for folder in folders:
         base = Path(root) / folder
         for p in sorted(base.rglob('*')) if base.is_dir() else []:
-            if p.is_file() and not p.is_symlink() and 'node_modules' not in p.parts:
-                digest.update(str(p.relative_to(root)).encode()); digest.update(p.read_bytes())
+            rel = p.relative_to(root).as_posix()
+            if (not p.is_file() or p.is_symlink() or checkpoints.denied(rel) or '.pytest_cache' in p.parts
+                    or '.build' in p.parts or '.swiftpm' in p.parts or p.name.endswith('.tsbuildinfo')):
+                continue
+            digest.update(rel.encode()); digest.update(p.read_bytes())
     return digest.hexdigest()
 
 
@@ -186,7 +199,9 @@ def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v
         retries = saved.get('retries', 0) if saved.get('turn') == turn else 0
         last_signature = None
         while True:
-            protected_before = _folder_digest(state['root'], protect) if protect else None
+            # Compare with the tested blocks recorded when block building finished, so an earlier edit is never accepted.
+            protected_before = ((workflow.store.get(pid).get('blocks_digest') or _folder_digest(state['root'], protect))
+                                if protect else None)
             result = workflow.invoke(pid, 'sw-developer', goal, session_scope=session_scope)
             if protect and _folder_digest(state['root'], protect) != protected_before:
                 raise ValueError('The app body changed files inside ' + ', '.join(protect) +
@@ -194,8 +209,9 @@ def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v
             reopen = [b for b in (result.get('blockers') or []) if isinstance(b, dict) and b.get('block') and protect]
             if reopen:
                 from .blockbuild import reopen_blocks
-                reopen_blocks(workflow, pid, reopen)
-                return
+                if reopen_blocks(workflow, pid, reopen):
+                    return
+                # Unknown or deferred block ids are ordinary blockers handled below, never a silent rerun.
             swarm.save_worker(workflow, pid, worker, result=result)
             workflow.authorized(pid)
             if workflow.cancelled[pid].is_set():

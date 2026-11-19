@@ -113,9 +113,11 @@ def validate(raw, spec, catalogue=()):
 
 
 def deferred(plan, spec):
-    """Blocks whose criteria were all moved to a later release."""
+    """Blocks the owner left for later, or whose criteria all moved to a later release."""
     release = {c['id']: c['release'] for c in spec['criteria']}
-    return {b['id'] for b in plan['blocks'] if b['criteria'] and all(release.get(c) == 'later' for c in b['criteria'])}
+    left = set(spec.get('deferred_blocks') or [])
+    return {b['id'] for b in plan['blocks']
+            if b['id'] in left or (b['criteria'] and all(release.get(c) == 'later' for c in b['criteria']))}
 
 
 def markdown(plan, spec):
@@ -134,7 +136,10 @@ def markdown(plan, spec):
     lines += [f'{i}. ' + ', '.join(wave) + (' (in parallel)' if len(wave) > 1 else '') for i, wave in enumerate(plan['waves'], 1)]
     lines += ['', '## Interfaces', '']
     for b in plan['blocks']:
-        lines += [f"### {b['name']}", '', b['interface'], '', f"Covers: {', '.join(b['criteria']) or '-'} · Test: `{b['test']}`", '']
+        lines += [f"### {b['name']}", '', b['interface'], '',
+                  f"Covers: {', '.join(b['criteria']) or '-'} · " + (f"Setup: `{b['setup']}` · " if b.get('setup') else '') + f"Test: `{b['test']}`", '']
+    if plan['body'].get('test'):
+        lines += [f"App body test: `{plan['body']['test']}`", '']
     lines += ['Approving this plan lets Appling run each block\'s setup and test commands above on this Mac to check the blocks itself.',
               'To leave a block for later, choose Request changes and say which blocks.']
     return '\n'.join(lines).strip() + '\n'
@@ -185,14 +190,32 @@ def builder_goal(block, plan, spec):
 
 
 def _run(command, root, log, timeout=900):
+    """Run an owner-approved command in its own process group; output goes to a file, not a pipe,
+    so a background child cannot hang the wait, and the whole group is killed afterwards."""
+    import signal
     started = time.time()
-    try:
-        proc = subprocess.run(command, shell=True, cwd=root, capture_output=True, text=True, timeout=timeout)
-        code, out = proc.returncode, (proc.stdout or '') + (proc.stderr or '')
-    except subprocess.TimeoutExpired as exc:
-        code, out = 124, f'Timed out after {timeout}s\n' + str(exc.stdout or '')
     log.parent.mkdir(parents=True, exist_ok=True)
-    log.write_text(f'command: {command}\nexit: {code}\nseconds: {time.time()-started:.1f}\n\n{out[-200_000:]}' or 'no output')
+    output = log.with_suffix('.out')
+    with open(output, 'w', errors='replace') as fh:
+        proc = subprocess.Popen(command, shell=True, cwd=root, stdout=fh, stderr=subprocess.STDOUT,
+                                stdin=subprocess.DEVNULL, start_new_session=True)
+        try:
+            code = proc.wait(timeout=timeout)
+        except subprocess.TimeoutExpired:
+            code = 124
+        finally:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except (ProcessLookupError, PermissionError):
+                pass
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                pass
+    text = output.read_text(errors='replace')[-200_000:]
+    output.unlink(missing_ok=True)
+    note = f'Timed out after {timeout}s\n' if code == 124 else ''
+    log.write_text(f'command: {command}\nexit: {code}\nseconds: {time.time()-started:.1f}\n\n{note}{text}')
     return code
 
 
@@ -258,7 +281,7 @@ def library_name(block):
     return block['source'][8:].split('@')[0] if block['source'].startswith('library:') else block['id']
 
 
-def publish(root, block, project, commit=None, evidence=None, home=None):
+def publish(root, block, project, commit=None, evidence=None, home=None, verified=True):
     """Save a passing block as a new immutable version; reuse in a new project marks it verified."""
     home = Path(home or library_home())
     src = Path(root) / block['folder']
@@ -275,7 +298,7 @@ def publish(root, block, project, commit=None, evidence=None, home=None):
             meta = json.loads(meta_path.read_text())
             if meta.get('digest') == digest:
                 # Unchanged library block passed in another project: it is now verified.
-                if project != meta.get('project') and project not in meta.get('verified_in', []):
+                if verified and project != meta.get('project') and project not in meta.get('verified_in', []):
                     meta['verified_in'] = [*meta.get('verified_in', []), project]
                     meta['status'] = 'verified'
                     meta_path.write_text(json.dumps(meta, indent=2))
@@ -285,7 +308,13 @@ def publish(root, block, project, commit=None, evidence=None, home=None):
         if meta_path.is_file() and json.loads(meta_path.read_text()).get('digest') == digest:
             return json.loads(meta_path.read_text())
     version = (versions[0] + 1) if versions else 1
-    target = folder / f'v{version}'
+    while True:
+        target = folder / f'v{version}'
+        try:
+            target.mkdir(parents=True, exist_ok=False)   # claim the version exclusively
+            break
+        except FileExistsError:
+            version += 1
     _copy_clean(src, target / 'source')
     if evidence and (Path(root) / evidence).is_file():
         (target / 'evidence').mkdir(parents=True, exist_ok=True)
@@ -310,7 +339,12 @@ def install(root, block, home=None):
         shutil.rmtree(dst)
     _copy_clean(src, dst)
     info = dst / 'block.json'
-    data = json.loads(info.read_text()) if info.is_file() else {}
-    data['origin'] = dict(library=name, version=version)
-    info.write_text(json.dumps(data, indent=2))
+    if info.is_file():
+        try:
+            data = json.loads(info.read_text())
+        except ValueError:
+            data = None
+        if isinstance(data, dict):
+            data['origin'] = dict(library=name, version=version)
+            info.write_text(json.dumps(data, indent=2))
     return dst

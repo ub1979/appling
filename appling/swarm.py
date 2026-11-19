@@ -73,7 +73,23 @@ class IncompleteEvidence(ValueError):
     """A recoverable handoff omission; it never counts as a passing check."""
 
 
+def block_handoff(result):
+    """A block builder's handoff. Live parts waiting on owner setup do not stop a block, and failing
+    runs recorded on the way (for example tests written first, before the code) are history: the
+    controller runs the block's approved test command itself after integration."""
+    blockers=[b for b in result.get('blockers') or [] if isinstance(b,dict)]
+    if result.get('status')=='blocked' and blockers and all(b.get('kind') in {'owner_setup','live_acceptance'} for b in blockers):
+        return dict(result,status='completed')
+    return result
+
+
 def validate_checks(root,task,worker,result):
+    if task.get('block'):
+        result=block_handoff(result)
+        if result.get('status')!='completed':
+            summary=result.get('summary')
+            raise RuntimeError('Worker reported a blocker: '+(summary[:1200] if isinstance(summary,str) and summary.strip() else 'Inspect its retained workspace.'))
+        return
     if result.get('status')!='completed':
         summary=result.get('summary')
         detail=summary[:1200] if isinstance(summary,str) and summary.strip() else 'Inspect its retained workspace and checkpoint.'

@@ -20,7 +20,7 @@ export function BlocksPanel({ id, refresh }: { id: string; refresh: number }) {
         {status.blocks.map(b => (
           <li key={b.id} className={`block-row block-${b.status}`} style={{ marginBottom: 8 }} title={b.purpose}>
             <div className="small"><b>{b.name}</b>{b.runtime === "service" ? <span className="tiny muted"> · own process</span> : null}</div>
-            <div className="tiny muted">{blockLine(b)}</div>
+            <div className="tiny muted">{blockLine(b, status.blocks.some(x => x.status === "building"))}</div>
           </li>
         ))}
       </ul>

@@ -12,12 +12,14 @@ const base: BlocksStatus = {
 
 describe("blocks view", () => {
   it("summarises blocks in plain words", () => {
-    expect(blocksHeadline(base)).toBe("1 of 3 blocks done · 1 being built · 1 needs your decision · 1 left for later");
+    expect(blocksHeadline(base)).toBe("1 of 3 blocks done · 1 being built · 1 stuck (you'll be asked when the others finish) · 1 left for later");
+    expect(blocksHeadline({ ...base, blocks: base.blocks.filter(b => b.status !== "building") })).toBe("1 of 2 blocks done · 1 needs your decision · 1 left for later");
     expect(blocksHeadline({ ...base, approved: false, phase: "blocks_review" })).toBe("4 blocks planned. Review the block plan to start building.");
   });
 
   it("explains blocked blocks and library origin", () => {
     expect(blockLine(base.blocks[1])).toBe("Needs your decision: needs the real site");
+    expect(blockLine(base.blocks[1], true)).toContain("Appling will ask you what to do when the blocks still building finish");
     expect(blockLine({ ...base.blocks[0], library: "notifier@v1" })).toBe("Tested · from library notifier@v1");
     expect(blockLine(base.blocks[2])).toBe("Building · agent working");
   });
