@@ -31,12 +31,27 @@ class Engine:
         self.implemented = True      # whether the FR-2 adapter code exists
         self.live_ok = True          # whether a real live check would pass once setup is ready
         self.failed_check = None     # None | 'linked' | 'unlinked' failing builder check
+        self.impl_blocker = False    # builder cannot finish the FR-2 adapter
+        self.drop_requirement = False
+        self.rescope_prompts = []
+
+    @staticmethod
+    def scope_resolved(root):
+        spec = root / acceptance.SPEC
+        return spec.exists() and any(c['release'] == 'later' for c in json.loads(spec.read_text())['criteria'])
 
     def __call__(self, connection, run):
         brief = json.loads(run.prompt)
         role = run.instructions.split('Role: ', 1)[1].splitlines()[0]
         self.calls.append(role)
         root = run.root
+        if role == 'req-engineer' and 'Owner decision:' in run.prompt:
+            self.rescope_prompts.append(run.prompt)
+            if self.drop_requirement:
+                return dict(requirements='# App\n\n- FR-1: Show the saved number.\n', acceptance_criteria=[CRITERIA[0]], prerequisites=PREREQS)
+            later = [dict(c, release='later') if c['requirement'] == 'FR-2' else c for c in self.criteria]
+            return dict(summary='FR-2 moved to later', requirements=REQUIREMENTS.replace('account.', 'account. Release: later'),
+                        acceptance_criteria=later, prerequisites=PREREQS)
         if role == 'req-engineer':
             return dict(requirements=REQUIREMENTS, acceptance_criteria=self.criteria, prerequisites=PREREQS)
         if role == 'ui-designer':
@@ -53,6 +68,9 @@ class Engine:
             evidence.write_text(f'command: unit tests\nexit: 0\nok at {time.time_ns()}\n')
             blockers = [dict(kind='owner_setup', detail='Owner must sign in to the posting account', criteria=['AC-FR-2-1'])] \
                 if self.owner_blocker else []
+            if self.impl_blocker and not self.scope_resolved(root):
+                blockers.insert(0, dict(kind='implementation', detail='Posting adapter needs the real site to finish',
+                                        criteria=['AC-FR-2-1'], next_action='Build the account posting adapter'))
             checks = [dict(command='unit tests', exit_code=0, evidence='.sdlc/evidence/direct-build/build.txt')]
             if self.failed_check:
                 failed = root / '.sdlc/evidence/direct-build/live.txt'
@@ -381,3 +399,77 @@ def test_evaluate_rejects_old_evidence_and_live_pass_before_setup(tmp_path):
     assert early['status'] == 'pending_owner' and early['owner'] == 'you'
     ready = acceptance.evaluate(root, spec, {'prerequisites_done': {'P-login': 1}}, live, 'rev', evidence_prefix='.sdlc/evidence/run/')
     assert ready['AC-FR-2-1']['status'] == 'passed'
+
+
+from appling.direct import BUILD_SOME, KEEP_ALL, LEAVE_ALL, PROVIDE_FIRST
+
+
+def scope_question(store, pid):
+    items = [i for i in store.inbox(pid) if i.get('scope')]
+    assert len(items) == 1
+    return items[0]
+
+
+def stuck(tmp_path):
+    engine = Engine(); engine.impl_blocker = True
+    store, workflow, pid = make(tmp_path, engine)
+    to_build(store, workflow, pid)
+    return engine, store, workflow, pid
+
+
+def test_unfinishable_parts_are_put_to_the_owner_as_a_choice(tmp_path):
+    engine, store, workflow, pid = stuck(tmp_path)
+    try:
+        item = scope_question(store, pid)
+        assert item['choices'] == [BUILD_SOME, LEAVE_ALL, KEEP_ALL, PROVIDE_FIRST]
+        assert 'Build the account posting adapter' in item['question']
+        assert engine.calls.count('sw-developer') == 2 and 'qa-engineer' not in engine.calls
+    finally:
+        workflow.shutdown()
+
+
+def test_leaving_parts_for_later_needs_owner_review_then_builds_release_one_only(tmp_path):
+    engine, store, workflow, pid = stuck(tmp_path)
+    try:
+        item = scope_question(store, pid)
+        workflow.answer(pid, item['id'], LEAVE_ALL); wait_idle(workflow, pid)
+        assert 'Build the account posting adapter' in engine.rescope_prompts[0]
+        state = store.get(pid)
+        assert state['phase'] == 'requirements_review' and 'requirements' not in state['approvals']
+        review = store.inbox(pid)[0]
+        assert review['kind'] == 'requirements' and '| AC-FR-2-1 | FR-2 | later |' in review['question']
+        builds = engine.calls.count('sw-developer')
+        approve(store, workflow, pid, 'requirements')
+        assert engine.calls.count('sw-developer') == builds + 1
+        assert store.get(pid)['phase'] == 'delivered'
+        assert set(workflow.acceptance_status(pid)['results']) == {'AC-FR-1-1'}
+    finally:
+        workflow.shutdown()
+
+
+def test_keep_building_reruns_the_builder_and_provide_access_runs_nothing(tmp_path):
+    engine, store, workflow, pid = stuck(tmp_path)
+    try:
+        builds = engine.calls.count('sw-developer')
+        workflow.answer(pid, scope_question(store, pid)['id'], PROVIDE_FIRST); wait_idle(workflow, pid)
+        assert engine.calls.count('sw-developer') == builds and store.get(pid)['paused']
+        assert any('Tick each setup item' in m['content'] for m in store.messages(pid))
+        workflow.submit(pid, 'Continue'); wait_idle(workflow, pid)
+        workflow.answer(pid, scope_question(store, pid)['id'], KEEP_ALL); wait_idle(workflow, pid)
+        assert engine.calls.count('sw-developer') > builds + 1
+        assert 'req-engineer' not in engine.calls[2:]
+    finally:
+        workflow.shutdown()
+
+
+def test_owner_can_type_which_parts_to_build_and_scope_change_cannot_drop_requirements(tmp_path):
+    engine, store, workflow, pid = stuck(tmp_path)
+    try:
+        engine.drop_requirement = True
+        workflow.submit(pid, 'Build the number screen now; leave posting for later'); wait_idle(workflow, pid)
+        assert 'leave posting for later' in engine.rescope_prompts[0]
+        assert any(e['type'] == 'problem' and 'cannot add or remove' in e['text'] for e in store.events(pid))
+        root = Path(store.get(pid)['root'])
+        assert 'FR-2' in (root / 'requirements.md').read_text()
+    finally:
+        workflow.shutdown()

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AcceptanceStatus } from "../api";
-import { headline, openSetup, rows } from "./acceptance-view";
+import { headline, openSetup, rows, setupNeededNow } from "./acceptance-view";
 
 const base: AcceptanceStatus = {
   phase: "implementation_verified", derived: false, outcome: "pending_owner",
@@ -27,6 +27,7 @@ describe("acceptance view", () => {
     expect(headline(base)).toContain("live acceptance pending");
     expect(headline(base)).toContain("Not delivered");
     expect(openSetup(base).map(p => p.id)).toEqual(["P-login"]);
+    expect(setupNeededNow(base)).toBe(true);
   });
 
   it("counts unverified and stale results instead of hiding them", () => {
@@ -38,5 +39,11 @@ describe("acceptance view", () => {
   it("reports delivery only when every criterion passed", () => {
     const done = { ...base, phase: "delivered", results: { "AC-FR-1-1": { status: "passed" as const }, "AC-FR-2-1": { status: "passed" as const } } };
     expect(headline(done)).toBe("Delivered: all 2 criteria passed.");
+  });
+
+  it("says plainly that nothing is needed before QA has run", () => {
+    const fresh = { ...base, phase: "build", results: {} };
+    expect(headline(fresh)).toBe("2 checks, not run yet. Independent QA runs them after coding finishes. Nothing is needed from you now.");
+    expect(setupNeededNow(fresh)).toBe(false);
   });
 });

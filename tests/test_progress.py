@@ -21,8 +21,8 @@ def test_written_updates_are_due_every_five_minutes_and_persist_without_changing
     assert store.get(pid)==before
     messages=Store(store.home).messages(pid)
     assert len(messages)==2 and all(m['kind']=='progress' for m in messages)
-    assert '1 returned a nonzero' in messages[0]['content']
-    assert 'No completed commands' in messages[1]['content']
+    assert 'building and testing the app' in messages[0]['content'] and 'nonzero' not in messages[0]['content']
+    assert 'No activity in the last five minutes' in messages[1]['content']
     assert len([e for e in store.events(pid) if e['type']=='status_update'])==2
 
 
@@ -51,7 +51,7 @@ def test_reports_are_labelled_redacted_and_raw_commands_and_secret_questions_are
     store.ask(pid,'secret','private-secret-question',[])
     assert publish_due(store,pid,now=started+300)
     text=store.messages(pid)[0]['content']
-    assert 'not independent verification' in text and '[REDACTED]' in text
+    assert 'not yet checked' in text and '[REDACTED]' in text
     assert all(s not in text for s in ['private-progress-secret','raw-sensitive-command','private-secret-question'])
 
 

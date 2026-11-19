@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type AcceptanceStatus } from "../api";
-import { headline, openSetup, rows, STATUS_LABEL } from "./acceptance-view";
+import { headline, openSetup, rows, setupNeededNow, STATUS_LABEL } from "./acceptance-view";
 
 export function AcceptancePanel({ id, refresh }: { id: string; refresh: number }) {
   const [status, setStatus] = useState<AcceptanceStatus | null>(null);
@@ -25,8 +25,11 @@ export function AcceptancePanel({ id, refresh }: { id: string; refresh: number }
       {status.derived && <p className="tiny muted">Criteria are derived one per requirement. Send <code>/criteria</code> to propose
         approved criteria and setup items, including live checks that may wait on you.</p>}
       {status.prerequisites.length > 0 && (
-        <div style={{ marginBottom: 8 }}>
-          <div className="small muted">Setup you provide{waiting.length ? ` · ${waiting.length} open` : " · all marked done"}</div>
+        <details open={setupNeededNow(status)} style={{ marginBottom: 8 }}>
+          <summary className="small muted" style={{ cursor: "pointer" }}>
+            {setupNeededNow(status) ? `Your turn: ${waiting.length} setup item${waiting.length === 1 ? "" : "s"} needed for the live checks`
+              : `Setup you'll provide later (${status.prerequisites.length}) · not needed yet`}
+          </summary>
           <ul className="setup-list" style={{ listStyle: "none", padding: 0, margin: "4px 0 0" }}>
             {status.prerequisites.map(p => (
               <li key={p.id} className="small" style={{ display: "flex", gap: 8, alignItems: "baseline" }}>
@@ -36,8 +39,8 @@ export function AcceptancePanel({ id, refresh }: { id: string; refresh: number }
               </li>
             ))}
           </ul>
-          <p className="tiny muted" style={{ margin: "4px 0 0" }}>Marking an item done only allows its live checks to run again; it never passes them.</p>
-        </div>
+          <p className="tiny muted" style={{ margin: "4px 0 0" }}>Tick an item once it is ready. That lets its live checks run; it never passes them.</p>
+        </details>
       )}
       {list.length > 0 && (
         <details open={status.phase === "implementation_verified"}>

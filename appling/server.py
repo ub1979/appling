@@ -196,7 +196,7 @@ def create_app(home=None,execute=None):
         phases=[]
         names=['requirements','prototype',*(['plan'] if p.get('execution_mode','planned')=='planned' else []),'build','qa']
         names += [name for name,role in [('code-review','code-reviewer'),('security','security-auditor'),('accessibility','a11y-auditor')] if role in p['team']]
-        stage={'criteria':'requirements','implementation_verified':'qa'}.get(phase,phase.replace('_review',''))
+        stage={'criteria':'requirements','rescope':'requirements','implementation_verified':'qa'}.get(phase,phase.replace('_review',''))
         position=names.index(stage) if stage in names else len(names)
         role_map={'requirements':'req-engineer','prototype':'ui-designer','plan':'task-planner','build':'sw-developer','qa':'qa-engineer','security':'security-auditor','code-review':'code-reviewer','accessibility':'a11y-auditor'}
         for index,name in enumerate(names):

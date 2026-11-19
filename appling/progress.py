@@ -36,20 +36,32 @@ def publish_due(store, pid, *, now=None, interval=INTERVAL):
         recent = [e for e in events if e.get('ts',0) >= now-interval]
         commands = [e for e in recent if e['type']=='tool' and e.get('phase')=='complete' and e.get('name')=='commandExecution']
         failed = sum(type(e.get('exit_code')) is int and e['exit_code']!=0 for e in commands)
-        labels = {'build':'Coding and integration','qa':'Independent QA','security':'Security review','prototype':'Prototype design','requirements':'Requirements','plan':'Implementation planning','code-review':'Code review','accessibility':'Accessibility review'}
-        lines = [f"Progress update — {labels.get(state['phase'],state['phase'])} is active."]
-        if commands:lines.append(f"In the last five minutes, {len(commands)} command(s) finished; {failed} returned a nonzero exit code. These results do not establish release acceptance.")
-        else:lines.append('No completed commands were reported in the last five minutes. The job is still marked running; this alone does not prove progress.')
-        if any(e['type']=='native_agent' or e.get('name')=='subAgentActivity' for e in recent):
-            lines.append('Native coding-agent activity was reported; an exact concurrent agent count is unavailable.')
+        # Plain language for the owner: what stage the project is in, what the
+        # builder says it is working on, and whether anything needs them.
+        labels = {'build':'building and testing the app','qa':'independently checking the app','security':'reviewing security',
+                  'prototype':'designing the prototype','requirements':'writing the requirements','plan':'planning the build',
+                  'code-review':'reviewing the code','accessibility':'checking accessibility','criteria':'drafting acceptance checks'}
+        lines = [f"Still working on {state.get('name','your project')}: {labels.get(state['phase'],state['phase'])}."]
         reports = [e for e in recent if e['type']=='worker_commentary' and isinstance(e.get('text'),str)]
-        if reports:lines.append('Latest agent report (not independent verification): '+safe_diagnostic(reports[-1]['text'])[:800])
+        if reports:
+            lines.append('What the builder says it is doing (its own words, not yet checked): '+safe_diagnostic(reports[-1]['text'])[:400])
+        if not commands and not reports:
+            lines.append('No activity in the last five minutes. It may be thinking or stuck; Appling will keep watching.')
+        try:
+            from . import acceptance
+            root=__import__('pathlib').Path(state['root'])
+            results=acceptance.load_results(root)
+            if results:
+                passed=sum(r.get('status')=='passed' for r in results.values())
+                lines.append(f'Checks passed at the last QA run: {passed} of {len(results)}.')
+        except Exception:
+            pass
         current = {t['id'] for t in state.get('tasks',[]) if t.get('status')!='done'}
         latest = {w['task_id']:w for w in state.get('workers',[])}
         blocked = [w['task_id'] for w in latest.values() if w['task_id'] in current and w['status'] in {'blocked','conflict'}]
-        if blocked:lines.append('Blocked work: '+', '.join(blocked)+'. Retained changes are not treated as completed.')
+        if blocked:lines.append('Some work is paused and needs attention: '+', '.join(blocked)+'.')
         waiting = db.execute('SELECT COUNT(*) FROM inbox WHERE project=?',(pid,)).fetchone()[0]
-        if waiting:lines.append(f'{waiting} question or approval request(s) are waiting for your input.')
+        lines.append(f'You have {waiting} question(s) or approval(s) waiting.' if waiting else 'Nothing is needed from you right now.')
         message = dict(role='assistant',kind='progress',content='\n\n'.join(lines))
         cursor = db.execute('SELECT COALESCE(MAX(seq),0) FROM events WHERE project=?',(pid,)).fetchone()[0]
         db.execute('INSERT INTO messages(project,data) VALUES (?,?)',(pid,json.dumps(message)))

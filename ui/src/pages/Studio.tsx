@@ -560,37 +560,19 @@ export function Studio({ id }: { id: string }) {
         <aside className="side right">
           <section className="panel">
             <h3>Project map</h3>
+            {/* The controller's own phase list is the only source of truth here. */}
             <ol className="phase-list">
-              {phases.ordered.map((pid, i) => {
-                const state = phases.completed.has(pid)
-                  ? "done"
-                  : phases.current === pid
-                    ? (phases.waiting ? "owner" : "now")
-                    : workingIds.has(pid)
-                      ? "now"
-                      : "pending";
+              {(map?.phases ?? []).map((p, i) => {
+                const state = p.state === "running" ? "now" : p.state === "blocked" ? "owner" : p.state;
                 return (
-                  <li key={pid} className={`phase ${state}`}>
+                  <li key={`${i}-${p.name}`} className={`phase ${state}`}>
                     <span className="dot">{state === "done" ? "✓" : state === "owner" ? "!" : i + 1}</span>
-                    <span className="name">{labelOf(pid)}</span>
-                    <span className="state">{state === "done" ? "Done" : state === "owner" ? "Needs you" : state === "now" ? "Now" : ""}</span>
+                    <span className="name">{p.name}</span>
+                    <span className="state">{state === "done" ? "Done" : state === "owner" ? (p.state === "blocked" ? "Paused" : "Needs you") : state === "now" ? "Now" : ""}</span>
                   </li>
                 );
               })}
             </ol>
-            {map?.exists && map.phases.length > 0 && (
-              <details style={{ marginTop: 10 }}>
-                <summary className="small muted" style={{ cursor: "pointer" }}>From the project plan</summary>
-                <ol className="phase-list" style={{ marginTop: 6 }}>
-                  {map.phases.map((p, i) => (
-                    <li key={`${i}-${p.name}`} className={`phase ${p.state === "running" ? "now" : p.state}`} title={p.status}>
-                      <span className="dot">{p.state === "done" ? "✓" : p.state === "owner" ? "!" : "·"}</span>
-                      <span className="name">{p.name}</span>
-                    </li>
-                  ))}
-                </ol>
-              </details>
-            )}
           </section>
           <AcceptancePanel id={id} refresh={live.turnsEnded} />
           <UsagePanel id={id} refresh={live.turnsEnded + live.helperChanges} agents={agents} />

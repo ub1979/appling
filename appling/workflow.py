@@ -352,6 +352,19 @@ class Workflow:
                     self.store.update(pid,phase=phase,approvals=approvals)
                     self.store.message(pid,'user',feedback)
                     self.submit(pid,feedback,kind='auto')
+            elif item.get('scope'):
+                from .direct import KEEP_ALL, PROVIDE_FIRST
+                self.store.close(pid,iid);self.store.message(pid,'user',choice,'answer')
+                if choice==KEEP_ALL:
+                    self.store.update(pid,phase='build',stalled_attempts=0,last_wait_signature=None)
+                    self.submit(pid,'The owner chose to keep all remaining parts in this release. Continue building them.',kind='auto')
+                elif choice==PROVIDE_FIRST:
+                    self.store.update(pid,paused=True)
+                    self.store.message(pid,'assistant','OK. Tick each setup item in the Acceptance panel when it is ready, then send "continue". '
+                                       'Nothing will run until then.','status')
+                else:
+                    self.store.update(pid,phase='rescope',rescope=dict(choice=choice,parts=item.get('parts',[])))
+                    self.submit(pid,choice,kind='auto')
             else:
                 self.store.close(pid,iid);self.store.message(pid,'user',choice,'answer')
                 self.submit(pid,choice,kind='auto')
@@ -632,6 +645,29 @@ class Workflow:
                 self.store.update(pid,phase='prototype_review');self.review(pid,'prototype');return
             elif phase=='prototype_review':
                 self.review(pid,'prototype');return
+            elif phase=='rescope':
+                root=Path(state['root']);old_requirements=safe_path(root,'requirements.md').read_text()
+                request=state.get('rescope') or {}
+                result=self.invoke(pid,'req-engineer',f'Owner decision: {text}\nParts that could not be finished: '+json.dumps(request.get('parts',[]))+
+                    '\nApply only the owner\'s decision to release scope. Keep every requirement and criterion; change only Release tags '
+                    '(in requirements.md and the acceptance criteria) for the parts the owner chose to leave for later. '
+                    'If the owner said to build some, keep those in release 1 and move the rest. If the decision is unclear, ask one question. '
+                    'Return {"summary":"...","question":"only if unclear","choices":["..."]} or {"summary":"plain list of what moved to later and what stays",'
+                    '"requirements":"complete updated Markdown","acceptance_criteria":[...all criteria...],"prerequisites":[...]}.',readonly=True)
+                if result.get('question'):
+                    self.store.ask(pid,'question',result['question'],result.get('choices',[]));return
+                if not isinstance(result.get('requirements'),str) or not result.get('acceptance_criteria'):
+                    raise ValueError('The scope change is incomplete. Send your decision again.')
+                if set(acceptance.requirement_ids(result['requirements']))!=set(acceptance.requirement_ids(old_requirements)):
+                    raise ValueError('A scope change may move requirements to later but cannot add or remove them.')
+                spec=acceptance.normalize(result['acceptance_criteria'],result.get('prerequisites',[]),result['requirements'])
+                before=artifact_revision(root,'requirements')
+                self._write(pid,'requirements.md',result['requirements']);acceptance.write(root,spec)
+                if artifact_revision(root,'requirements')==before:
+                    self.store.update(pid,phase='build',rescope=None);text='Continue building; the release scope did not change.';continue
+                approvals={k:v for k,v in state['approvals'].items() if k!='requirements'}
+                self.store.update(pid,phase='requirements_review',approvals=approvals,rescope=None)
+                self.review(pid,'requirements');return
             elif phase=='criteria':
                 root=Path(state['root']);requirements=safe_path(root,'requirements.md').read_text()
                 result=self.invoke(pid,'req-engineer',f'{text}\nThe requirements in requirements.md are already written. Do not change them or add scope. '
@@ -714,7 +750,9 @@ class Workflow:
                         tasks=state['tasks']+[dict(id=f'repair-{state["revision"]}-{cycles}',goal=json.dumps(repair),depends_on=[],role='sw-developer',status='pending')]
                         self.store.update(pid,tasks=tasks,phase='build',repair_cycles=cycles);continue
                     missing=[i for i,r in results.items() if r['status']=='not_run']
-                    if missing or not valid or (result.get('verdict')!='pass' and status!='pending_owner'):
+                    # The controller judges release-1 criteria itself; a verifier's overall "blocked"
+                    # caused only by later-release or owner-pending items does not block.
+                    if missing or not valid or result.get('verdict') not in {'pass','blocked'}:
                         detail=('Not verified: '+', '.join(missing[:20])) if missing else 'Evidence is incomplete or the verdict is blocked.'
                         raise RuntimeError('Verification is blocked or has unresolved findings. Evidence and findings are saved; review them before continuing. '+detail)
                 else:
@@ -774,7 +812,8 @@ class Workflow:
     def _criteria_brief(self,state):
         spec=acceptance.load(Path(state['root']))
         pending=[c['id'] for c in acceptance.release_one(spec) if acceptance.deferrable(spec,c,state)]
-        return (' Verify every approved release-1 acceptance criterion in .sdlc/acceptance.json (or derived from requirements.md when absent) '
+        return (' Verify every approved release-1 acceptance criterion in .sdlc/acceptance.json (or derived from requirements.md when absent); '
+            'criteria with release "later" are out of scope, so do not test or report them '
             'and add "criteria":[{"id":"AC-...","status":"passed|failed|pending_owner|not_run","implemented":true,'
             '"command":"actual command","exit_code":0,"evidence":"path","detail":"...","next_action":"..."}]. '
             'Confirm each criterion\'s implementation exists in source (real route/adapter/code path, not a stub) and run its locally testable behaviour, '

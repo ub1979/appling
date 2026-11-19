@@ -7,6 +7,23 @@ import uuid
 from . import acceptance, checkpoints, swarm
 
 MAX_CONTINUATIONS = 3
+KEEP_ALL = 'Keep building all of them'
+BUILD_SOME = 'Build some now, leave the rest for later'
+LEAVE_ALL = 'Leave all of them for later'
+PROVIDE_FIRST = "I'll provide the access first"
+SCOPE_CHOICES = [BUILD_SOME, LEAVE_ALL, KEEP_ALL, PROVIDE_FIRST]
+
+
+def ask_scope(workflow, pid, parts, intro):
+    """Put unfinishable parts to the owner. Only the owner may move scope to a later release."""
+    for item in workflow.store.inbox(pid):
+        if item.get('scope'):workflow.store.close(pid, item['id'])
+    lines = [intro, '']
+    lines += [f'- {p}' for p in parts[:12]]
+    lines += ['', 'These usually need real accounts, devices or services to build and test properly. '
+              'You can keep them, build only some (say which), leave them for a later release, or set up access first. '
+              'Moving anything to later changes the requirements, so you will review that change before coding continues.']
+    return workflow.store.ask(pid, 'question', '\n'.join(lines), SCOPE_CHOICES, scope=True, parts=parts[:12])
 
 
 def _blockers(result):
@@ -140,7 +157,10 @@ def build(workflow, pid, feedback):
             '[{"command":"actual command","exit_code":0,"evidence":".sdlc/evidence/direct-build/..."}],'
             '"blockers":[{"kind":"implementation|owner_setup|live_acceptance","detail":"...","criteria":["AC-..."],"evidence":"path","next_action":"..."}]}. '
             'Implement and locally test the code paths of live criteria too; owner setup postpones only the live check. '
-            'A completed response hands the built application to independent QA; it never declares delivery.')
+            'A completed response hands the built application to independent QA; it never declares delivery. '
+            'Build only release-1 requirements; anything tagged Release: later is out of scope for now. '
+            'Write progress commentary for a non-technical owner: name the app feature you are working on and what now works, '
+            'without file, function or test names.')
         current = workflow.store.get(pid)
         if (current.get('last_wait_reason') == 'prerequisites' and current.get('stalled_attempts', 0) >= 1
                 and current.get('last_wait_signature') == progress_signature(state['root'], current, worker.get('result'))):
@@ -163,10 +183,15 @@ def build(workflow, pid, feedback):
                 raise InterruptedError('Stopped. Builder files and session are retained.')
             if result.get('status') not in {'completed','blocked'}:
                 raise ValueError('Builder must return a completed or blocked handoff.')
-            blockers = _blockers(result)
+            spec = acceptance.load(Path(state['root']))
+            later = {c['id'] for c in spec['criteria'] if c['release'] == 'later'}
+            # Blockers that concern only parts the owner moved to a later release are out of scope now.
+            blockers = [b for b in _blockers(result)
+                        if not (isinstance(b.get('criteria'), list) and b['criteria'] and set(b['criteria']) <= later)]
+            if not blockers and result['status'] == 'blocked' and len(_blockers(result)) > 0:
+                result = dict(result, status='completed')
             if result['status'] == 'completed' and not blockers:
                 break
-            spec = acceptance.load(Path(state['root']))
             current = workflow.store.get(pid)
             allowed_failures, unlinked_failures = deferred_failures(result, spec, current)
             implementation = [b for b in blockers if b['kind'] == 'implementation'] + [
@@ -223,6 +248,9 @@ def build(workflow, pid, feedback):
             details = '\n'.join(f"- {b['kind'].replace('_',' ')} ({b['owner']}): {b['next_action']}"
                                 + (f" [criteria: {', '.join(b['criteria'])}]" if b.get('criteria') else '')
                                 + (f" [evidence: {b['evidence']}]" if b.get('evidence') else '') for b in blockers)
+            if implementation:
+                ask_scope(workflow, pid, [str(b.get('next_action') or b['detail'])[:300] for b in blockers if b['kind'] == 'implementation'],
+                          f"Some parts of {current.get('name') or 'the app'} could not be finished after several coding rounds:")
             raise WorkWaiting(message+('\n'+details if details else ''),reason=reason,blockers=blockers)
         # Reuse the receipt/exit/path checks, without inventing a planned graph.
         swarm.validate_checks(Path(state['root']), {}, worker, result)

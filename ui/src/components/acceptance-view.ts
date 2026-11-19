@@ -16,6 +16,7 @@ export interface AcceptanceRow {
   stale: boolean;
   next: string;
   owner: string;
+  checked: boolean;
 }
 
 export function rows(status: AcceptanceStatus): AcceptanceRow[] {
@@ -25,6 +26,7 @@ export function rows(status: AcceptanceStatus): AcceptanceRow[] {
       id: c.id, requirement: c.requirement, description: c.description, live: c.live,
       status: r?.status ?? "not_run", stale: Boolean(r?.stale),
       next: r?.next_action ?? "", owner: r?.owner === "you" ? "You" : r?.owner === "builder" ? "Builder" : "",
+      checked: Boolean(r && (r.status !== "not_run" || r.stale)),
     };
   });
 }
@@ -33,6 +35,8 @@ export function rows(status: AcceptanceStatus): AcceptanceRow[] {
 export function headline(status: AcceptanceStatus): string {
   const list = rows(status);
   if (!list.length) return "No acceptance criteria yet.";
+  if (!list.some(r => r.checked))
+    return `${list.length} checks, not run yet. Independent QA runs them after coding finishes. Nothing is needed from you now.`;
   const count = (s: CriterionStatus) => list.filter(r => r.status === s).length;
   if (status.phase === "implementation_verified" && count("pending_owner"))
     return `Implementation verified; live acceptance pending (${count("pending_owner")} waiting on you). Not delivered yet.`;
@@ -42,6 +46,11 @@ export function headline(status: AcceptanceStatus): string {
   if (count("pending_owner")) parts.push(`${count("pending_owner")} waiting on you`);
   if (count("not_run")) parts.push(`${count("not_run")} not verified`);
   return parts.join(" · ");
+}
+
+/** Owner setup only matters once local work is verified; earlier it is information. */
+export function setupNeededNow(status: AcceptanceStatus): boolean {
+  return status.phase === "implementation_verified" && openSetup(status).length > 0;
 }
 
 export function openSetup(status: AcceptanceStatus) {
