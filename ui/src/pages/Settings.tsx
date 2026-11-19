@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api, type AiConnection, type AgentModelSetting, type AiSettings, type ConnectionTestResult, type ModelOptions, type ModelSelection, type ProjectDetail } from "../api";
 import { WorkerSettings } from "../components/WorkerSettings";
+import { PhoneConnections } from "../components/PhoneConnections";
 import { Brand, PrefButtons } from "../components/common";
 import { DEFAULT_EFFORT_LABEL, HERMES_EFFORT_LEVELS, effortName } from "../effort";
 import { go } from "../router";
@@ -114,12 +115,18 @@ export function Settings({ projectId }: { projectId: string | null }) {
           </section>
 
           <WorkerSettings value={settings.parallel_work.max_workers}
-            onSave={(max_workers) => run(async () => setSettings(await api.settingsSave({ parallel_work: { max_workers } })), "Worker limit saved. Active work continues safely.")} />
+            agentsPerProject={settings.parallel_work.agents_per_project ?? 3}
+            onSave={async (parallel_work) => {
+              setSettings(await api.settingsSave({ parallel_work }));
+              setNote("Worker limits saved. Active work continues safely.");
+            }} />
 
           <Connections settings={settings} options={options} onSave={async (id, connection) => {
             setSettings(await api.settingsSave({ connections: { [id]: connection } }));
             await loadModels(true);
           }} />
+
+          <PhoneConnections />
 
           <AboutMe
             initial={settings.about_me}
@@ -129,6 +136,18 @@ export function Settings({ projectId }: { projectId: string | null }) {
           {project && (
             <section className="card card-pad">
               <h2 style={{ fontSize: 20 }}>This project: {project.name}</h2>
+              <label><span className="field-label">Build coordination</span>
+                <select value={project.execution_mode ?? "planned"} disabled={project.running}
+                  onChange={event => { const execution_mode = event.target.value; void run(async () => {
+                    const updated = await api.settings(project.id, { execution_mode }) as ProjectDetail;
+                    if (updated.execution_mode !== execution_mode) throw new Error("Restart Appling to load build coordination settings.");
+                    setProject(updated);
+                  }, "Saved. Return to the project and send a message to continue."); }}>
+                  <option value="direct">Let the coding engine coordinate (default)</option>
+                  <option value="planned">Review a separate implementation plan</option>
+                </select>
+              </label>
+              <p className="small muted">Appling keeps requirements, approvals and independent QA. The coding engine can call specialists and coordinate their work. Changing this setting preserves files and saved handoffs.</p>
               <p style={{ margin: "14px 0 4px" }}><b>{project.engine}</b> · Project memory stays with Appling</p>
               <p className="muted small">Uses the saved model and effort for each agent.</p>
             </section>

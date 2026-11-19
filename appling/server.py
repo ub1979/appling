@@ -21,6 +21,7 @@ from .preview import Previews
 from .store import Store, safe_path
 from .workflow import Workflow, ARTIFACTS, artifact_revision
 from . import connections
+from .messaging import PhoneConnections
 
 
 def create_app(home=None,execute=None):
@@ -30,14 +31,19 @@ def create_app(home=None,execute=None):
     token=secrets.token_urlsafe(32)
     default_root=home/'projects';default_root.mkdir(exist_ok=True)
     model_cache={}
+    phone=PhoneConnections(store,workflow,home)
 
     @asynccontextmanager
     async def lifespan(app):
-        yield
-        await asyncio.to_thread(workflow.shutdown);await asyncio.to_thread(previews.close)
+        phone.start()
+        try:
+            yield
+        finally:
+            await asyncio.to_thread(phone.close)
+            await asyncio.to_thread(workflow.shutdown);await asyncio.to_thread(previews.close)
 
     app=FastAPI(title='Appling C',lifespan=lifespan)
-    app.state.store=store;app.state.workflow=workflow;app.state.token=token
+    app.state.store=store;app.state.workflow=workflow;app.state.token=token;app.state.phone=phone
 
     @app.exception_handler(ValueError)
     async def bad_request(request,exc):
@@ -67,15 +73,20 @@ def create_app(home=None,execute=None):
         s=workflow.settings();selection=dict(provider=s['provider'],model=s['model'],effort=s.get('effort',''))
         return dict(engine=s['provider'],hermes=selection,hermes_effort=dict(effort=s.get('effort',''),effective=s.get('effort',''),overridden=False),
             about_me=s.get('about_me',''),connections=s['connections'],installed=available(),
-            parallel_work=dict(max_workers=s.get('parallel_work',{}).get('max_workers',3),maximum=8,default=3,active=len(workflow.active)),
+            parallel_work=dict(max_workers=s.get('parallel_work',{}).get('max_workers',3),maximum=8,default=3,active=len(workflow.active),
+                agents_per_project=s.get('parallel_work',{}).get('agents_per_project',3),agents_maximum=6),
             agent_models=[dict(id=a[0],label=a[1],default=selection,selection=s.get('agent_models',{}).get(a[0])) for a in CATALOG['AGENTS']])
 
     def detail(pid):
         p=store.get(pid);items=store.inbox(pid)
-        helpers=[dict(id=role,goal=role,started=None) for role in [
-            {'requirements':'req-engineer','prototype':'ui-designer','plan':'task-planner','build':'sw-developer','qa':'qa-engineer','security':'security-auditor'}.get(p['phase'],'app-it')]
+        helpers=[dict(id=role,role=role,goal=role,started=None) for role in [
+            {'requirements':'req-engineer','prototype':'ui-designer','plan':'task-planner','build':'sw-developer','qa':'qa-engineer','security':'security-auditor','code-review':'code-reviewer','accessibility':'a11y-auditor'}.get(p['phase'],'app-it')]
             if p['running']]
-        return dict(p,inbox=items,messages=store.messages(pid),helpers=helpers,
+        working=[dict(id=w['id'],role=w['role'],goal=w['goal'],started=None) for w in p.get('workers',[])
+                 if w['status'] in {'running','completed','integrating'}]
+        if p['running'] and working:helpers=working
+        if p['running']:helpers.extend(p.get('native_helpers',{}).values())
+        return dict(p,inbox=items,messages=store.messages(pid),helpers=helpers,task_workers=p.get('workers',[]),
             engine_override=False,engine_locked=False,keep_going=False,models={},rules_outdated=False,
             active_update=p.get('active_update'),update_available=p['phase']=='delivered',next_revision=p['revision']+1,
             review_pending=any(i['kind'] in ARTIFACTS for i in items),watchdog={},
@@ -103,8 +114,10 @@ def create_app(home=None,execute=None):
             if p['root']==str(root):
                 return detail(p['id'])
         team=list(dict.fromkeys([*CATALOG['REQUIRED'],*data.get('team',[])]))
+        execution_mode=data.get('execution_mode') or ('planned' if 'task-planner' in team or data.get('style')=='planning' else 'direct')
+        if execution_mode not in {'direct','planned'}:raise ValueError('Choose direct or planned execution.')
         p=store.add(root,team=team,style=data.get('style','app-it'),profile=data.get('profile','personal'),
-                    kind=data.get('kind','app'),platforms=data.get('platforms') or ['web'],engine=workflow.settings()['provider'])
+                    kind=data.get('kind','app'),platforms=data.get('platforms') or ['web'],engine=workflow.settings()['provider'],execution_mode=execution_mode)
         if not (root/'.git').exists():
             subprocess.run(['git','init','-b','main',str(root)],capture_output=True,check=True)
         ignore=root/'.gitignore'
@@ -147,6 +160,15 @@ def create_app(home=None,execute=None):
     async def answer(pid:str,iid:str,request:Request):
         return workflow.answer(pid,iid,(await request.json())['answer'])
 
+    @app.get('/api/projects/{pid}/acceptance')
+    def acceptance_status(pid:str):
+        return workflow.acceptance_status(pid)
+
+    @app.post('/api/projects/{pid}/prerequisites/{ident}')
+    async def prerequisite(pid:str,ident:str,request:Request):
+        body=await request.json() if (await request.body()) else {}
+        return workflow.set_prerequisite(pid,ident,bool(body.get('done',True)))
+
     @app.post('/api/projects/{pid}/stop')
     def stop(pid:str):
         workflow.stop(pid);return dict(ok=True)
@@ -172,13 +194,15 @@ def create_app(home=None,execute=None):
     def project_map(pid:str):
         p=store.get(pid);phase=p['phase'];labels=dict((a[0],a[1]) for a in CATALOG['AGENTS'])
         phases=[]
-        names=['requirements','prototype','plan','build','qa','security']
-        position=names.index(phase.replace('_review','')) if phase.replace('_review','') in names else len(names)
-        role_map={'requirements':'req-engineer','prototype':'ui-designer','plan':'task-planner','build':'sw-developer','qa':'qa-engineer','security':'security-auditor'}
+        names=['requirements','prototype',*(['plan'] if p.get('execution_mode','planned')=='planned' else []),'build','qa']
+        names += [name for name,role in [('code-review','code-reviewer'),('security','security-auditor'),('accessibility','a11y-auditor')] if role in p['team']]
+        stage={'criteria':'requirements','implementation_verified':'qa'}.get(phase,phase.replace('_review',''))
+        position=names.index(stage) if stage in names else len(names)
+        role_map={'requirements':'req-engineer','prototype':'ui-designer','plan':'task-planner','build':'sw-developer','qa':'qa-engineer','security':'security-auditor','code-review':'code-reviewer','accessibility':'a11y-auditor'}
         for index,name in enumerate(names):
             if name=='security' and 'security-auditor' not in p['team']:
                 continue
-            status='done' if index<position or phase=='delivered' else ('owner' if '_review' in phase else 'running') if index==position else 'pending'
+            status='done' if index<position or phase=='delivered' else ('owner' if '_review' in phase or phase=='implementation_verified' else 'blocked' if p['paused'] else 'running') if index==position else 'pending'
             phases.append(dict(name=labels[role_map[name]],state=status,status=status,note=''))
         markdown='| Phase | Status | Note |\n|---|---|---|\n'+'\n'.join(f'| {r["name"]} | {r["status"]} | |' for r in phases)
         return dict(exists=True,phases=phases,current_phase=phase,updated=str(p['updated']),markdown=markdown)
@@ -194,7 +218,7 @@ def create_app(home=None,execute=None):
             if event['type']=='helper' and event.get('event')=='start':
                 run_key=event['seq']
             if event['type']=='usage':
-                current[(run_key,event.get('role','app-it'))]=event['usage']
+                current[(event.get('run_id',run_key),event.get('role','app-it'))]=event['usage']
         def empty():
             return dict(api_calls=0,input=0,cache_read=0,output=0,prompt=0,cached_pct=0,cost_usd=0)
         for (_,role),raw in current.items():
@@ -224,6 +248,9 @@ def create_app(home=None,execute=None):
         data=await request.json()
         if data.get('keep_going'):
             raise ValueError('Tasks already continue until an approval, blocker, or completion. Automatic retry loops are disabled.')
+        if 'execution_mode' in data:
+            from .direct import set_mode
+            set_mode(workflow,pid,data['execution_mode'])
         return detail(pid)
 
     @app.post('/api/projects/{pid}/new-chat')
@@ -294,6 +321,15 @@ def create_app(home=None,execute=None):
             temporary.unlink(missing_ok=True)
         return dict(path=str(target.relative_to(Path(store.get(pid)['root']))),size=size)
 
+    @app.get('/api/settings/phone')
+    def phone_settings():
+        return phone.snapshot()
+
+    @app.post('/api/settings/phone/{channel}')
+    async def phone_action(channel:str,request:Request):
+        data=await request.json()
+        return await asyncio.to_thread(phone.action,channel,data)
+
     @app.get('/api/settings')
     def settings():
         return settings_payload()
@@ -304,10 +340,14 @@ def create_app(home=None,execute=None):
         if 'about_me' in data:
             s['about_me']=str(data['about_me'])[:10000]
         if 'parallel_work' in data:
-            n=int(data['parallel_work']['max_workers'])
+            current=s.get('parallel_work',{});selected=data['parallel_work']
+            n=int(selected.get('max_workers',current.get('max_workers',3)))
+            agents=int(selected.get('agents_per_project',current.get('agents_per_project',3)))
             if not 1<=n<=8:
                 raise ValueError('Choose 1–8 concurrent projects.')
-            s['parallel_work']=dict(max_workers=n)
+            if not 1<=agents<=6:
+                raise ValueError('Choose 1–6 development agents per project.')
+            s['parallel_work']=dict(max_workers=n,agents_per_project=agents)
         if 'connections' in data:
             for key,conn in data['connections'].items():
                 if not re.fullmatch(r'[a-z0-9-]{1,60}',key):

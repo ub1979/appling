@@ -11,18 +11,18 @@ Read `.sdlc/changes/CR-*.md` for this change first — it states what was meant 
 change and why. A diff that exceeds its record is a finding: either the record
 was wrong or the change grew silently.
 
-Then check `references/engineering-standards.md`:
+Check the project's existing engineering standards where present. Missing
+optional process files do not block an otherwise verifiable review:
 
-- one unit per file, named after it, one responsibility, under ~300 lines;
-- **every unit has a test file** — a unit without one is a finding, not a
-  follow-up task;
-- `.sdlc/class-map.md` updated in the same change: no file without a row, no row
-  without a file, touched units marked stale;
+- coherent modules and clear responsibilities consistent with this project;
+- meaningful behavior/regression coverage for changed contracts and failure paths;
+  missing per-file tests or arbitrary file-length targets alone are not findings;
+- existing code maps and change records accurate where the project uses them;
 - patterns justified in one sentence, in the ADR or the change record.
 
 ## ⛔ ENFORCEMENT
 
-Run as a spawned Agent, not inline by the orchestrator. Execute every step, run real tools (tests, linters, type checkers, SAST), dispatch specialist subagents, and write `review-report.md` with confidence-scored findings.
+Run as a spawned Agent, not inline by the orchestrator. Execute every step, run real tools (tests, linters, type checkers, SAST), use host-scheduled specialist reviews when available, and write `review-report.md` with confidence-scored findings.
 Reading files and saying "looks good", or "I fixed it so review isn't needed", does not count.
 
 Catches what tests miss: security gaps, architectural drift, performance problems, consistency violations. Output feeds the `sw-developer` skill directly.
@@ -124,18 +124,16 @@ Cover every dimension; skip none.
 
 Each specialist runs with fresh context — no prior review bias.
 
-**4a. Select.** Measure the diff first:
+**4a. Select.** Choose useful independent review scopes from risk and changed
+contracts, not diff-size thresholds. Security follows actual trust-boundary
+changes; data review follows schema/migration changes; performance follows
+measured hot paths; test review follows behavior and coverage gaps.
 
-```bash
-DIFF_BASE=$(git merge-base origin/main HEAD 2>/dev/null || echo HEAD~1)
-DIFF_LINES=$(git diff "$DIFF_BASE" --stat | tail -1 | grep -oE '[0-9]+ insertion' | grep -oE '[0-9]+' || echo 0)
-```
-
-- **Always-on** at 50+ changed lines: **Testing Specialist** (deep test quality), **Maintainability Specialist** (clarity, modularity, tech debt).
-- **Diff < 50 lines**: skip specialists, print "Small diff — specialists skipped."
-- **Conditional**: **Security Specialist** (auth/crypto/API changed, or diff >100 lines); **Performance Specialist** (backend or frontend changed); **Data Migration Specialist** (migration files or schema changes); **API Contract Specialist** (routes or request/response shapes changed); **Design Specialist** (UI components changed).
-
-**4b. Dispatch.** Launch all selected specialists in a **single message** (multiple Agent calls) so they run concurrently. Each receives the git diff, stack context, and instructions to return structured findings: severity, confidence (1-10), file:line, category, summary, recommended fix.
+**4b. Schedule.** Use host-scheduled review scopes when available. Return
+bounded independent scopes and evidence needs to the coordinator when more
+reviewers are needed. Do not wait for nonexistent specialist agent types or
+start nested writable agents. Perform the assigned scope with native tools;
+record any required independent review that remains blocked.
 
 **4c. Merge.** Deduplicate by `file:line:category` fingerprint; confirmation by a second specialist adds +1 confidence. Then apply the gates:
 
@@ -149,7 +147,7 @@ DIFF_LINES=$(git diff "$DIFF_BASE" --stat | tail -1 | grep -oE '[0-9]+ insertion
 
 **Pre-emit verification gate**: quote the motivating code line verbatim (file:line) before a finding enters the report. Cannot quote it → force confidence to 4 (appendix only). Never claim 7+ without the quote.
 
-**4d. Red team** — activate if diff >200 lines OR any specialist produced a BLOCKER/CRITICAL. Dispatch one adversarial subagent with the merged findings and the diff, tasked with what the specialists MISSED: edge cases, race conditions, security holes, resource leaks, silent data corruption, logic errors producing silently wrong results, trust-boundary violations, error handling that swallows failures. Thinks like an attacker and a chaos engineer. Findings tagged `[RED-TEAM]` and merged in.
+**4d. Red team** — use when trust-boundary changes, concurrency, data-loss risk or concrete findings justify an independent adversarial pass; a line-count threshold alone is insufficient. Request a host-scheduled independent review with the merged findings and the diff, tasked with what the specialists MISSED: edge cases, race conditions, security holes, resource leaks, silent data corruption, logic errors producing silently wrong results, trust-boundary violations, error handling that swallows failures. Thinks like an attacker and a chaos engineer. Findings tagged `[RED-TEAM]` and merged in.
 
 ## Step 5 — Fix-First Review
 

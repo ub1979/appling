@@ -5,6 +5,29 @@ const feed = (events: Partial<LyraEvent>[]) =>
   events.reduce((s, e, i) => applyEvent(s, { ts: i, type: "", ...e } as LyraEvent), emptyLive());
 
 describe("applyEvent", () => {
+  it("restores recent activity without replaying old controller state or duplicate entries", () => {
+    let state=feed([{type:"turn_start",turn:"current",text:"Build"}]);
+    const before=state;
+    for (const event of [{type:"turn_end",ts:1,status:"error"}, {type:"inbox",ts:1,item:{id:"old"}},
+      {type:"helper",ts:2,event:"start",subagent_id:"old",goal:"Old task"}]) {
+      state=applyEvent(state,{type:"activity_history",ts:2,event});
+    }
+    expect(state.turn).toEqual(before.turn); expect(state.inbox).toEqual([]); expect(state.helpers).toEqual({});
+    const history={type:"activity_history",ts:3,event:{type:"tool",ts:3,id:"c",phase:"start",name:"subAgentActivity"}};
+    state=applyEvent(state,history);state=applyEvent(state,history);
+    expect(state.activity.filter(a=>a.text==="Codex helper activity")).toHaveLength(1);
+    expect(state.turnsEnded).toBe(0);
+  });
+  it("refreshes task integration status and keeps native progress separate from the chat response", () => {
+    const state=feed([
+      { type: "turn_start", turn: "t", text: "Build" },
+      { type: "worker", worker: { id: "a", status: "integrated" } },
+      { type: "worker_commentary", thread_id: "a", text: "Checking the navigation" },
+    ]);
+    expect(state.helperChanges).toBe(1);
+    expect(state.turn?.reply).toBe("");
+    expect(state.activity.at(-1)?.detail).toBe("Checking the navigation");
+  });
   it("moves completed commentary from streaming text to the saved conversation", () => {
     const state = feed([
       { type: "turn_start", turn: "t", text: "Build" },
@@ -85,6 +108,18 @@ describe("applyEvent", () => {
 });
 
 import { asksForApproval } from "./pages/Studio";
+
+it("shows retained waiting and continuation without a crash or completion claim", () => {
+  const running = feed([{ type: "turn_start", turn: "build", text: "Build" }]);
+  const continued = applyEvent(running, { type: "build_continuation", ts: 2, text: "Continuing coding" });
+  expect(continued.turn).toEqual(running.turn);
+  expect(continued.activity.at(-1)?.text).toBe("Continuing remaining coding");
+  const waiting = applyEvent(continued, { type: "work_waiting", ts: 3, text: "Owner sign-in needed" });
+  const ended = applyEvent(waiting, { type: "turn_end", ts: 4, status: "blocked" });
+  expect(ended.lastProblem).toBeNull();
+  expect(ended.turn).toBeNull();
+  expect(ended.activity.at(-1)?.detail).toBe("Owner sign-in needed");
+});
 
 describe("asksForApproval", () => {
   it("shows the Approve button only when Appling asks for approval", () => {

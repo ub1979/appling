@@ -74,7 +74,7 @@ Build these once and reuse them:
 - Real screenshots of the product, cropped tight to the part being
   discussed, with a soft shadow or device frame.
 - Photos full-bleed or in a strict grid; never small and floating.
-- AI pictures (`.lyra/kit/imagine`, owner's consent) for mood, metaphor or
+- AI pictures (an available image-generation tool, owner's consent) for mood, metaphor or
   illustration — one consistent style for the whole deck; never fake
   product screens, people presented as real, or charts.
 - Icons from one set only, same stroke and size.

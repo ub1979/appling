@@ -3,7 +3,7 @@ import { api, type BuildProfile, type Catalog, type Platform, type ProjectKind, 
 import { AvatarStack, Brand, FolderDialog, PrefButtons, TeamPicker } from "../components/common";
 import { go } from "../router";
 
-const REQUIRED = ["req-engineer", "task-planner"];
+const REQUIRED = ["req-engineer", "ui-designer", "sw-developer", "qa-engineer"];
 
 const KINDS: { id: ProjectKind; name: string; text: string; icon: string; team: string[] }[] = [
   { id: "app", name: "App", text: "Something people use: a tool, tracker, game or service.", icon: "◫", team: [] },

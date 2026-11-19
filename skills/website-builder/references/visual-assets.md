@@ -6,20 +6,20 @@
    product site. Capture at 2× scale, crop to the part that tells the
    story, frame in simple browser or phone chrome drawn in CSS/SVG.
 2. **The owner's photos and video** (`assets/uploads/` when attached in chat).
-3. **AI pictures** with `.lyra/kit/imagine` — only after the owner said
-   yes for this project; each picture uses their ChatGPT plan allowance.
+3. **AI pictures** with an available image-generation tool — only after the owner said
+   yes for this project; do not assume a subscription entitlement or silently use a paid provider.
 4. **Designed placeholders** — gradients, shapes, type compositions — plus
    a list in the report of exactly which pictures the owner should supply.
 
 Never hot-link images, never use stock without a licence the owner holds,
 never present an AI picture as a real product, place, customer or employee.
 
-## AI pictures with imagine
+## AI pictures with an available engine tool
 
-```
-.lyra/kit/imagine "PROMPT" --out assets/hero.png --aspect landscape
-.lyra/kit/imagine "same scene, camera 20° lower" --out assets/hero-2.png --ref assets/hero.png
-```
+Inspect the live tool's parameters and account access before generation. Use
+reference-image support when available to keep a series consistent. If no
+image tool is available, use the owner's assets or designed placeholders and
+report the missing capability. Do not invent an installed image CLI.
 
 Write prompts as a photo or art-direction brief:
 

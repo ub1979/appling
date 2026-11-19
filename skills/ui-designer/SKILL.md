@@ -15,29 +15,29 @@ without an approved brief is a build that will be redone.
 
 ## Step 1 — Direction from real references
 
-Load `skill_view(name="design-reference")` and follow it. In short: ask the user
+Load `skills/design-reference/SKILL.md` and follow it. In short: ask the user
 for one site they already like, gather three references (layout, colour and
 type, motion), open them with the browser tools, and extract a spec rather than
 adjectives. Never describe a page you did not open.
 
 ## Step 2 — Taste
 
-Load `skill_view(name="design-taste-frontend")` for the anti-slop rules, and one
+Load `skills/taste-skill/SKILL.md` for the anti-slop rules, and one
 overlay if the brief calls for it: `minimalist-ui`, `industrial-brutalist-ui`,
 or `high-end-visual-design`.
 
 ## Step 3 — Colour, layout and tokens
 
-Load `skill_view(name="ultimate-builder:color-and-ux")` and choose the palette,
+Load `skills/color-and-ux/SKILL.md` and choose the palette,
 type scale and interaction defaults with it; its `scripts/palette.py check`
 must pass on the final palette (record the result in the brief).
 
-Load `skill_view(name="design-tokens")`. Every colour, size, radius and duration
+Load `skills/design-tokens/SKILL.md`. Every colour, size, radius and duration
 in the brief becomes a token. Hardcoded values in the build are a review finding,
 not a shortcut.
 
 Check contrast here, with the measuring tools, not by eye — a palette that fails
-AA is not a palette, it is a rework. See `skill_view(name="a11y-audit")`.
+AA is not a palette, it is a rework. See `skills/a11y-audit/SKILL.md`.
 
 ## Step 4 — Hand over
 
@@ -46,7 +46,7 @@ direction is and what it deliberately refuses.
 
 ## Step 5 — Review what was built
 
-After implementation, `skill_view(name="design-review")` against the brief:
+After implementation, `skills/design-review/SKILL.md` against the brief:
 spacing rhythm, type scale, state coverage (hover, focus, empty, error, loading),
 and whether the one memorable idea survived. Findings go back to development with
 the token or brief line each one violates.

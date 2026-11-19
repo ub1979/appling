@@ -134,7 +134,7 @@ diff .sdlc/oop-baseline-run.txt .sdlc/oop-after-run.txt && echo "BEHAVIOR PRESER
 
 ## Phase 5 — Dispatch Code Review
 
-**REQUIRED:** After verification passes, invoke the `llm:code-reviewer` skill (or spawn the `code-reviewer` agent) on the restructured code. Give it: the list of new/changed files, the decomposition plan, and the note that this was a behavior-preserving restructure (so it flags any behavior change as CRITICAL). Apply its MUST-FIX findings, then re-run Phase 4 verification.
+After verification, hand the changed-file list and evidence to the coordinator for independent `code-reviewer` validation where required by the approved plan. Do not start an unavailable nested agent. Give it: the list of new/changed files, the decomposition plan, and the note that this was a behavior-preserving restructure (so it flags any behavior change as CRITICAL). Apply its MUST-FIX findings, then re-run Phase 4 verification.
 
 ## Phase 6 — Report
 

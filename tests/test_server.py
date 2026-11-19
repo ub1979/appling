@@ -1,4 +1,5 @@
 from pathlib import Path
+import json
 from fastapi.testclient import TestClient
 import pytest
 from appling.server import create_app
@@ -85,3 +86,61 @@ def test_connection_test_uses_selected_saved_connection_and_model(client,monkeyp
     response=c.post('/api/settings/connections/codex/test',json={'model':'chosen-coder'})
     assert response.json()['ok'];assert calls[0][0]['engine']=='codex';assert calls[0][1]=='chosen-coder'
     assert c.post('/api/settings/connections/missing/test',json={'model':'anything'}).status_code==400
+
+
+def test_agent_slots_are_separate_from_concurrent_project_limit(client):
+    c,app,tmp=client
+    updated=c.post('/api/settings',json={'parallel_work':{'agents_per_project':4}})
+    assert updated.status_code==200
+    config=updated.json()['parallel_work']
+    assert config['agents_per_project']==4 and config['max_workers']==3
+    assert c.post('/api/settings',json={'parallel_work':{'max_workers':2}}).json()['parallel_work']['agents_per_project']==4
+    assert c.post('/api/settings',json={'parallel_work':{'agents_per_project':7}}).status_code==400
+    p=app.state.store.add(tmp/'workers')
+    app.state.store.update(p['id'],workers=[dict(id='w',task_id='a',role='sw-developer',status='running',goal='feature')])
+    assert c.get('/api/projects/'+p['id']).json()['task_workers'][0]['task_id']=='a'
+
+
+def test_interleaved_worker_usage_is_counted_per_invocation(client):
+    c,app,tmp=client;store=app.state.store;p=store.add(tmp/'parallel-counter')
+    for run_id in ['worker-a','worker-b']:
+        store.event(p['id'],'helper',event='start',subagent_id=run_id,run_id=run_id)
+    for ident,prompt in [('worker-a',10),('worker-b',20),('worker-a',30)]:
+        store.event(p['id'],'usage',role='sw-developer',run_id=ident,usage=dict(input_tokens=prompt,output_tokens=2))
+    total=c.get('/api/projects/'+p['id']+'/usage').json()['total']
+    assert total['prompt']==50 and total['api_calls']==2
+
+
+def test_new_projects_default_to_direct_with_mandatory_design_and_qa(client):
+    c,app,tmp=client
+    p=c.post('/api/projects',json=dict(path=str(tmp/'simple'),create=True)).json()
+    assert p['execution_mode']=='direct'
+    assert {'req-engineer','ui-designer','sw-developer','qa-engineer'}<=set(p['team'])
+    assert 'task-planner' not in p['team']
+    names=[row['name'] for row in c.get('/api/projects/'+p['id']+'/map').json()['phases']]
+    assert 'Task planning' not in names and 'Design' in names and 'Quality assurance' in names
+    planned=c.post('/api/projects',json=dict(path=str(tmp/'planned'),create=True,style='planning')).json()
+    assert planned['execution_mode']=='planned'
+
+
+def test_changing_coordination_preserves_approvals_files_and_retained_workers(client):
+    c,app,tmp=client;store=app.state.store
+    p=store.add(tmp/'legacy',execution_mode='planned')
+    root=Path(p['root']);(root/'source.txt').write_text('retained code')
+    workers=[dict(id='old',task_id='old-feature',role='sw-developer',status='blocked',workspace=str(root),goal='Retained feature')]
+    approvals=dict(requirements='unchanged',prototype='unchanged',plan='unchanged')
+    store.update(p['id'],phase='build',paused=True,workers=workers,approvals=approvals,tasks=[dict(id='old-feature',status='pending')])
+    response=c.post('/api/projects/'+p['id']+'/settings',json=dict(execution_mode='direct'))
+    assert response.status_code==200
+    state=store.get(p['id'])
+    assert state['execution_mode']=='direct' and state['paused'] and not state['running']
+    assert state['approvals']==approvals and state['workers']==workers
+    assert (root/'source.txt').read_text()=='retained code'
+    assert not app.state.workflow.active
+    with store.connect() as db:
+        history=json.loads(db.execute("select data from checkpoints where project=? and role like 'execution-history:%'",(p['id'],)).fetchone()[0])
+    assert history['tasks']==[dict(id='old-feature',status='pending')]
+    store.update(p['id'],running=True)
+    before=store.get(p['id'])
+    assert c.post('/api/projects/'+p['id']+'/settings',json=dict(execution_mode='planned')).status_code==400
+    assert store.get(p['id'])==before

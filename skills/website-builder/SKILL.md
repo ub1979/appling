@@ -18,17 +18,21 @@ work, log-ins and databases go to `sw-developer` with `sw-architect`.
 - The owner asks for a landing page, product page, homepage, company site,
   pricing page, docs or developer site, or "make my site look professional".
 - A website template was chosen: its `template_spec` and the live demo in
-  `.lyra/kit/reference/index.html` are the approved starting design.
+  `.sdlc/template/reference/index.html` are the approved starting design.
 
 ## Prerequisites
 
 - Approved `requirements.md` (build profile, template, brand, pages).
 - `design-brief.md` from `ui-designer` when the team has one.
 - Node 20+ and npm (`node -v`).
-- Appling's kit in the project: `.lyra/kit/site-check.mjs`,
-  `.lyra/kit/imagine` (AI pictures on the owner's ChatGPT plan).
+- The bundled `web-cinematic/scripts/site-check.mjs` checker.
+- Optional authorized image generation, when the design needs generated assets.
 
 ## How to Run
+
+Resolve `<skills-directory>` to the absolute Skills directory supplied in the
+engine briefing before executing example commands. No project-kit installation
+is required; use the bundled scripts in place.
 
 Work from the project folder:
 
@@ -36,7 +40,7 @@ Work from the project folder:
 npm create vite@latest . -- --template vanilla-ts   # React + TS only if the site needs it
 npm i                                               # + gsap / lenis only when motion calls for it
 npm run build                                       # after every section
-node .lyra/kit/site-check.mjs dist --compare .lyra/kit/reference/index.html
+node <skills-directory>/web-cinematic/scripts/site-check.mjs dist --compare .sdlc/template/reference/index.html
 ```
 
 Drop `--compare` when there is no template. The site builds to `dist/` so
@@ -88,21 +92,22 @@ Copy this checklist into the plan and tick it as you go:
    clearly marked placeholders — never invented customers, logos, numbers
    or quotes.
 3. **Set the direction.** Use `design-brief.md` when it exists. Otherwise
-   load `skill_view(name="design-reference")` (one site the owner likes,
-   opened in the browser), `skill_view(name="frontend-design")` and
-   `skill_view(name="design-taste-frontend")` for the anti-generic rules,
-   and `skill_view(name="ultimate-builder:color-and-ux")` for palette and
+   load `skills/design-reference/SKILL.md` (one site the owner likes,
+   opened in the browser), `skills/frontend-design/SKILL.md` and
+   `skills/taste-skill/SKILL.md` for the anti-generic rules,
+   and `skills/color-and-ux/SKILL.md` for palette and
    tokens. Commit to one named aesthetic (e.g. "calm editorial", "terminal
    precision", "warm hardware") and write its tokens before any section.
 4. **Plan the pictures** with `references/visual-assets.md`: real product
    screens framed in browser or phone chrome, the owner's photos, AI
-   pictures through `.lyra/kit/imagine` (only after the owner agreed; each
-   uses their plan), or designed placeholders. Record every AI picture in
+   pictures through an available image-generation tool (only after the owner agreed; only through an available authorized tool), or designed placeholders. Record every AI picture in
    `assets/ASSETS.md` (prompt, file, where used).
-5. **Build one section at a time**: build, run the site check, open its
-   contact sheets, commit, then the next. Never one-shot the whole page.
+5. **Build coherent owned sections** with focused checks and native tools.
+   Independent assigned sections can run concurrently. After integration, build
+   the combined site, run the site check and inspect its contact sheets. Leave
+   snapshots and commits to the host; do not force a build/commit per section.
    For parallax, pinned scroll stories, frame-scrubbed video or 3D, load
-   `skill_view(name="ultimate-builder:web-cinematic")` for that section.
+   `skills/web-cinematic/SKILL.md` for that section.
 6. **Run the quality checklist** in `references/quality-checklist.md`
    (speed, theme and contrast, responsive, accessibility, SEO and sharing,
    forms). Fix every failed line; re-run.

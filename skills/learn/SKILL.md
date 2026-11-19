@@ -97,7 +97,7 @@ If a matching pitfall exists, apply it before trying other hypotheses.
 
 ## Auto-Learn Triggers
 
-The orchestrator (idk_it) should call this skill automatically when:
+The Appling controller should call this skill automatically when:
 
 1. **A debugging session resolves** — record the root cause as a pitfall
 2. **A code review finds a recurring pattern** — record it as a convention

@@ -95,21 +95,167 @@ Prototype, plan, permission and secret controls retain their dedicated treatment
    engine sessions, so switching connections doesn't discard them.
 2. The designer builds a clickable prototype using realistic sample data.
 3. The user reviews the exact prototype revision and the requirements draft.
-4. The planner creates a readable plan plus a dependency-checked task list.
-5. After plan approval, the builder executes bounded tasks, resuming saved work.
-6. Independent QA checks the integrated app and saves evidence mapped to approved
-   requirement IDs; missing coverage blocks delivery. Security runs
+4. By default, the approved requirements and prototype go directly to the coding
+   engine. Its saved builder session owns implementation and integration. Codex
+   can call native independent specialists and exchange messages/results; compact
+   handoffs under `.sdlc/handoffs/` preserve decisions across restart. Appling
+   records native helper activity without creating a competing coding task graph.
+5. Requirements may recommend additional specialists. The prototype is always
+   created and reviewed, including any requested revisions, before coding starts.
+   A separate implementation plan is optional: select **Plan before building**,
+   add Task planning at setup, or use `/replan` to request that workflow explicitly.
+6. Requirements carry approved acceptance criteria and owner prerequisites
+   (`.sdlc/acceptance.json`), each tagged release 1 or later and live or local.
+   They are part of the requirements approval; `/criteria` proposes them for an
+   existing project and asks for re-approval. Before coding, Appling lists the
+   setup you will need to provide.
+7. Independent QA checks every release-1 criterion against the current source and
+   records passed, failed, waiting on you, or not verified. Only an approved live
+   criterion whose recorded prerequisite is not ready may wait, and only after QA
+   confirms its implementation exists and its local behaviour passes; a builder's
+   "owner setup" label alone never defers anything. Missing code is a failure.
+   When only such live checks remain, the project is **Implementation verified;
+   live acceptance pending**, not delivered. Marking setup done in the Acceptance
+   panel reruns verification only (never the builder); delivery needs passing live
+   evidence. Source changes turn earlier results into "not verified". Security runs
    when selected. Findings return to a bounded repair loop; blocked checks never
    count as passes. QA cannot change source and retain a passing verdict.
-7. Follow-up requests are classified as explanations, in-scope fixes or material
+   Appling commits a milestone checkpoint to the project branch after each
+   validated builder handoff and before each resume, skipping secrets and
+   generated files and leaving your staged changes alone. Repeated resumes with no
+   change in source, evidence, criteria or recorded setup pause with an explanation.
+8. Follow-up requests are classified as explanations, in-scope fixes or material
    scope changes. Only new scope restarts the relevant requirements work.
 
 The controller enforces revision-bound approvals. Specialist skills guide work;
-they cannot advance workflow gates. Tasks run serially inside a project, while
-independent projects can run concurrently. The concurrency setting does not
-promise a swarm of workers inside one project. Architecture, documentation,
-deployment preparation and other selected roles can receive planned tasks.
-Remote publishing remains a separately authorized action.
+they cannot advance workflow gates. Independent tasks can now run concurrently
+inside a project; architecture, documentation, deployment preparation and other
+selected roles can receive planned tasks. Remote publishing remains a separately
+authorized action.
+
+## Parallel development and Codex
+
+New projects use direct engine coordination. In **Settings → This project → Build
+coordination**, an idle existing project can explicitly switch between direct
+and separately planned execution. Files, approvals and retained attempts are
+preserved; the previous task ledger is checkpointed. Existing projects are not
+silently migrated, resumed or marked complete. Native coding helpers use the
+engine's own agent configuration and limits; Appling's role model overrides
+apply to the stages it invokes separately. Independent QA runs after the builder,
+followed by selected code, security and accessibility reviewers one at a time.
+Reviewer findings return to the saved builder for bounded repairs, then fresh QA.
+
+The following host task scheduler applies to the optional planned workflow.
+
+Settings separates **concurrent projects** (default 3, maximum 8) from
+**development agents per project** (default 3, maximum 6). New app plans require
+capacity for at least 2 agents and at least one executable parallel wave. Shared
+foundations, integration and small follow-up fixes may run alone. The limit
+remains a ceiling; it does not require filling every slot. Reducing capacity to
+1 pauses plans created under this policy rather than silently serializing them.
+
+Every worker package must be an entry in the structured task list; describing
+helpers only in prose does not schedule them. A bounded correction pass rejects
+missing ownership and graphs that the real scheduler would execute entirely
+serially. Invalid plans pause before approval or implementation. The planner
+reuses approved requirements/design and existing code instead of redesigning the
+app. Existing approved plans are not rewritten automatically; request a revised
+implementation plan to adopt this policy.
+
+To replan an existing project, stop that project's work and wait for the worker
+to finish, then send `/replan` with any implementation guidance in project chat.
+Appling preserves requirements/prototype approvals, current source and the prior
+task ledger, invalidates only the implementation-plan approval, and presents
+the new parallel plan for review. Changed requirements or prototype bytes still
+need their own approval; `/replan` cannot bypass those gates.
+
+The proposed reusable-block catalogue is described in
+[docs/reusable-blocks.md](docs/reusable-blocks.md). The catalogue itself is not
+implemented by this execution/planner patch.
+
+The planner describes task dependencies and file ownership. Tasks with disjoint
+ownership and satisfied dependencies run in a bounded parallel pool, each in its
+own detached Git worktree with its own model session, checkpoint and evidence
+directory. The coordinator integrates each validated result immediately and
+refills the free slot from the latest integrated source, without waiting for
+slower independent workers. Active ownership and the current configured agent
+limit still constrain dispatch. A failed task is not automatically rescheduled;
+its dependents wait while other eligible work continues. Shared contracts and
+overlapping or unscoped work run sequentially.
+For older approved plans, a read-only assessment can assign execution ownership
+and add necessary dependencies to unfinished tasks. It cannot rewrite goals,
+remove dependencies, invent tasks or edit the approved plan. Uncertain ownership
+stays serial; the assessment is saved rather than repeated every turn.
+
+Private snapshots include uncommitted application work without committing or
+changing the user's branch, HEAD or staging index. Credentials and generated
+dependencies are excluded. The coordinator checks ownership, approved artifacts,
+passing worker evidence and current project bytes before integrating changes.
+Renames, symlinks and newer user edits cannot silently bypass those checks.
+Independent QA checks the combined app after development, with security review
+when selected; parallel worker results alone never count as delivery.
+
+Interrupted workers retain their workspace and task-specific session. Integration
+is journaled so restart after an applied patch can finish without rerunning a
+completed worker. Conflicts pause work; a subsequent continuation starts a fresh
+workspace from current source and gives the worker the retained attempt's diff
+to reconcile. Previous attempts remain inspectable under the private studio
+state folder. Editing a retained worktree invalidates its old verification.
+
+Codex workers use the native bidirectional app-server protocol, workspace
+sandbox, saved threads, streaming activity, approval/permission callbacks,
+compaction notifications and interruption. Managed parallel workers disable
+recursive native agents so the host's limits, file ownership and cancellation
+remain enforceable: the swarm consists of **separate controlled Codex threads**,
+not untracked nested editors. Other Codex calls retain the user's native agent
+configuration, and native child activity is reported when present. Unsupported
+client requests are denied, rather than silently granting access.
+
+Other adapters use the same task controller with their own supported execution
+mechanisms and permission limits. Parallel work can improve elapsed time for
+independent tasks, but uses more simultaneous account/model capacity; a speed or
+quality improvement has not yet been measured on real app projects.
+
+## Questions and approvals on your phone
+
+Open **Settings → Questions and approvals on your phone**. Telegram and WhatsApp
+are opt-in and can be enabled independently. The computer must remain awake,
+online and running Appling. No public inbound port or tunnel is created.
+
+For Telegram, create a dedicated bot with [BotFather](https://t.me/BotFather).
+Save its token in Settings (a private owner-only credential file), or supply
+`TELEGRAM_BOT_TOKEN` to the process that starts Appling. Choose **Pair phone**
+and send the displayed one-time code to your bot from your private account.
+Use **Send test message** after pairing.
+
+For WhatsApp, install the optional bridge once:
+
+```bash
+cd bridge/whatsapp
+npm install
+```
+
+Then choose **WhatsApp → Pair phone**, scan its QR through WhatsApp's Linked
+devices, and send the displayed pairing code in **Message yourself**. Both steps
+are required. This uses the upstream, unofficial Baileys library; live WhatsApp
+compatibility and account pairing still need verification. See the
+[bridge guide](bridge/whatsapp/README.md) for dependency and connection details.
+
+Questions and requirements/plan reviews arrive with the project name and request
+code. Reply to the exact message or use `/reply CODE your answer`. Telegram also
+offers buttons. WhatsApp supports `/approve CODE` and `/deny CODE your feedback`.
+The existing controller rejects closed, duplicated or stale approvals. Only the
+paired owner can respond; WhatsApp contacts/groups and secret prompts are not
+forwarded into this flow. Responses appear in the original project conversation.
+
+Prototype previews remain local; phone messaging does not make the clickable
+preview remotely accessible. Review the prototype in Appling before approving.
+Use **Disconnect** in Settings to revoke phone access. Live phone setup has not
+been verified in this restricted execution environment.
+
+When updating a running installation, let the current job finish before running
+`./stop.sh` then `./start.sh`; refresh the browser afterward. The running Python
+process uses its already loaded controller until restarted.
 
 ## Browser QA and previews
 
@@ -158,6 +304,34 @@ reported when the provider supplies it; hits and cost savings are not guaranteed
 Restarting pauses interrupted work. Nothing automatically replays privileged
 operations. Send a message to resume after inspecting saved progress. Start a
 new conversation to replace engine sessions while retaining project knowledge.
+
+While a turn is running, Appling writes a progress message in the project
+conversation every five minutes. The server saves these even when the page is
+closed. Updates summarize observed command results, helper activity and waiting
+input, with model reports explicitly labelled as unverified. Quiet periods are
+reported honestly. Updates stop while paused or idle, do not change approvals,
+and never mark work complete. Cadence is persisted to prevent duplicate messages;
+computer sleep or a stopped service can delay updates without a backlog burst.
+
+Codex builds have no fixed total-duration cutoff. By default, 30 minutes without
+task activity pauses the job with a resumable inactivity message. Reasoning,
+model output, command output, tool progress and known helper activity renew that
+budget; unrelated traffic and the five-minute Appling messages do not. Waiting
+for your approval or answer suspends the inactivity timer. Stop remains available.
+The Codex connection's `idle_timeout` sets this budget in seconds; its older
+`timeout` value is used when `idle_timeout` is absent. Setup RPCs and explicit
+connection checks retain bounded deadlines. Other execution adapters retain
+their own timeout policies.
+
+In direct mode, a builder handoff with unfinished `implementation` blockers gets
+an automatic continuation in its saved native session, even when setup or live
+acceptance is also pending. Appling allows at most three continuations per owner
+turn, and stops earlier if a repeated attempt changes no source. It retains all
+handoffs and reports a normal waiting state with specific blockers. Setup-only
+and live-acceptance-only blockers wait immediately. These waits do not appear as
+engine crashes and never advance QA or delivery. Stop and all approval gates
+remain effective; a new owner message resumes retained work. Actual connection,
+protocol, approval-integrity and evidence failures still report errors.
 
 ## Development and verification
 

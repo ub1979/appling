@@ -45,6 +45,13 @@ def read_state(directory=RUN):
     except (OSError,ValueError):return {}
 
 
+def stopping(directory=RUN):
+    state=read_state(directory)
+    try:request=json.loads((directory/'stop.json').read_text())
+    except (OSError,ValueError):return False
+    return bool(state.get('instance') and request.get('instance')==state['instance'])
+
+
 def atomic(path,data):
     temporary=path.with_name(path.name+'.'+uuid.uuid4().hex+'.tmp')
     temporary.write_text(json.dumps(data));temporary.chmod(0o600);temporary.replace(path)
@@ -56,7 +63,10 @@ def serve_managed(app,listener,port,no_open=False):
         instance=uuid.uuid4().hex
         (RUN/'server.json').unlink(missing_ok=True);(RUN/'stop.json').unlink(missing_ok=True)
         url=f'http://127.0.0.1:{port}'
-        server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=port,fd=listener.fileno(),log_level='info'))
+        # SSE connections stay open indefinitely. Bound their drain so lifespan
+        # cleanup can cancel/checkpoint workers and release the service lease.
+        server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=port,fd=listener.fileno(),log_level='info',
+                                            timeout_graceful_shutdown=3))
         finished=threading.Event()
         def watch():
             while not finished.wait(.1):
@@ -81,6 +91,11 @@ def start(args,*,directory=RUN,command=None,timeout=20):
     # Serialize launchers while the child takes its lifetime lease.
     with (directory/'launch.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX)
+        deadline=time.monotonic()+timeout
+        while live(directory) and stopping(directory):
+            if time.monotonic()>=deadline:
+                raise RuntimeError('The previous Appling server is still shutting down. For a stuck idle legacy server, run .venv/bin/python -m appling.recovery from this checkout.')
+            time.sleep(.1)
         if live(directory):
             state=read_state(directory)
             if state.get('url'):
@@ -115,7 +130,7 @@ def stop(*,directory=RUN,timeout=20):
         if not live(directory):
             print('Appling stopped.');return
         time.sleep(.1)
-    raise RuntimeError(f'Appling is still shutting down its tasks. Check {directory / "server.log"}; no process was force-killed.')
+    raise RuntimeError(f'Appling is still shutting down its tasks. Check {directory / "server.log"}; no process was force-killed. For a stuck idle legacy server, run .venv/bin/python -m appling.recovery.')
 
 
 def main():
@@ -132,7 +147,9 @@ def main():
         elif args.action=='stop':stop()
         else:
             running=live()
-            if not args.quiet:print(f'Appling is running: {read_state().get("url","starting")}' if running else 'Appling is not running.')
+            if not args.quiet:
+                print('Appling is shutting down.' if running and stopping() else
+                      f'Appling is running: {read_state().get("url","starting")}' if running else 'Appling is not running.')
             raise SystemExit(0 if running else 1)
     except RuntimeError as exc:
         print(str(exc),file=sys.stderr);raise SystemExit(1)

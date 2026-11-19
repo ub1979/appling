@@ -1,0 +1,90 @@
+{
+  "result": {
+    "status": "completed",
+    "summary": "One sub-agent created hello.txt; verified it contains exactly hi."
+  },
+  "helper_events": [
+    {
+      "type": "helper",
+      "ts": 1795101832.025623,
+      "event": "start",
+      "subagent_id": "codex:01a1f468-330e-7890-9571-fafe03a89c14",
+      "goal": "Codex agent /root/create_hello",
+      "native": true,
+      "agent_path": "/root/create_hello",
+      "model": "gpt-6.1-sol",
+      "reasoning_effort": "medium"
+    },
+    {
+      "type": "helper",
+      "ts": 1795101837.874092,
+      "event": "complete",
+      "subagent_id": "codex:01a1f468-330e-7890-9571-fafe03a89c14",
+      "status": "completed",
+      "native": true
+    }
+  ],
+  "native_agent": [
+    {
+      "type": "native_agent",
+      "ts": 1795101832.025629,
+      "tool": "subAgentActivity",
+      "status": "started",
+      "agents": {},
+      "threads": [
+        "01a1f468-330e-7890-9571-fafe03a89c14"
+      ],
+      "agent_path": "/root/create_hello"
+    },
+    {
+      "type": "native_agent",
+      "ts": 1795101832.02781,
+      "tool": "subAgentActivity",
+      "status": "started",
+      "agents": {},
+      "threads": [
+        "01a1f468-330e-7890-9571-fafe03a89c14"
+      ],
+      "agent_path": "/root/create_hello"
+    },
+    {
+      "type": "native_agent",
+      "ts": 1795101833.6236641,
+      "tool": "wait",
+      "status": "inProgress",
+      "agents": {},
+      "threads": []
+    },
+    {
+      "type": "native_agent",
+      "ts": 1795101837.8740962,
+      "tool": "subAgentActivity",
+      "status": "completed",
+      "agents": {},
+      "threads": [
+        "01a1f468-330e-7890-9571-fafe03a89c14"
+      ],
+      "agent_path": "/root/create_hello"
+    },
+    {
+      "type": "native_agent",
+      "ts": 1795101837.874422,
+      "tool": "subAgentActivity",
+      "status": "completed",
+      "agents": {},
+      "threads": [
+        "01a1f468-330e-7890-9571-fafe03a89c14"
+      ],
+      "agent_path": "/root/create_hello"
+    },
+    {
+      "type": "native_agent",
+      "ts": 1795101837.875233,
+      "tool": "wait",
+      "status": "completed",
+      "agents": {},
+      "threads": []
+    }
+  ],
+  "hello": "hi"
+}

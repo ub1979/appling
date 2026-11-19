@@ -12,6 +12,9 @@ from pathlib import Path
 from . import context, engines
 from .engines import Run
 from .store import safe_path
+from .workspaces import ownership
+from . import planning
+from . import acceptance
 
 ARTIFACTS = {'prototype':'prototypes/index.html','requirements':'requirements.md','plan':'plan.md'}
 CHOICES = {'prototype':['Approve prototype','Request changes'],
@@ -21,8 +24,19 @@ ROLES = {'requirements':'req-engineer','prototype':'ui-designer','plan':'task-pl
          'build':'sw-developer','qa':'qa-engineer','security':'security-auditor','deploy':'devops-engineer'}
 
 
+class WorkWaiting(Exception):
+    """Expected retained work, never an engine failure or release approval."""
+    def __init__(self, message, *, reason, blockers):
+        super().__init__(message)
+        self.reason = reason
+        self.blockers = blockers
+
+
 def artifact_revision(root, kind):
     names=[ARTIFACTS[kind]]
+    if kind=='requirements' and safe_path(root,acceptance.SPEC).is_file():
+        # Criteria and owner prerequisites are approved with the requirements.
+        names.append(acceptance.SPEC)
     if kind=='prototype':
         names=[str(p.relative_to(root)) for p in sorted((root/'prototypes').rglob('*'))
                if p.is_file() and not p.is_symlink()]
@@ -42,13 +56,20 @@ def parse_tasks(value):
         raise ValueError('The plan must contain at least one bounded implementation task.')
     tasks=[];ids=set()
     for task in value:
-        if not isinstance(task,dict) or not task.get('id') or not task.get('goal'):
+        if not isinstance(task,dict) or not isinstance(task.get('id'),str) or not isinstance(task.get('goal'),str) or not task['id'] or not task['goal']:
             raise ValueError('Every task needs an ID and a goal.')
         if task['id'] in ids:
             raise ValueError('Task IDs must be unique.')
         ids.add(task['id'])
-        tasks.append(dict(id=task['id'],goal=task['goal'],depends_on=task.get('depends_on',[]),
-                          role=task.get('role','sw-developer'),status='pending'))
+        deps=task.get('depends_on',[])
+        if not isinstance(deps,list) or any(not isinstance(dep,str) for dep in deps):
+            raise ValueError('Task dependencies must be a list of task IDs.')
+        kind=task.get('kind','development')
+        role=task.get('role','qa-engineer' if kind=='verification' else 'sw-developer')
+        planning.validate_role(kind,role,ownership(task.get('files',[])))
+        tasks.append(dict(id=task['id'],goal=task['goal'],depends_on=deps,kind=kind,
+                          role=role,files=ownership(task.get('files',[])),status='pending',
+                          **{k:task[k] for k in ['requirements','inputs','outputs','acceptance'] if k in task}))
     done=set()
     while len(done)<len(tasks):
         ready=[t for t in tasks if t['id'] not in done and set(t['depends_on'])<=done]
@@ -81,7 +102,13 @@ class Workflow:
         self.started=time.time()
         for p in store.projects():
             if p.get('running'):
-                store.update(p['id'],running=False,paused=True)
+                workers=p.get('workers',[])
+                for worker in workers:
+                    if worker['status']=='running':worker['status']='interrupted'
+                tasks=p['tasks']
+                for task in tasks:
+                    if task['status']=='running':task['status']='pending'
+                store.update(p['id'],running=False,paused=True,workers=workers,tasks=tasks,native_helpers={})
                 store.message(p['id'],'assistant','Appling restarted. Your files and task checkpoints are saved. Send a message to continue.','status')
             for item in store.inbox(p['id']):
                 if item['kind'] in {'approval','question'} and item.get('runtime'):
@@ -89,7 +116,7 @@ class Workflow:
 
     def settings(self):
         return self.store.setting('ai',dict(provider='codex',model='',effort='',about_me='',agent_models={},
-            parallel_work=dict(max_workers=3),connections=default_connections()))
+            parallel_work=dict(max_workers=3,agents_per_project=3),connections=default_connections()))
 
     def connection(self,role):
         s=self.settings();selection=s.get('agent_models',{}).get(role) or s
@@ -103,6 +130,10 @@ class Workflow:
         text=text.strip()
         if not text:
             raise ValueError('Write a message first.')
+        if kind=='user' and text.split(maxsplit=1)[0]=='/replan':
+            return self.replan(pid,text)
+        if kind=='user' and text.split(maxsplit=1)[0]=='/criteria':
+            return self.propose_criteria(pid,text)
         with self.lock:
             pending=[i for i in self.store.inbox(pid) if i['kind'] in {'question','prototype','requirements','plan'}
                      and not (i.get('runtime') and self.cancelled.get(pid,threading.Event()).is_set())]
@@ -116,10 +147,80 @@ class Workflow:
             if state['phase']=='requirements':
                 self.store.update(pid,requirements_notes=[*state.get('requirements_notes',[]),text])
             item=dict(id=uuid.uuid4().hex,text=text,kind=kind)
-            self.store.update(pid,paused=False,queue=[*state['queue'],item])
+            self.store.update(pid,paused=False,attention=None,queue=[*state['queue'],item])
             self.store.event(pid,'queued',item=item)
             self._start(pid)
             return item
+
+    def propose_criteria(self,pid,text):
+        """Add acceptance criteria to existing approved requirements; the owner re-approves them."""
+        with self.lock:
+            state=self.store.get(pid)
+            if pid in self.active or state['running']:
+                raise ValueError('Stop the project and wait for its worker to finish before changing acceptance criteria.')
+            root=Path(state['root'])
+            if not safe_path(root,'requirements.md').is_file() or not state['approvals'].get('prototype'):
+                raise ValueError('Acceptance criteria can be added after the requirements and prototype have been reviewed.')
+            if any(item['kind'] not in {'requirements','plan'} for item in self.store.inbox(pid)):
+                raise ValueError('Resolve the pending question or review before changing acceptance criteria.')
+            for item in self.store.inbox(pid):self.store.close(pid,item['id'])
+            self.store.checkpoint(pid,'criteria-history:'+uuid.uuid4().hex,dict(phase=state['phase'],approvals=state['approvals']))
+            self.store.update(pid,phase='criteria',queue=[],paused=False,attention=None)
+            self.store.message(pid,'user',text)
+            note=text.split(maxsplit=1)[1] if len(text.split(maxsplit=1))>1 else ''
+            return self.submit(pid,'Propose acceptance criteria for the existing requirements. '+note,kind='auto')
+
+    def set_prerequisite(self,pid,ident,done=True):
+        """Owner-reported setup. It changes readiness; it never passes a criterion by itself."""
+        with self.lock:
+            state=self.store.get(pid);root=Path(state['root'])
+            spec=acceptance.load(root)
+            known={p['id']:p for p in spec['prerequisites']}
+            if ident not in known:
+                raise ValueError('Unknown setup item for this project.')
+            marked=dict(state.get('prerequisites_done') or {})
+            if done:marked[ident]=time.time()
+            else:marked.pop(ident,None)
+            self.store.update(pid,prerequisites_done=marked)
+            self.store.event(pid,'prerequisite',id=ident,done=bool(done))
+            self.store.message(pid,'assistant',('Setup recorded: ' if done else 'Setup marked as not ready: ')+known[ident]['description'],'status')
+            state=self.store.get(pid)
+            if done and state['phase']=='implementation_verified' and not state['running'] and pid not in self.active:
+                self.submit(pid,f'Setup recorded for {ident}. Verify the pending live acceptance.',kind='auto')
+            return dict(ok=True,prerequisites_done=marked)
+
+    def acceptance_status(self,pid):
+        state=self.store.get(pid);root=Path(state['root'])
+        spec=acceptance.load(root)
+        results=acceptance.current(root,spec,acceptance.load_results(root),source_revision(root))
+        done=acceptance.readiness(state)
+        return dict(phase=state['phase'],derived=bool(spec.get('derived')),criteria=spec['criteria'],
+            prerequisites=[dict(p,done=p['id'] in done) for p in spec['prerequisites']],
+            results=results,outcome=acceptance.outcome(results) if results else 'not_run')
+
+    def replan(self,pid,feedback):
+        """Replace execution planning only, retaining approved intent and code."""
+        with self.lock:
+            state=self.store.get(pid)
+            if pid in self.active or state['running']:
+                raise ValueError('Stop the project and wait for its worker to finish before replanning. Existing work will be preserved.')
+            root=Path(state['root'])
+            for kind in ['requirements','prototype']:
+                if not state['approvals'].get(kind) or state['approvals'][kind]!=artifact_revision(root,kind):
+                    raise ValueError(f'The current {kind} needs approval before implementation replanning.')
+            planning.require_parallel_capacity(self.settings())
+            inbox=self.store.inbox(pid)
+            if any(item['kind']!='plan' for item in inbox):
+                raise ValueError('Resolve the pending question or review before replanning.')
+            # Retain the prior graph and approvals without overwriting source or
+            # any worker workspace. The new graph requires its own plan approval.
+            self.store.checkpoint(pid,'plan-history:'+uuid.uuid4().hex,
+                                  dict(tasks=state['tasks'],approvals=state['approvals'],workers=state.get('workers',[])))
+            for item in inbox:self.store.close(pid,item['id'])
+            approvals={kind:revision for kind,revision in state['approvals'].items() if kind!='plan'}
+            self.store.update(pid,phase='plan',approvals=approvals,queue=[],paused=False,execution_mode='planned')
+            self.store.message(pid,'user',feedback)
+            return self.submit(pid,feedback+'\nReplan implementation only; retain approved requirements/design and existing code.',kind='auto')
 
     def _start(self,pid):
         if pid in self.active:
@@ -144,23 +245,32 @@ class Workflow:
                         item=None
                     else:
                         item=state['queue'][0]
-                        self.store.update(pid,queue=state['queue'][1:],running=True,turn=item)
+                        self.store.update(pid,queue=state['queue'][1:],running=True,turn=item,native_helpers={})
                 if item is None:
                     if self.cancelled[pid].wait(.2):
                         return
                     continue
                 self.store.event(pid,'turn_start',turn=item['id'],text=item['text'],kind=item['kind'])
+                from .progress import start as start_progress
+                progress_stop,progress_thread=start_progress(self.store,pid)
                 status='completed';error=None
                 try:
                     self._advance(pid,item['text'])
                 except InterruptedError as exc:
                     status='interrupted';self.store.message(pid,'assistant',str(exc),'status')
+                except WorkWaiting as exc:
+                    status='blocked'
+                    self.store.update(pid,paused=True,attention=dict(reason=exc.reason,
+                        message=str(exc),blockers=exc.blockers))
+                    self.store.message(pid,'assistant',str(exc),'status')
+                    self.store.event(pid,'work_waiting',reason=exc.reason,text=str(exc),blockers=exc.blockers)
                 except Exception as exc:
                     status='error';error=f'{type(exc).__name__}: {exc}'
                     self.store.event(pid,'problem',text=error)
                     self.store.message(pid,'assistant',error,'status')
                     self.store.update(pid,paused=True)
                 finally:
+                    progress_stop.set();progress_thread.join(timeout=2)
                     self.store.update(pid,running=False,turn=None,last_completed_turn=item['id'])
                     self.store.event(pid,'turn_end',turn=item['id'],status=status,error=error)
         finally:
@@ -180,10 +290,16 @@ class Workflow:
                     self.answers[item['id']]='deny';self.store.close(pid,item['id'])
             self.store.event(pid,'stop_requested',cleared_queue=True)
 
-    def runtime_ask(self,pid,kind,question,choices):
-        item=self.store.ask(pid,kind,question,choices,runtime=True,**({'command':question} if kind=='approval' else {}))
+    def runtime_ask(self,pid,kind,question,choices,worker=None,done=None,invocation_id=None):
+        if worker:question=f'[{worker["task_id"]} · {worker["role"]}] {question}'
+        item=self.store.ask(pid,kind,question,choices,runtime=True,
+            invocation_id=invocation_id,
+            **({'worker_id':worker['id'],'task_id':worker['task_id']} if worker else {}),
+            **({'command':question} if kind=='approval' else {}))
         try:
             while not self.cancelled[pid].wait(.15):
+                if done and done.is_set():
+                    raise InterruptedError('The task that asked this question has ended.')
                 with self.lock:
                     if item['id'] in self.answers:
                         return self.answers.pop(item['id'])
@@ -191,6 +307,7 @@ class Workflow:
         finally:
             if any(i['id']==item['id'] for i in self.store.inbox(pid)):
                 self.store.close(pid,item['id'])
+            self.answers.pop(item['id'],None)
 
     def answer(self,pid,iid,answer):
         with self.lock:
@@ -212,12 +329,18 @@ class Workflow:
                     raise ValueError('The reviewed files changed. Reopen the current review before approving.')
                 if choice not in CHOICES[kind]:
                     raise ValueError('Use the approval or request-changes button.')
+                if kind=='plan' and choice==CHOICES[kind][0] and state.get('plan_policy')!=planning.POLICY:
+                    raise ValueError('This plan uses the previous execution contract. Use /replan to regenerate it before approval.')
                 self.store.close(pid,iid)
                 if choice==CHOICES[kind][0]:
                     approvals={**state['approvals'],kind:revision}
                     phase={'prototype':'requirements_review','requirements':'plan','plan':'build'}[kind]
+                    if kind=='requirements' and state.get('execution_mode')=='direct':phase='build'
+                    elif kind=='requirements' and approvals.get('plan') and approvals['plan']==artifact_revision(root,'plan'):phase='build'
                     self.store.update(pid,approvals=approvals,phase=phase)
                     self.store.message(pid,'assistant',f'{kind.capitalize()} approved.','status')
+                    if kind=='requirements':
+                        self._prerequisite_notice(pid,root)
                     self.submit(pid,f'Continue from approved {kind}.',kind='auto')
                 else:
                     feedback=answer.get('feedback','Please ask what needs changing.') if isinstance(answer,dict) else 'Ask what needs changing.'
@@ -234,6 +357,19 @@ class Workflow:
                 self.submit(pid,choice,kind='auto')
             return dict(ok=True)
 
+    def _prerequisite_notice(self,pid,root):
+        spec=acceptance.load(root)
+        if spec.get('derived') or not spec['prerequisites']:
+            return
+        live=[c for c in acceptance.release_one(spec) if c['live']]
+        local=len(acceptance.release_one(spec))-len(live)
+        lines=[f'Coding can proceed on {local} locally testable criteria. You will be needed for:']
+        for p in spec['prerequisites']:
+            uses=[c['id'] for c in live if p['id'] in c['prerequisites']]
+            lines.append(f"- {p['description']} ({p['kind']}, needed at {p['needed_at']}; affects {', '.join(uses) or 'no release-1 criterion'})")
+        lines.append('Mark each item done in Setup when it is ready. Live checks wait for it; they are never counted as passed without evidence.')
+        self.store.message(pid,'assistant','\n'.join(lines),'status')
+
     def review(self,pid,kind):
         root=Path(self.store.get(pid)['root']);revision=artifact_revision(root,kind)
         if not revision:
@@ -241,64 +377,208 @@ class Workflow:
         question=f'Review the {kind} before continuing.'
         if kind!='prototype':
             question+='\n\n'+safe_path(root,ARTIFACTS[kind]).read_text()
+        if kind=='requirements':
+            table=acceptance.summary_markdown(acceptance.load(root))
+            if table:question+='\n\n'+table
         self.store.ask(pid,kind,question,CHOICES[kind],revision=revision)
 
     def authorized(self,pid):
         state=self.store.get(pid);root=Path(state['root'])
-        for kind in ARTIFACTS:
+        kinds=['requirements','prototype'] if state.get('execution_mode')=='direct' else list(ARTIFACTS)
+        for kind in kinds:
             if state['approvals'].get(kind)!=artifact_revision(root,kind) or not state['approvals'].get(kind):
                 raise PermissionError(f'The current {kind} needs approval before implementation can continue.')
 
-    def invoke(self,pid,role,goal,readonly=False):
+    def scope_remaining_tasks(self,pid):
+        """Assess legacy execution metadata without rewriting an approved plan."""
+        state=self.store.get(pid);pending=[t for t in state['tasks'] if t['status']!='done']
+        if not pending or not any(not t.get('files') for t in pending):
+            return
+        signature=hashlib.sha256(json.dumps(dict(plan=state['approvals'].get('plan'),revision=state['revision'],
+            tasks=[{k:t.get(k) for k in ['id','goal','depends_on']} for t in state['tasks']]),sort_keys=True).encode()).hexdigest()
+        if state.get('scope_assessed')==signature:return
+        self.authorized(pid)
+        result=self.invoke(pid,'task-planner',
+            'Assess safe execution ownership for these existing unfinished tasks: '+json.dumps(pending)+'. '
+            'Inspect plan.md, shared interfaces and current source. Do not edit files, rewrite task goals, remove dependencies or add scope. '
+            'Return {"summary":"brief execution assessment","task_scopes":[{"id":"existing task ID","files":["src/feature/"],"additional_depends_on":[]}]}. '
+            'Assign disjoint plain relative files/folders only where independence is clear; folders end in /. '
+            'Add dependencies for shared contracts where necessary. Leave files empty for uncertain tasks; these remain serial. '
+            'Do not invent tasks or change already assigned ownership.',readonly=True)
+        self.authorized(pid)
+        updates=result.get('task_scopes',[])
+        if not isinstance(updates,list):raise ValueError('Execution ownership assessment must return a list of task scopes.')
+        tasks=self.store.get(pid)['tasks'];by={t['id']:t for t in tasks if t['status']!='done'};seen=set()
+        for update in updates:
+            ident=update.get('id') if isinstance(update,dict) else None
+            if ident not in by or ident in seen:raise ValueError('Execution assessment referred to an unknown or duplicated task.')
+            seen.add(ident);task=by[ident]
+            scopes=ownership(update.get('files',[]));deps=update.get('additional_depends_on',[])
+            if not isinstance(deps,list) or any(not isinstance(dep,str) for dep in deps):
+                raise ValueError('Execution dependencies must be task IDs.')
+            if task.get('files') and scopes!=task['files']:
+                raise ValueError('Execution assessment cannot change already assigned file ownership.')
+            task['files']=scopes
+            task['depends_on']=list(dict.fromkeys([*task['depends_on'],*deps]))
+        parse_tasks(tasks)  # Validate the resulting dependency graph before saving anything.
+        # The stable assessment key uses the final (possibly stricter) dependency graph.
+        signature=hashlib.sha256(json.dumps(dict(plan=state['approvals'].get('plan'),revision=state['revision'],
+            tasks=[{k:t.get(k) for k in ['id','goal','depends_on']} for t in tasks]),sort_keys=True).encode()).hexdigest()
+        self.store.update(pid,tasks=tasks,scope_assessed=signature)
+
+    def invoke(self,pid,role,goal,readonly=False,workspace=None,worker=None,session_scope=None,planning_context=None):
+        if self.cancelled[pid].is_set():
+            raise InterruptedError('Stopped before starting the next model invocation. Existing work is saved.')
+        invocation_id=uuid.uuid4().hex;done=threading.Event()
         key,conn,selection=self.connection(role)
         state=self.store.get(pid)
         # A changed model/skill gets a new session; existing prefixes stay unchanged.
-        instructions=context.instructions(role)
+        instructions=context.instructions(role,state.get('execution_mode','planned'))
         if self.settings().get('about_me'):
             instructions+='\nOwner preferences (apply only where compatible with project requirements):\n'+self.settings()['about_me']
-        fingerprint=hashlib.sha256((key+json.dumps(conn,sort_keys=True)+selection.get('model','')+instructions).encode()).hexdigest()[:16]
-        session_key=role+':'+fingerprint
+        instruction_hash=hashlib.sha256(instructions.encode()).hexdigest()
+        fingerprint=hashlib.sha256((key+json.dumps(conn,sort_keys=True)+selection.get('model','')+selection.get('effort','')+instructions).encode()).hexdigest()[:16]
+        session_key=role+':'+fingerprint+(':'+worker['id'] if worker else ':'+session_scope if session_scope else '')
+        self.store.event(pid,'invocation',run_id=invocation_id,role=role,provider=key,
+            model=selection.get('model') or 'provider-default',effort=selection.get('effort') or 'provider-default',
+            instructions_sha256=instruction_hash,worker_id=worker['id'] if worker else None,
+            source_access='verification' if worker and worker.get('kind')=='verification' else 'read-only' if readonly else 'workspace-write')
         self.store.update(pid,engine=key,requirements_started=True)
         usage_baseline=state.get('session_usage',{}).get(session_key,{})
         def save_session(sid):
-            current=self.store.get(pid);self.store.update(pid,sessions={**current['sessions'],session_key:sid})
+            with self.lock:
+                current=self.store.get(pid);self.store.update(pid,sessions={**current['sessions'],session_key:sid})
         def save_usage(usage):
             if 'total' in usage:
                 total=usage['total']
-                current=self.store.get(pid)
-                self.store.update(pid,session_usage={**current.get('session_usage',{}),session_key:total})
+                with self.lock:
+                    current=self.store.get(pid)
+                    self.store.update(pid,session_usage={**current.get('session_usage',{}),session_key:total})
                 usage={name:max(0,total.get(native,0)-usage_baseline.get(native,0)) for name,native in
                        [('input_tokens','inputTokens'),('cached_input_tokens','cachedInputTokens'),('output_tokens','outputTokens')]}
             elif conn['engine']=='claude-cli':
                 cached=usage.get('cache_read_input_tokens',0)
                 usage=dict(input_tokens=usage.get('input_tokens',0)+cached+usage.get('cache_creation_input_tokens',0),
                            cached_input_tokens=cached,output_tokens=usage.get('output_tokens',0))
-            self.store.event(pid,'usage',provider=key,role=role,usage=usage)
-        self.store.event(pid,'helper',event='start',subagent_id=role,goal=role)
+            self.store.event(pid,'usage',provider=key,role=role,run_id=invocation_id,worker_id=worker['id'] if worker else None,usage=usage)
+        helper_id=worker['id'] if worker else role
+        display_goal=worker['goal'] if worker else role
+        def emit_event(type_,**fields):
+            if type_=='helper' and fields.get('native'):
+                with self.lock:
+                    helpers=dict(self.store.get(pid).get('native_helpers',{}))
+                    helper=fields.get('subagent_id')
+                    if fields.get('event')=='start':
+                        helpers[helper]=dict(id=helper,goal=fields.get('goal') or 'Codex agent',
+                                            **{k:fields[k] for k in ('agent_path','model') if fields.get(k)},
+                                            started=time.time(),run_id=invocation_id)
+                    else:helpers.pop(helper,None)
+                    self.store.update(pid,native_helpers=helpers)
+            self.store.event(pid,type_,**fields)
+        self.store.event(pid,'helper',event='start',subagent_id=helper_id,goal=display_goal,role=role,run_id=invocation_id)
         try:
-            run=Run(root=Path(state['root']),instructions=instructions,
-                prompt=context.briefing(self.store,pid,role,goal),model='' if selection.get('model')=='default' else selection.get('model',''),effort=selection.get('effort',''),
+            run=Run(root=Path(workspace or state['root']),instructions=instructions,
+                managed_worker=bool(worker) or (state['phase']=='build' and state.get('execution_mode')!='direct'),
+                native_delegation=not worker and state['phase']=='build' and state.get('execution_mode')=='direct',
+                prompt=context.briefing(self.store,pid,role,goal,workspace=workspace,worker=worker,planning_context=planning_context),model='' if selection.get('model')=='default' else selection.get('model',''),effort=selection.get('effort',''),
                 readonly=readonly,session=state['sessions'].get(session_key),cancel=self.cancelled[pid],
-                emit=lambda t,**kw:self.store.event(pid,t,**kw),
-                ask=lambda k,q,c:self.runtime_ask(pid,k,q,c),recall=lambda q:self.store.search(pid,q),
+                emit=emit_event,
+                ask=lambda k,q,c:self.runtime_ask(pid,k,q,c,worker=worker,done=done,invocation_id=invocation_id),recall=lambda q:self.store.search(pid,q),
                 save_session=save_session,save_usage=save_usage)
             data=self.execute(conn,run)
             if self.cancelled[pid].is_set():
                 raise InterruptedError('Stopped. Files are saved; send a message to continue.')
-            context.checkpoint(self.store,pid,role,goal,data,self.store.get(pid)['phase'])
-            self.store.event(pid,'helper',event='complete',subagent_id=role,goal=role,status='completed')
+            if worker:
+                self.store.checkpoint(pid,role+':'+worker['id'],dict(goal=goal,outcome=data,workspace=str(workspace),next_action='Integrate and verify.'))
+            else:context.checkpoint(self.store,pid,role,goal,data,self.store.get(pid)['phase'])
+            self.store.event(pid,'helper',event='complete',subagent_id=helper_id,goal=display_goal,status='completed')
             if data.get('summary'):
                 self.store.message(pid,'assistant',data['summary'])
                 self.store.event(pid,'interim',text=data['summary'])
             return data
         except BaseException:
-            context.checkpoint(self.store,pid,role,goal,'Interrupted or blocked; inspect existing files before retrying.',self.store.get(pid)['phase'])
-            self.store.event(pid,'helper',event='complete',subagent_id=role,goal=role,status='error')
+            if worker:
+                self.store.checkpoint(pid,role+':'+worker['id'],dict(goal=goal,outcome='Interrupted or blocked; inspect existing files before retrying.',workspace=str(workspace),next_action='Resume retained worker.'))
+            else:context.checkpoint(self.store,pid,role,goal,'Interrupted or blocked; inspect existing files before retrying.',self.store.get(pid)['phase'])
+            self.store.event(pid,'helper',event='complete',subagent_id=helper_id,goal=display_goal,status='error')
             raise
+        finally:
+            done.set()
+            with self.lock:
+                helpers=self.store.get(pid).get('native_helpers',{})
+                if any(h.get('run_id')==invocation_id for h in helpers.values()):
+                    self.store.update(pid,native_helpers={k:h for k,h in helpers.items() if h.get('run_id')!=invocation_id})
+                for item in self.store.inbox(pid):
+                    if item.get('runtime') and item.get('invocation_id')==invocation_id:
+                        self.answers.pop(item['id'],None);self.store.close(pid,item['id'])
 
     def _write(self,pid,name,text):
         path=safe_path(Path(self.store.get(pid)['root']),name);path.parent.mkdir(parents=True,exist_ok=True)
         path.write_text(text);self.store.remember(pid,name,text)
+
+    def create_plan(self,pid,text):
+        limit=planning.require_parallel_capacity(self.settings())
+        state=self.store.get(pid);root=Path(state['root'])
+        # Bind retained proposals to the actual inputs/source. A saved review is
+        # feedback for a new review, never approval or permission to execute.
+        signature=hashlib.sha256(json.dumps(dict(policy=planning.POLICY,
+            approvals=state['approvals'],source=source_revision(root)),sort_keys=True).encode()).hexdigest()
+        draft=state.get('plan_draft') or {}
+        if draft.get('signature')!=signature:draft={}
+        history=list(draft.get('reviews',[]));candidate=draft.get('candidate');seen=set()
+        goal=planning.planning_goal(text,limit)
+        if candidate:
+            goal+='\nContinue planning.draft.candidate, preserving its useful corrections. Resolve the accumulated review findings; do not restart planning from the old execution ledger.'
+        for attempt in range(planning.MAX_PLAN_ATTEMPTS):
+            plan_context=dict(stage='proposal')
+            if candidate:plan_context['draft']=dict(candidate=candidate,reviews=history)
+            result=self.invoke(pid,'task-planner',goal,readonly=True,session_scope='planner-'+planning.SESSION_VERSION,
+                               planning_context=plan_context)
+            candidate=result;review=None
+            self.store.update(pid,plan_draft=dict(signature=signature,candidate=candidate,reviews=history))
+            try:
+                tasks=parse_tasks(result.get('tasks'))
+                if not isinstance(result.get('plan'),str) or not result['plan'].strip():
+                    raise ValueError('The readable implementation plan is missing.')
+                waves=planning.execution_waves(tasks,limit)
+                contract=planning.validate_contract(result,tasks,Path(self.store.get(pid)['root']))
+                review=self.invoke(pid,'sw-architect',
+                    'Independently review this candidate implementation plan against the approved requirements, current source and host capabilities. '
+                    'Do not edit files or grant approval. Check complete user journeys from input through real operations, review/resume and observed results; '
+                    'check missing owners, shared interfaces, runtime/bootstrap feasibility, real dependency consumers, independent QA and live blockers. '
+                    'Do not pass adapter lists or requirement-ID mentions as end-to-end implementation. '
+                    'Audit every approved journey and return all concrete gaps together, including provider-operation-result continuation, '
+                    'review/restart/resume, real file transport, and any required device/audio routing. Verify prior findings against this candidate. '
+                    'Distinguish missing implementation assignments from execution-time acceptance evidence: this is planning, not release QA. '
+                    'Use planning.recovery to check retained worker blockers against the candidate, not as competing task assignments. '
+                    'Check every acceptance requires_tasks list against actual routes/factories/identity/device prerequisites. '
+                    'Reject semantic dependency cycles: an upstream feature cannot need downstream integration to pass. '
+                    'Keep owner-dependent live acceptance as an explicit release gate while allowing independently testable development; '
+                    'a fixture or recorded blocker is never a live pass. '
+                    'A concrete assigned feasibility check may gate dependent implementation and release; do not require planned code to exist before plan review. '
+                    'The sole candidate is supplied in planning.candidate; it has not been adopted or approved yet. '
+                    'Return {"verdict":"pass|fail|blocked","summary":"concrete rationale","findings":["actionable gap"]}.',
+                    readonly=True,session_scope='plan-review-'+planning.SESSION_VERSION+'-'+uuid.uuid4().hex,
+                    planning_context=dict(stage='review',candidate=dict(plan=result['plan'],tasks=tasks,**contract),prior_reviews=history))
+                if review.get('verdict')!='pass' or review.get('findings')!=[] or not isinstance(review.get('summary'),str) or not review['summary'].strip():
+                    raise ValueError('Independent plan review requires correction: '+json.dumps(review))
+                contract['review']=dict(verdict='pass',summary=review['summary'],findings=[])
+                return planning.with_schedule(result['plan'],waves,tasks,limit,contract),tasks,contract
+            except ValueError as exc:
+                feedback=review if isinstance(review,dict) else dict(verdict='fail',summary=str(exc),findings=[str(exc)])
+                history.append(feedback)
+                self.store.update(pid,plan_draft=dict(signature=signature,candidate=candidate,reviews=history))
+                marker=json.dumps(dict(candidate={k:candidate.get(k) for k in ['plan','tasks','runtime','journeys']},
+                    verdict=feedback.get('verdict'),findings=feedback.get('findings')),sort_keys=True)
+                no_progress=marker in seen;seen.add(marker)
+                if no_progress or attempt==planning.MAX_PLAN_ATTEMPTS-1:
+                    self.store.event(pid,'plan_validation',status='paused',text=str(exc),attempt=attempt+1,retained=True)
+                    raise ValueError('The planner could not produce a safe parallel plan. The draft and review findings are saved for correction. '+str(exc)) from exc
+                self.store.event(pid,'plan_validation',status='retry',text=str(exc),attempt=attempt+1)
+                goal=planning.planning_goal(text,limit)+'\nCorrect the rejected plan: '+str(exc)+(
+                    '\nContinue planning.draft.candidate; address ALL accumulated findings in planning.draft.reviews together, '
+                    'preserve resolved corrections and self-audit all journeys before returning the complete replacement. '
+                    'Do not merely acknowledge findings or defer controller-supported assignments.')
 
     def _advance(self,pid,text):
         for step in range(100):
@@ -309,7 +589,15 @@ class Workflow:
                 result=self.invoke(pid,'req-engineer',f'User input: {text}\nInterview for requirements; ask only unanswered questions, one at a time. '
                     'Respect skip/decide/defaults. For existing apps distinguish explanation or in-scope fixes from material scope changes. '
                     'Return {"summary":"...","question":"one question","choices":["..."]} while gaps remain; '
-                    'when ready return {"summary":"...","requirements":"complete Markdown with stable requirement IDs, journeys, assumptions and acceptance criteria"}. '
+                    'when ready return {"summary":"...","requirements":"complete Markdown with stable requirement IDs, journeys, assumptions and acceptance criteria; tag each FR/NFR Release: 1 or later",'
+                    '"acceptance_criteria":[{"id":"AC-FR-001-1","requirement":"FR-001","description":"observable pass condition","release":"1|later","live":false,"prerequisites":[]}],'
+                    '"prerequisites":[{"id":"P-google-login","kind":"account|driver|permission|device|time|service|other","description":"what the owner must provide","needed_at":"build|verification"}],'
+                    '"suggested_team":["specialist role IDs from available_roles"]}. '
+                    'Every FR/NFR needs at least one criterion. Set live=true only when passing needs real accounts, devices, permissions, other people or elapsed time, '
+                    'and name the prerequisite it needs; its code must still be buildable and testable locally. '
+                    'If release 1 is large or depends on several external integrations, offer the owner a smaller first release as a question before finishing; '
+                    'never move a requirement to later without the owner choosing it. '
+                    'Recommend only specialists useful for this project. '
                     'Do not implement the app. Do not ask for approvals yourself; the controller handles those.',readonly=True)
                 if result.get('question'):
                     self.store.ask(pid,'question',result['question'],result.get('choices',[]));return
@@ -317,7 +605,23 @@ class Workflow:
                     raise ValueError('Requirements are incomplete. Continue the interview.')
                 if not re.search(r'\bFR-\d+\b',result['requirements']):
                     raise ValueError('Requirements need stable FR IDs and acceptance criteria before prototype work.')
-                self._write(pid,'requirements.md',result['requirements'])
+                root=Path(state['root'])
+                if result.get('acceptance_criteria'):
+                    spec=acceptance.normalize(result['acceptance_criteria'],result.get('prerequisites',[]),result['requirements'])
+                    self._write(pid,'requirements.md',result['requirements'])
+                    acceptance.write(root,spec)
+                else:
+                    self._write(pid,'requirements.md',result['requirements'])
+                    # Never keep criteria approved for a different requirements text.
+                    stale=safe_path(root,acceptance.SPEC)
+                    if stale.is_file():stale.unlink()
+                if state.get('execution_mode')=='direct':
+                    valid_roles={entry[0] for entry in context.CATALOG['AGENTS']}
+                    suggested=result.get('suggested_team',[])
+                    if not isinstance(suggested,list):raise ValueError('Suggested team must be a list of role IDs.')
+                    suggested=[r for r in suggested if isinstance(r,str) and r in valid_roles and r!='task-planner']
+                    team=list(dict.fromkeys([*state['team'],*suggested]))
+                    self.store.update(pid,team=team);state=self.store.get(pid)
                 self.store.update(pid,phase='prototype');text='Build the prototype from this draft.'
             elif phase=='prototype':
                 result=self.invoke(pid,'ui-designer',f'{text}\nCreate or revise prototypes/index.html and its clickable screens from requirements.md. '
@@ -328,49 +632,49 @@ class Workflow:
                 self.store.update(pid,phase='prototype_review');self.review(pid,'prototype');return
             elif phase=='prototype_review':
                 self.review(pid,'prototype');return
+            elif phase=='criteria':
+                root=Path(state['root']);requirements=safe_path(root,'requirements.md').read_text()
+                result=self.invoke(pid,'req-engineer',f'{text}\nThe requirements in requirements.md are already written. Do not change them or add scope. '
+                    'Propose acceptance criteria and owner prerequisites for every FR/NFR. '
+                    'Return {"summary":"...","acceptance_criteria":[{"id":"AC-FR-001-1","requirement":"FR-001","description":"observable pass condition",'
+                    '"release":"1","live":false,"prerequisites":[]}],"prerequisites":[{"id":"P-name","kind":"account|driver|permission|device|time|service|other",'
+                    '"description":"what the owner must provide","needed_at":"build|verification"}]}. '
+                    'Keep every requirement in release 1 unless requirements.md already says otherwise. Set live=true only for checks that need real accounts, '
+                    'devices, permissions, other people or elapsed time, and name the prerequisite. The owner approves these criteria.',readonly=True)
+                spec=acceptance.normalize(result.get('acceptance_criteria'),result.get('prerequisites',[]),requirements)
+                acceptance.write(root,spec)
+                approvals={k:v for k,v in state['approvals'].items() if k!='requirements'}
+                self.store.update(pid,phase='requirements_review',approvals=approvals)
+                self.review(pid,'requirements');return
             elif phase=='requirements_review':
                 self.review(pid,'requirements');return
             elif phase=='plan':
-                result=self.invoke(pid,'task-planner',f'{text}\nPlan the approved requirements. Use small coherent tasks. '
-                    'Return {"summary":"...","plan":"readable Markdown plan including verification commands",'
-                    '"tasks":[{"id":"task-1","goal":"bounded goal and acceptance criteria","depends_on":[],"role":"sw-developer"}]}. '
-                    'Use selected specialist roles where useful, including architecture, UX writing, documentation or deployment preparation. '
-                    'Deployment tasks prepare and locally validate; actual remote deployment requires separate explicit owner authorization. '
-                    'Do not implement code. Keep the plan proportional to project size.',readonly=True)
-                tasks=parse_tasks(result.get('tasks'))
-                if not isinstance(result.get('plan'),str) or not result['plan'].strip():
-                    raise ValueError('The readable implementation plan is missing.')
-                self._write(pid,'plan.md',result['plan'])
-                self.store.update(pid,tasks=tasks,phase='plan_review')
+                plan,tasks,contract=self.create_plan(pid,text)
+                self._write(pid,'plan.md',plan)
+                self.store.update(pid,tasks=tasks,phase='plan_review',plan_policy=planning.POLICY,plan_contract=contract,plan_draft=None)
                 self.review(pid,'plan');return
             elif phase=='plan_review':
                 self.review(pid,'plan');return
             elif phase=='build':
                 self.authorized(pid)
-                tasks=state['tasks'];done={t['id'] for t in tasks if t['status']=='done'}
-                task=next((t for t in tasks if t['status']!='done' and set(t['depends_on'])<=done),None)
-                if task is None:
-                    if any(t['status']!='done' for t in tasks):
-                        raise ValueError('No task is ready; resolve its dependencies.')
+                if state.get('execution_mode')=='direct':
+                    from .direct import build
+                    build(self,pid,text)
+                    continue
+                if state.get('plan_policy') and state['plan_policy']!=planning.POLICY:
+                    raise ValueError('Replan with the current execution contract before starting development.')
+                if state.get('plan_policy')==planning.POLICY:
+                    planning.require_parallel_capacity(self.settings())
+                self.scope_remaining_tasks(pid)
+                from .swarm import build_ready
+                if not build_ready(self,pid,feedback=text):
                     self.store.update(pid,phase='qa');continue
-                task['status']='running';self.store.update(pid,tasks=tasks)
-                role=task.get('role','sw-developer')
-                if role not in state['team']:
-                    role='sw-developer'
-                result=self.invoke(pid,role,f'Implement task {task["id"]}: {task["goal"]}. '
-                    'Inspect existing work before editing; do not discard it. Leave requirements.md, plan.md and prototypes/ unchanged. '
-                    'Run meaningful affected build/tests, save evidence under .sdlc/evidence/. '
-                    'Use the installed browser automation for UI verification when relevant. '
-                    'Return {"summary":"...","status":"completed|blocked","checks":[{"command":"...","exit_code":0,"evidence":".sdlc/evidence/..."}]}.')
+            elif phase in {'qa','security','code-review','accessibility'}:
                 self.authorized(pid)
-                if result.get('status')!='completed':
-                    raise RuntimeError('Development is blocked. Review the saved task report and continue when resolved.')
-                task['status']='done';self.store.update(pid,tasks=tasks)
-            elif phase in {'qa','security'}:
-                self.authorized(pid)
-                role='qa-engineer' if phase=='qa' else 'security-auditor'
+                role={'qa':'qa-engineer','security':'security-auditor','code-review':'code-reviewer','accessibility':'a11y-auditor'}[phase]
                 before=source_revision(Path(state['root']))
-                result=self.invoke(pid,role,
+                from .swarm import verify_project
+                result=verify_project(self,pid,role,
                     'Independently verify the integrated application against approved requirements. Do not edit application source. '
                     'For QA, run real builds/tests and interact with every approved core UI journey using Playwright or available browser tools. '
                     'For requested phone/computer targets, use their actual emulator/device/native automation as well; report missing access as blocked. '
@@ -378,41 +682,120 @@ class Workflow:
                     'For security, check the actual auth/data/dependencies relevant to this app, without destructive external testing. '
                     'Return {"summary":"...","verdict":"pass|fail|blocked","browser_tested":true,"platforms_tested":["web"],'
                     '"checks":[{"command":"actual command or browser actions","exit_code":0,"evidence":".sdlc/evidence/path","requirements":["FR-001"]}],'
-                    '"findings":[{"description":"...","severity":"high"}]}.')
+                    '"findings":[{"description":"...","severity":"high"}]}.'+(self._criteria_brief(state) if phase=='qa' else ''))
                 self.authorized(pid)
                 after=source_revision(Path(state['root']))
                 if before!=after:
                     raise RuntimeError('Verification changed application source. Its evidence is invalid; inspect the changes and rerun verification.')
                 result['source_revision']=after
+                root=Path(state['root'])
+                evidence_folder=result.pop('_evidence_folder',None)
                 self._write(pid,f'.sdlc/{phase}-report.json',json.dumps(result,indent=2))
-                valid=self.valid_evidence(pid,result,require_browser=phase=='qa' and state['kind'] in {'app','website'},require_coverage=phase=='qa')
-                if phase=='qa' and any(p!='web' and p not in result.get('platforms_tested',[]) for p in state['platforms']):
-                    valid=False
-                if result.get('verdict')!='pass' or not valid:
-                    cycles=state.get('repair_cycles',0)+1
-                    if cycles>3 or result.get('verdict')=='blocked' or not valid:
-                        raise RuntimeError('Verification is blocked or has unresolved findings. Evidence and findings are saved; review them before continuing.')
-                    tasks=state['tasks']+[dict(id=f'repair-{state["revision"]}-{cycles}',goal=json.dumps(result),depends_on=[],role='sw-developer',status='pending')]
-                    self.store.update(pid,tasks=tasks,phase='build',repair_cycles=cycles);continue
-                if phase=='qa' and 'security-auditor' in state['team']:
-                    self.store.update(pid,phase='security');continue
+                if phase=='qa':
+                    valid=self.valid_evidence(pid,result,require_browser=state['kind'] in {'app','website'},require_coverage=False)
+                    if any(p!='web' and p not in result.get('platforms_tested',[]) for p in state['platforms']):
+                        valid=False
+                    spec=acceptance.load(root)
+                    results=acceptance.evaluate(root,spec,state,result,after,role=role,evidence_prefix=evidence_folder)
+                    acceptance.save_results(root,results)
+                    status=acceptance.outcome(results)
+                    self.store.update(pid,acceptance_outcome=status,readiness_verified=acceptance.readiness(state))
+                    self.store.event(pid,'acceptance',outcome=status,counts={k:sum(r['status']==k for r in results.values()) for k in acceptance.STATUSES})
+                    failed=[i for i,r in results.items() if r['status']=='failed']
+                    if failed or result.get('verdict')=='fail':
+                        cycles=state.get('repair_cycles',0)+1
+                        if cycles>3:
+                            raise RuntimeError('Verification still has unresolved findings after 3 repair cycles. Evidence and findings are saved; review them before continuing.')
+                        repair=dict(findings=result.get('findings',[]),failed_criteria={i:results[i] for i in failed})
+                        if state.get('execution_mode')=='direct':
+                            self.store.update(pid,phase='build',repair_cycles=cycles)
+                            text='Fix these independent review findings without adding scope: '+json.dumps(repair)
+                            continue
+                        tasks=state['tasks']+[dict(id=f'repair-{state["revision"]}-{cycles}',goal=json.dumps(repair),depends_on=[],role='sw-developer',status='pending')]
+                        self.store.update(pid,tasks=tasks,phase='build',repair_cycles=cycles);continue
+                    missing=[i for i,r in results.items() if r['status']=='not_run']
+                    if missing or not valid or (result.get('verdict')!='pass' and status!='pending_owner'):
+                        detail=('Not verified: '+', '.join(missing[:20])) if missing else 'Evidence is incomplete or the verdict is blocked.'
+                        raise RuntimeError('Verification is blocked or has unresolved findings. Evidence and findings are saved; review them before continuing. '+detail)
+                else:
+                    valid=self.valid_evidence(pid,result,require_browser=False,require_coverage=False)
+                    if result.get('verdict')!='pass' or not valid:
+                        cycles=state.get('repair_cycles',0)+1
+                        if cycles>3 or result.get('verdict')=='blocked' or not valid:
+                            raise RuntimeError('Verification is blocked or has unresolved findings. Evidence and findings are saved; review them before continuing.')
+                        if state.get('execution_mode')=='direct':
+                            self.store.update(pid,phase='build',repair_cycles=cycles)
+                            text='Fix these independent review findings without adding scope: '+json.dumps(result)
+                            continue
+                        tasks=state['tasks']+[dict(id=f'repair-{state["revision"]}-{cycles}',goal=json.dumps(result),depends_on=[],role='sw-developer',status='pending')]
+                        self.store.update(pid,tasks=tasks,phase='build',repair_cycles=cycles);continue
+                reviews=[('qa','qa-engineer'),('code-review','code-reviewer'),('security','security-auditor'),('accessibility','a11y-auditor')]
+                next_reviews=[name for name,reviewer in reviews[1:] if reviewer in state['team']]
+                pipeline=['qa',*next_reviews]
+                if phase in pipeline and pipeline.index(phase)+1<len(pipeline):
+                    self.store.update(pid,phase=pipeline[pipeline.index(phase)+1]);continue
+                spec=acceptance.load(root)
+                final=acceptance.current(root,spec,acceptance.load_results(root),source_revision(root))
+                outcome=acceptance.outcome(final)
+                if outcome=='pending_owner':
+                    waiting=[(i,r) for i,r in final.items() if r['status']=='pending_owner']
+                    self.store.update(pid,phase='implementation_verified',repair_cycles=0)
+                    lines=['Implementation verified; live acceptance pending. This is not delivered yet. Waiting on you:']
+                    lines+=[f"- {i}: {r.get('next_action') or 'owner setup'}" for i,r in waiting]
+                    lines.append('Mark setup items done when they are ready; only the pending checks and reviews will run again.')
+                    self.store.message(pid,'assistant','\n'.join(lines),'status')
+                    return
+                if outcome!='passed':
+                    raise RuntimeError('Acceptance results do not match the current source. Verification must run again before delivery.')
                 self.store.update(pid,phase='delivered')
                 self.store.message(pid,'assistant','Your app is ready. Use Open app to try it. Verified checks are saved with the project.')
                 return
+            elif phase=='implementation_verified':
+                root=Path(state['root'])
+                spec=acceptance.load(root)
+                final=acceptance.current(root,spec,acceptance.load_results(root),source_revision(root))
+                if acceptance.readiness(state)!=(state.get('readiness_verified') or {}) or acceptance.outcome(final)!='pending_owner':
+                    # Setup or source changed: verification only, never the builder.
+                    self.store.update(pid,phase='qa')
+                    continue
+                changed=self._change_request(pid,state,text)
+                if changed is None:
+                    return
+                text=changed;continue
             elif phase=='delivered':
-                result=self.invoke(pid,'change-manager',f'User input: {text}\nInspect the existing app and approved requirements. '
-                    'Return {"summary":"answer","action":"explain|fix|scope","goal":"bounded change"}. '
-                    'Choose fix only for an in-scope change covered by approved requirements; material behavior changes require scope. Do not edit files.',readonly=True)
-                if result.get('action')=='scope':
-                    self.store.update(pid,phase='requirements',revision=state['revision']+1,repair_cycles=0,requirements_notes=[text])
-                    text=result.get('goal',text);continue
-                if result.get('action')=='fix':
-                    tasks=[dict(id='change-'+uuid.uuid4().hex[:6],goal=result.get('goal',text),depends_on=[],role='sw-developer',status='pending')]
-                    self.store.update(pid,tasks=tasks,phase='build',repair_cycles=0);continue
-                return
+                changed=self._change_request(pid,state,text)
+                if changed is None:
+                    return
+                text=changed;continue
             else:
                 raise ValueError('Unknown workflow phase: '+phase)
         raise RuntimeError('Workflow step limit reached. Progress is saved.')
+
+    def _criteria_brief(self,state):
+        spec=acceptance.load(Path(state['root']))
+        pending=[c['id'] for c in acceptance.release_one(spec) if acceptance.deferrable(spec,c,state)]
+        return (' Verify every approved release-1 acceptance criterion in .sdlc/acceptance.json (or derived from requirements.md when absent) '
+            'and add "criteria":[{"id":"AC-...","status":"passed|failed|pending_owner|not_run","implemented":true,'
+            '"command":"actual command","exit_code":0,"evidence":"path","detail":"...","next_action":"..."}]. '
+            'Confirm each criterion\'s implementation exists in source (real route/adapter/code path, not a stub) and run its locally testable behaviour, '
+            'using fixtures or fakes only for the live boundary. Report a missing or stubbed implementation as failed. '
+            'Use pending_owner only for these live criteria whose owner setup is not ready: '+(', '.join(pending) or 'none')+
+            '; even then include the passing local check and evidence. Never report live acceptance as passed without real live evidence. '
+            'List only checks that actually exited 0 in "checks"; record failing commands under the failed criterion.')
+
+    def _change_request(self,pid,state,text):
+        """Classify a follow-up; return the next goal when it leads to work, else None."""
+        result=self.invoke(pid,'change-manager',f'User input: {text}\nInspect the existing app and approved requirements. '
+            'Return {"summary":"answer","action":"explain|fix|scope","goal":"bounded change"}. '
+            'Choose fix only for an in-scope change covered by approved requirements; material behavior changes require scope. Do not edit files.',readonly=True)
+        if result.get('action')=='scope':
+            self.store.update(pid,phase='requirements',revision=state['revision']+1,repair_cycles=0,requirements_notes=[text])
+            return result.get('goal',text)
+        if result.get('action')=='fix':
+            tasks=[dict(id='change-'+uuid.uuid4().hex[:6],goal=result.get('goal',text),depends_on=[],role='sw-developer',status='pending')]
+            self.store.update(pid,tasks=tasks,phase='build',repair_cycles=0)
+            return result.get('goal',text)
+        return None
 
     def valid_evidence(self,pid,result,require_browser=False,require_coverage=True):
         if require_browser and not result.get('browser_tested'):

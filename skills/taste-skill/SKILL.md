@@ -196,7 +196,7 @@ LLMs default to clichés. Override these defaults proactively. Each rule has a c
     - Text: `#1a1714`, `#1a1814`, `#1b1814` (all "espresso / warm near-black")
   * This palette is BANNED as the default reach for premium-consumer briefs. Every premium-consumer site you have ever shipped uses this exact palette. The brand becomes invisible.
   * **Default alternatives (rotate, do not reuse):**
-    - **Cold Luxury:** silver-grey + chrome + smoke (think Tesla, Apple Watch Hermes-without-the-leather)
+    - **Cold Luxury:** silver-grey + chrome + smoke (think Tesla, Apple Watch metal-and-glass)
     - **Forest:** deep green + bone + amber accent (think Filson, Patagonia premium)
     - **Black and Tan:** true off-black + warm tan, sharp contrast, no beige
     - **Cobalt + Cream:** saturated blue against a single neutral, no brass

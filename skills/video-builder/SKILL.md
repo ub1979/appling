@@ -11,7 +11,7 @@ announcements and data stories. Motion is built in code with HyperFrames
 (HTML compositions rendered to MP4), from the owner's real screens and
 words; AI pictures add atmosphere when the owner agrees. For a premium
 30–40 s commercial with 3D and AI footage, load
-`skill_view(name="ultimate-builder:business-motion-film")` instead.
+`skills/business-motion-film/SKILL.md` instead.
 
 ## When to Use
 
@@ -25,10 +25,10 @@ words; AI pictures add atmosphere when the owner agrees. For a premium
 - Approved `requirements.md`: purpose, length, aspect ratio(s), where it is
   posted, brand, the screens / footage / data, audio choice.
 - Node 20+ and FFmpeg + FFprobe (`ffmpeg -version`).
-- `.lyra/kit/imagine` for AI stills (only after the owner agreed; each uses
-  their ChatGPT plan). There is no GPT video model in Appling: moving AI
-  footage needs a video provider switched on in `hermes tools` (Video
-  Generation); otherwise motion is code-built.
+- Optional AI stills or generated footage require an available authorized
+  engine tool/provider. CLI login alone does not establish image/video access.
+  Prefer the owner's assets or code-built motion when generation is unavailable;
+  do not invoke external setup commands or silently switch to a paid service.
 
 ## How to Run
 
@@ -84,7 +84,7 @@ Review loop and the export checks: `references/review-and-export.md`.
    → what carries into the next shot. Write the longest version of each
    headline and check it fits the layout before any motion.
 3. **Assets.** The owner's screens (record or screenshot at 2×), footage
-   and logo first. AI stills with `.lyra/kit/imagine` (key picture first,
+   and logo first. AI stills with an available image-generation tool (key picture first,
    then `--ref` it for consistency); list each in `assets/ASSETS.md`. Only
    music the owner owns or a licence covers.
 4. **Three stills first.** Render the opening frame, the moment the

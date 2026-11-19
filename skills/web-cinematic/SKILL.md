@@ -16,7 +16,7 @@ log-ins or databases — hand those to `sw-developer` with `sw-architect`.
   portfolio, product page or "a site like Apple / Awwwards / Scrolltide".
 - A template was chosen at set-up: its `template_spec` (in the setup message
   and `requirements.md`) is the starting design, and its live demo — copied
-  to `.lyra/kit/reference/index.html` — is the approved look and motion.
+  to `.sdlc/template/reference/index.html` — is the approved look and motion.
   Build that, with the changes the owner approved.
 
 ## Prerequisites
@@ -24,9 +24,13 @@ log-ins or databases — hand those to `sw-developer` with `sw-architect`.
 - Approved `requirements.md` (with the build profile and any template).
 - Node 20+ and npm (check with `node -v`).
 - Images decided at requirements time (see "Assets" below).
-- The `ultimate-builder:ui-designer` direction when the team has one.
+- The `ui-designer` direction when the team has one.
 
 ## How to Run
+
+Resolve `<skills-directory>` to the absolute Skills directory supplied in the
+engine briefing before executing example commands. No project-kit installation
+is required; use the bundled scripts in place.
 
 Work in the project folder. Scaffold once:
 `npm create vite@latest site -- --template vanilla-ts` (or React + TS when
@@ -78,7 +82,7 @@ oversized wordmark and a magnetic button.
    respect `prefers-reduced-motion` with a static version; on phones,
    simplify parallax and turn off mouse tilt. Target Lighthouse
    performance ≥ 85.
-5. **Taste pass.** Load `ultimate-builder:color-and-ux` (run its palette
+5. **Taste pass.** Load `color-and-ux` (run its palette
    check on the site's colours), `design-taste-frontend` (and `frontend-design` when present)
    and remove anything that looks AI-made: generic gradients, centred
    everything, stock icon rows, purple-blue defaults.
@@ -95,9 +99,9 @@ with Appling's own Python; files the owner attaches are in `assets/uploads/`):
 
 | Command | Use |
 |---|---|
-| `.lyra/kit/frames clip.mp4 public/frames --count 120` | Video → numbered WebP frames + `frames.json` for a scroll-scrubbed canvas |
-| `.lyra/kit/cutout in.png out.webp --bg white\|black\|green [--from top]` | Cut a subject off a plain background for a parallax layer |
-| `.lyra/kit/imagine "prompt" --out assets/x.png [--ref first.png]` | AI picture on the owner's ChatGPT plan — only after they said yes |
+| `python <skills-directory>/web-cinematic/scripts/frames.py clip.mp4 public/frames --count 120` | Video → numbered WebP frames + `frames.json` for a scroll-scrubbed canvas |
+| `python <skills-directory>/web-cinematic/scripts/cutout.py in.png out.webp --bg white\|black\|green [--from top]` | Cut a subject off a plain background for a parallax layer |
+| Available authorized image-generation tool with reference-image support | AI picture through an available authorized tool — only after they said yes |
 
 - **Frame player:** preload all frames, draw the current one on a canvas with
   cover-fit, blend toward the next; drive it from ScrollTrigger progress. With
@@ -121,10 +125,10 @@ and phone size, scrolls it like a visitor, and lists console errors, failed
 requests, sideways overflow and text that never becomes readable. It writes
 screenshots and one contact sheet per size; with `--compare` each row shows
 the build next to the reference demo at the same scroll point. In an Appling
-project it is copied to `.lyra/kit/site-check.mjs`:
+project invoke it directly from the supplied Skills directory:
 
 ```
-node .lyra/kit/site-check.mjs dist --compare .lyra/kit/reference/index.html
+node <skills-directory>/web-cinematic/scripts/site-check.mjs dist --compare .sdlc/template/reference/index.html
 ```
 
 Exit 0 = nothing automatic found, 1 = problems listed, 3 = BLOCKED (no

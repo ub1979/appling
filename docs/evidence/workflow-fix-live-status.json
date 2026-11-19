@@ -1,0 +1,17 @@
+{
+  "checked_at": 1795096489.76993,
+  "state": {
+    "phase": "build",
+    "running": true,
+    "paused": false
+  },
+  "latest_tool": {
+    "ts": 1795096486.927944,
+    "type": "tool",
+    "phase": "start",
+    "id": "exec-6764afea-64e8-49fc-84bb-a2801e992d4b",
+    "name": "commandExecution",
+    "thread_id": "01a1f16f-31b4-7092-9ced-4c14b3c5ee55"
+  },
+  "activation": "pending next normal host restart; active run preserved"
+}

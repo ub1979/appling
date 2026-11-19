@@ -20,7 +20,10 @@ import { activeHelpers, applyEvent, emptyLive, type InboxItem, type LiveState, t
 import { go } from "../router";
 import { ProviderAlerts } from "../components/ProviderAlerts";
 import { UpdateDialog } from "../components/UpdateDialog";
-import { composerContext } from "./composer-context";
+import { composerContext, questionTarget } from "./composer-context";
+import { BlockedWork, currentBlockedWorkers, projectIsDelivered } from "./project-outcome";
+import { BuildStatus } from "../components/BuildStatus";
+import { AcceptancePanel } from "../components/AcceptancePanel";
 import {
   extractAppItSkillSelection,
   orderGuidedPhases,
@@ -35,6 +38,13 @@ const ANSWERS = [
   { label: "Decide for me", text: "Decide this question for me using the safest sensible default. Briefly state the default, then ask the next single question." },
   { label: "Use smart defaults", text: "Use sensible defaults for all remaining requirements questions. Summarize the complete requirements and choices for my approval before any coding." },
 ];
+
+const WORKER_STATUS: Record<string, string> = {
+  pending: "Waiting", running: "Working", completed: "Ready to integrate",
+  integrating: "Integrating changes", integrated: "Integrated", blocked: "Blocked",
+  conflict: "Integration needs attention", interrupted: "Interrupted · work saved",
+  retained: "Previous attempt saved",
+};
 
 // Stop first only when the owner explicitly chooses to interrupt active work.
 export async function applyUpdatedRules(id: string, stopFirst: boolean) {
@@ -141,10 +151,14 @@ export function Studio({ id }: { id: string }) {
       if (cancelled) return;
       dispatch({ type: "reset", detail: data });
       setShowUpdate(data.update_available);
-      source = new EventSource(streamUrl(id, data.turn_start_offset));
+      const cursor = data.turn_start_offset;
+      // Replay a bounded recent window for presentation only. Historical events
+      // must never reopen approvals or overwrite the current controller state.
+      source = new EventSource(streamUrl(id, Math.max(0, cursor - 2000)));
       source.onmessage = (msg) => {
         try {
-          dispatch(JSON.parse(msg.data) as LyraEvent);
+          const event = JSON.parse(msg.data) as LyraEvent;
+          dispatch(Number(event.seq) <= cursor ? { type: "activity_history", ts: event.ts, event } : event);
         } catch {
           // skip a malformed line
         }
@@ -254,8 +268,9 @@ export function Studio({ id }: { id: string }) {
       (map?.phases ?? []).some((row) => (row.state === "blocked" || row.state === "owner") && rowIsAgent(row.name, currentAgent));
     return { ordered, completed, current, waiting };
   }, [detail?.messages, detail?.active_update, detail?.requirements_started, detail?.review_pending, live.turn?.reply, ids, agents, map?.markdown, map?.phases, team]);
-  const allDone = phases.ordered.length > 0 && phases.ordered.every((p) => phases.completed.has(p));
-  const workingIds = new Set(helpers.map((h) => agentForGoal(h.goal, agents)).filter((x): x is string => !!x));
+  const blockedWorkers = currentBlockedWorkers(detail);
+  const helperAgent = (helper: { role?: string; goal: string }) => helper.role && ids.includes(helper.role) ? helper.role : agentForGoal(helper.goal, agents);
+  const workingIds = new Set(helpers.map(helperAgent).filter((x): x is string => !!x));
 
   const shown: Shown[] = useMemo(() => (detail?.messages ?? []).map((m) => shownMessage(m, ids)), [detail?.messages, ids]);
   const lastLyra = [...shown].map((s, i) => [s, i] as const).reverse().find(([s]) => s.role === "lyra");
@@ -285,6 +300,8 @@ export function Studio({ id }: { id: string }) {
       ? { text: "Appling is working", tone: "busy" }
       : helpers.length
         ? { text: `${helpers.length} agent${helpers.length > 1 ? "s" : ""} working`, tone: "busy" }
+        : blockedWorkers.length
+          ? { text: "Work needs attention", tone: "need" }
         : live.paused
           ? { text: "Stopped", tone: "" }
           : { text: "Ready", tone: "good" };
@@ -303,11 +320,14 @@ export function Studio({ id }: { id: string }) {
       }
     });
   };
-  const send = async (text: string) => {
+  const send = async (text: string, questionId?: string) => {
     askNotificationPermission();
     try {
       setProblem(null);
-      await api.send(id, text);
+      if (questionId) await api.answer(id, questionId, text);
+      else if (live.inbox.filter((item) => item.kind === "question").length > 1) {
+        throw new Error("Choose which question to answer above the message box.");
+      } else await api.send(id, text);
       setSent((n) => n + 1);
       await load().catch(() => undefined);
       return true;
@@ -388,7 +408,7 @@ export function Studio({ id }: { id: string }) {
           onChangeAi={() => void run(async () => { await api.stop(id); go(`/settings?project=${id}`); })} />}
         {helpers.length > 0 && providerStatuses.length === 0 && live.inbox.length === 0 && (
           <div className="banner" role="status">
-            <span><b>{helpers.map((h) => labelOf(agentForGoal(h.goal, agents) ?? "") || "Agent").join(", ")} working</b>
+            <span><b>{helpers.map((h) => labelOf(helperAgent(h) ?? "") || "Agent").join(", ")} working</b>
               {" — "}{agentTaskDescription(helpers[0].goal)}
               <span className="small"> Please wait. The result or next question will appear here automatically.</span>
             </span>
@@ -432,7 +452,8 @@ export function Studio({ id }: { id: string }) {
             </div>
           );
         })()}
-        {!busy && helpers.length === 0 && allDone && (
+        <BlockedWork workers={blockedWorkers} running={busy || helpers.length > 0} />
+        {!busy && helpers.length === 0 && live.inbox.length === 0 && live.queued.length === 0 && projectIsDelivered(detail) && (
           <div className="banner good">
             🎉 {detail.name} is ready — every step is done.
             {canOpen && <button className="btn primary small" disabled={opening} onClick={openApp}>{opening ? "Getting it ready…" : "▶ Open app"}</button>}
@@ -496,6 +517,15 @@ export function Studio({ id }: { id: string }) {
                   </div>
                 );
               })}
+            </section>
+          )}
+          {!!detail.task_workers?.length && (
+            <section className="panel">
+              <h3>Development tasks</h3>
+              {detail.task_workers.map((worker) => <div key={worker.id} style={{ marginBottom: 12 }}>
+                <div className="tiny muted">{worker.task_id} · {labelOf(worker.role)} · {WORKER_STATUS[worker.status] ?? worker.status}</div>
+                <div className="helper-goal">{worker.goal}</div>
+              </div>)}
             </section>
           )}
         </aside>
@@ -562,9 +592,11 @@ export function Studio({ id }: { id: string }) {
               </details>
             )}
           </section>
+          <AcceptancePanel id={id} refresh={live.turnsEnded} />
           <UsagePanel id={id} refresh={live.turnsEnded + live.helperChanges} agents={agents} />
           <section className="panel" style={{ flex: 1 }}>
             <h3>Activity</h3>
+            <BuildStatus id={id} />
             {live.activity.length === 0 ? (
               <p className="muted small" style={{ margin: 0 }}>Nothing yet.</p>
             ) : (
@@ -1103,13 +1135,17 @@ export function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype, requi
 interface Attachment { key: string; name: string; progress: number; path?: string; error?: string }
 
 export function Composer({ busy, inbox, onSend, projectId, dropped, picks, onPicksChange }: {
-  busy: boolean; onSend: (text: string) => Promise<boolean>; projectId: string; dropped: File[];
+  busy: boolean; onSend: (text: string, questionId?: string) => Promise<boolean>; projectId: string; dropped: File[];
   inbox: InboxItem[];
   picks: PickedElement[]; onPicksChange: (p: PickedElement[]) => void;
 }) {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [files, setFiles] = useState<Attachment[]>([]);
+  const [selectedQuestion, setSelectedQuestion] = useState("");
+  const questions = inbox.filter((item) => item.kind === "question");
+  const questionId = questionTarget(inbox, selectedQuestion);
+  const needsQuestionSelection = questions.length > 1 && !questionId;
   const area = useRef<HTMLTextAreaElement>(null);
   const picker = useRef<HTMLInputElement>(null);
   const context = composerContext(inbox, busy);
@@ -1135,19 +1171,26 @@ export function Composer({ busy, inbox, onSend, projectId, dropped, picks, onPic
   const ready = files.filter((f) => f.path);
   const send = async () => {
     const value = text.trim();
-    if ((!value && !ready.length && !picks.length) || uploading || sending) return;
+    if ((!value && !ready.length && !picks.length) || uploading || sending || needsQuestionSelection) return;
     const parts = [value];
     if (picks.length) parts.push(picks.map(pickNote).join("\n\n"));
     if (ready.length) parts.push(`Attached: ${ready.map((f) => f.path).join(", ")}`);
     setSending(true);
     try {
-      if (await onSend(parts.filter(Boolean).join("\n\n"))) {
+      if (await onSend(parts.filter(Boolean).join("\n\n"), questionId)) {
         setText(""); setFiles([]); onPicksChange([]);
       }
     } finally { setSending(false); }
   };
   return (
     <div className="composer">
+      {questions.length > 1 && <label style={{ display: "block", marginBottom: 8 }}>
+        <span className="field-label">Which question are you answering?</span>
+        <select className="input" value={questionId ?? ""} disabled={sending} onChange={(event) => setSelectedQuestion(event.target.value)}>
+          <option value="">Choose a question…</option>
+          {questions.map((item) => <option key={item.id} value={item.id}>{item.question ?? item.id}</option>)}
+        </select>
+      </label>}
       {(files.length > 0 || picks.length > 0) && (
         <div className="attachments">
           {picks.map((p, i) => (
@@ -1185,7 +1228,7 @@ export function Composer({ busy, inbox, onSend, projectId, dropped, picks, onPic
             }
           }}
         />
-        <button className="send" onClick={() => void send()} disabled={(!text.trim() && !ready.length && !picks.length) || uploading || sending} aria-label="Send" title={uploading ? "Wait for the upload to finish" : "Send"}><ArrowUp size={18} /></button>
+        <button className="send" onClick={() => void send()} disabled={(!text.trim() && !ready.length && !picks.length) || uploading || sending || needsQuestionSelection} aria-label="Send" title={needsQuestionSelection ? "Choose a question first" : uploading ? "Wait for the upload to finish" : "Send"}><ArrowUp size={18} /></button>
       </div>
       <div className="hint">{context.hint}</div>
     </div>

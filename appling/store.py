@@ -63,7 +63,8 @@ class Store:
             raise ValueError("Choose a dedicated project folder.")
         root.mkdir(parents=True, exist_ok=True)
         state = dict(id=ident()[:12], root=str(root), name=root.name, phase="requirements",
-                     team=["req-engineer", "task-planner"], style="app-it", profile="personal",
+                     team=["req-engineer", "ui-designer", "sw-developer", "qa-engineer"], style="app-it", profile="personal",
+                     execution_mode="direct",
                      kind="app", platforms=["web"], running=False, paused=False, queue=[],
                      tasks=[], approvals={}, sessions={}, chat_id=ident(), updated=time.time(),
                      requirements_started=False, revision=1, engine="codex")

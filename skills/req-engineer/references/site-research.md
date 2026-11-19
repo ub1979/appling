@@ -24,69 +24,44 @@ Treat “all details,” “everything,” “fully analyse this site,” and eq
 requests as Deep website research. Do not ask the depth question when the user
 already made the choice clear.
 
-Deep research is bounded, not an unlimited crawl. Inspect at most 25 relevant
-pages per domain unless the user approves a larger scope. Prefer product,
+Deep research is bounded, not an unlimited crawl. Choose relevant pages until the consequential questions are resolved;
+checkpoint long investigations instead of imposing an arbitrary page cap. Prefer product,
 features, documentation, onboarding, integrations, pricing, security, privacy,
 terms, FAQ, changelog, and help pages. Skip duplicate, tag, archive, tracking,
 advertising, and unrelated pages.
 
 ## Preflight capabilities
 
-Inspect the live Hermes tools before beginning:
+Inspect the selected engine's actual tools before beginning. Open exact URLs
+with its search/open or browser capabilities. Use browser interaction for
+JavaScript, hidden controls and visual evidence. Read full source content,
+including downloaded documents when supported. Search snippets alone are not
+evidence that a supplied page was inspected.
 
-1. Prefer `web_extract` for exact URLs, ordinary pages, and online PDFs.
-2. Use `browser_navigate` plus `browser_snapshot` when extraction is absent,
-   fails, omits important content, or the page requires JavaScript.
-3. Use browser interaction tools for tabs, accordions, pagination, menus, and
-   other content that a human must reveal.
-4. Use `browser_vision` or `browser_get_images` only when visual layout or
-   imagery materially affects the requirements.
-5. Use `web_search` to discover relevant pages or independent corroboration;
-   never substitute search snippets for opening a user-supplied URL.
+Tool availability does not authorize purchases, account creation or external
+writes. Use only authorized accounts. Never request secrets in ordinary chat.
 
-Skills may use any tool present in the live Hermes schema. Tool availability is
-not authorization for purchases, account creation, logins, credential use,
-form submission, downloads, or other external side effects.
+## Recover missing tools
 
-## Recover missing tools in chat
-
-Never silently skip source research and never send the user to a Settings page.
-
-- If `web_extract` is missing but browser tools work, continue with the browser
-  and record the fallback in the coverage note.
-- If browser tools are missing but `web_extract` works, continue with extraction
-  and state which interactive or visual checks could not be completed.
-- If the required toolset is disabled, explain the impact and ask permission to
-  enable it. After approval, give the exact same-chat action, such as
-  `/tools enable web` or `/tools enable browser`.
-- If a dependency is missing, ask permission before installing it. When
-  approved and a declared non-interactive installer exists, use
-  `hermes tools post-setup <key>` through the terminal tool, report its result,
-  and then enable the toolset from chat.
-- If a provider requires a credential, use only a Hermes masked secret prompt.
-  Never request or repeat an API key, token, password, cookie, or connection
-  string in ordinary chat. If masked capture is unavailable, say so and offer
-  the browser or another no-secret fallback.
-- After enabling tools, start a clean session before relying on the changed tool
-  schema. Briefly restate the research goal and supplied URLs so the user can
-  continue without reconstructing the task.
-
-If setup is declined or still fails, state exactly which sources and checks are
-unavailable. Continue only when the remaining evidence is sufficient; otherwise
-mark the requirements research as blocked.
+Use another already available source reader/browser when one fails. If the
+required capability is unavailable, record the exact source and missing check
+and return a concrete blocker. Do not invoke another product's setup commands,
+edit the engine's live toolset or invent a secret-entry mechanism. The owner
+can configure the engine/connection separately; resume with the saved brief.
+Continue only when the remaining evidence is sufficient for the claim.
 
 ## Inspect sources
 
 1. Normalize and deduplicate the supplied URLs without dropping query parameters
    that select meaningful public content. Reject URLs containing apparent
    secrets and ask for a safe public link.
-2. Open supplied URLs in batches of at most five with `web_extract`.
+2. Open supplied URLs with available engine tools, batching independent reads within their actual limits.
 3. Read cached full-text files when extraction reports truncation; do not treat
    the returned head and tail as the complete page.
 4. Retry failed or incomplete pages with the browser. Wait for the rendered
    state, inspect the snapshot, and reveal relevant hidden content.
 5. For Deep research, build a relevance queue from navigation, sitemaps, docs,
-   and same-domain links. Stay within the page cap and avoid cycles.
+   and same-domain links. Stay relevant and avoid cycles; record unresolved sources in the handoff.
 6. Open important linked PDFs directly and capture their title, publisher,
    publication or revision date, scope, and relevant requirements.
 7. Record access failures including login walls, paywalls, robots restrictions,
@@ -128,7 +103,7 @@ Add a concise research appendix to `requirements.md` containing:
 Include access dates and direct source URLs. Cite factual claims next to the
 claim. End with:
 
-- selected depth and pages inspected versus the cap;
+- selected depth, pages inspected and unresolved research questions;
 - inaccessible or intentionally skipped pages;
 - browser/extraction/search fallbacks used;
 - facts that may be time-sensitive;

@@ -5,7 +5,7 @@ description: Systematic root cause analysis in 5 phases — evidence collection,
 
 # Debugger
 
-**ENFORCEMENT**: The orchestrator MUST spawn this as a dedicated Agent — never "look at the error" and guess a fix itself.
+Run in the assigned debugging session. Establish the root cause with real evidence before changing code.
 The spawned agent executes all 5 phases: root cause identified with evidence, regression test written, fix verified. No shortcuts.
 
 Systematic root cause analysis: observe first, hypothesize second, verify third. Output: a fix for the root cause (not symptoms), a regression test that would have caught the bug, and a learnings entry.
@@ -138,6 +138,10 @@ Prove the fix works AND nothing else broke.
 Run the original reproduction (bug gone) and the regression test.
 
 ### 5.2 Blast Radius Check
+Run focused checks for affected consumers. Expand to the full suite/build when
+integration, approved acceptance or concrete regression risk requires it. Reuse
+valid unchanged evidence; the following are available checks, not a mandatory
+repeat campaign after every edit.
 ```bash
 npm test                # full suite
 npx eslint . --ext .ts,.js

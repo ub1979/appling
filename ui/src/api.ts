@@ -23,7 +23,7 @@ export interface ChatMessage {
   active?: boolean;
   role: "user" | "assistant";
   content: string;
-  kind: "chat" | "system" | "auto" | "question" | "answer" | "status";
+  kind: "chat" | "system" | "auto" | "question" | "answer" | "status" | "progress";
 }
 
 export interface QueueItem {
@@ -35,6 +35,7 @@ export interface QueueItem {
 
 export interface ProjectDetail {
   phase?: string;
+  execution_mode?: "direct" | "planned";
   id: string;
   name: string;
   root: string;
@@ -64,8 +65,21 @@ export interface ProjectDetail {
   provider_statuses?: Record<string, ProviderStatus>;
   inbox: InboxItem[];
   review_recovery?: InboxItem | null;
-  helpers: { id: string; goal: string; started: number | null }[];
+  helpers: { id: string; role?: string; goal: string; started: number | null }[];
+  task_workers?: TaskWorker[];
+  tasks?: { id: string; status: string }[];
   messages: ChatMessage[];
+}
+
+export interface TaskWorker {
+  id: string;
+  task_id: string;
+  role: string;
+  status: "pending" | "running" | "completed" | "blocked" | "integrating" | "integrated" | "conflict" | "interrupted" | "retained";
+  workspace: string;
+  goal: string;
+  error?: string | null;
+  result?: { summary?: string; blockers?: { kind: string; detail: string; requires_tasks?: string[] }[] } | null;
 }
 
 export interface ModelSelection {
@@ -92,7 +106,7 @@ export interface AiConnection {
 export interface AiSettings {
   connections: Record<string, AiConnection>;
   installed: { id: string; label: string; installed: boolean }[];
-  parallel_work: { max_workers: number; maximum: number; default: number; active: number };
+  parallel_work: { max_workers: number; maximum: number; default: number; active: number; agents_per_project?: number; agents_maximum?: number };
   engine: string;
   hermes: { provider: string; model: string };
   hermes_effort: { effort: string; effective: string; overridden: boolean };
@@ -112,6 +126,34 @@ export interface ConnectionTestResult {
   message: string;
   model: string;
   latency_ms: number;
+}
+
+export type PhoneChannel = "telegram" | "whatsapp";
+
+export interface PhoneConnection {
+  enabled: boolean;
+  configured: boolean;
+  connected: boolean;
+  paired: boolean;
+  message: string;
+  bot_username?: string;
+  token_env?: string;
+  pairing_code?: string;
+  pairing_url?: string;
+  qr?: string;
+  expires_at?: number;
+}
+
+export interface PhoneSettings {
+  telegram: PhoneConnection;
+  whatsapp: PhoneConnection;
+}
+
+export interface PhoneAction {
+  action: "configure" | "pair" | "disconnect" | "test";
+  enabled?: boolean;
+  bot_token?: string;
+  token_env?: string;
 }
 
 export interface MapPhase {
@@ -218,6 +260,44 @@ export function uploadFile(id: string, file: File, onProgress: (p: number) => vo
   });
 }
 
+export type CriterionStatus = "passed" | "failed" | "pending_owner" | "not_run";
+
+export interface AcceptanceCriterion {
+  id: string;
+  requirement: string;
+  description: string;
+  release: "1" | "later";
+  live: boolean;
+  prerequisites: string[];
+}
+
+export interface AcceptanceResult {
+  status: CriterionStatus;
+  requirement?: string;
+  evidence?: string | null;
+  next_action?: string | null;
+  owner?: "you" | "builder" | null;
+  detail?: string | null;
+  stale?: boolean;
+}
+
+export interface Prerequisite {
+  id: string;
+  kind: string;
+  description: string;
+  needed_at: "build" | "verification";
+  done: boolean;
+}
+
+export interface AcceptanceStatus {
+  phase: string;
+  derived: boolean;
+  criteria: AcceptanceCriterion[];
+  prerequisites: Prerequisite[];
+  results: Record<string, AcceptanceResult>;
+  outcome: CriterionStatus;
+}
+
 export const api = {
   projects: () => call<{ projects: ProjectSummary[]; default_root: string; version?: string }>("GET", "/api/projects"),
   catalog: () => call<Catalog>("GET", "/api/catalog"),
@@ -231,6 +311,9 @@ export const api = {
   openApp: (id: string) => call<AppPreview>("POST", `/api/projects/${id}/preview/open`),
   openPrototype: (id: string) => call<AppPreview>("POST", `/api/projects/${id}/preview/prototype`),
   map: (id: string) => call<ProjectMap>("GET", `/api/projects/${id}/map`),
+  acceptance: (id: string) => call<AcceptanceStatus>("GET", `/api/projects/${id}/acceptance`),
+  prerequisite: (id: string, item: string, done: boolean) =>
+    call<{ ok: boolean }>("POST", `/api/projects/${id}/prerequisites/${encodeURIComponent(item)}`, { done }),
   send: (id: string, text: string) => call("POST", `/api/projects/${id}/messages`, { text }),
   answer: (id: string, item: string, answer: ReviewAnswer) => call("POST", `/api/projects/${id}/inbox/${item}`, { answer }),
   reopenReview: (id: string, item: string) => call("POST", `/api/projects/${id}/review/reopen`, { item_id: item }),
@@ -238,6 +321,8 @@ export const api = {
   settings: (id: string, body: Record<string, unknown>) => call("POST", `/api/projects/${id}/settings`, body),
   settingsGet: () => call<AiSettings>("GET", "/api/settings"),
   settingsSave: (body: Record<string, unknown>) => call<AiSettings>("POST", "/api/settings", body),
+  phoneSettings: () => call<PhoneSettings>("GET", "/api/settings/phone"),
+  phoneAction: (channel: PhoneChannel, body: PhoneAction) => call<PhoneSettings>("POST", `/api/settings/phone/${channel}`, body),
   agentModelSave: (id: string, selection: ModelSelection | null) =>
     call<AiSettings>("POST", `/api/settings/agents/${id}`, { selection }),
   effortSave: (effort: string) => call<AiSettings["hermes_effort"]>("POST", "/api/settings/effort", { effort }),

@@ -7,8 +7,12 @@ description: Makes software production-ready — CI/CD, containerization, deploy
 
 ## ⛔ ENFORCEMENT
 
-The orchestrator (idk_it) MUST spawn this skill as a dedicated Agent — an untested Dockerfile written by the orchestrator does not count as DevOps.
-The spawned agent must build Docker images, test CI/CD pipelines, verify health checks, and produce `DEPLOYMENT.md`. Follow every step below; no shortcuts.
+Run in Appling's assigned deployment-preparation session. Apply the sections
+needed by the approved deployment target. Docker, Kubernetes, cloud and paid
+services are choices, not mandatory dependencies for every local app. Validate
+authorized local build/run/health/rollback paths and record evidence. Actual
+remote deployment or service changes need explicit owner authorization; do not
+perform them to satisfy documentation or checklist wording.
 
 ---
 
@@ -69,7 +73,7 @@ Accept inline args: `--plan`, `--path`, `--cloud` (aws/gcp/azure/self-hosted), `
 
 ---
 
-## Step 2 — Build & Verify Docker Image (Mandatory)
+## Step 2 — Build & Verify Docker Image (when containers are the approved target)
 
 Build the image and prove it runs before committing it:
 

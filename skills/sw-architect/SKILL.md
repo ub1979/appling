@@ -5,9 +5,16 @@ description: Designs system and security architecture from requirements or exist
 
 # Software Architect
 
+Use the controller's approved requirements, design and existing implementation.
+Scale the analysis to actual scope and risks; detailed enterprise checklists
+below do not require new authentication, cloud, classes or process artifacts
+that the app does not need. Preserve approved design choices and report only
+concrete unresolved contracts. Do not replace the controller's implementation
+plan or spawn a second workflow. Use the owner-selected engine/model.
+
 ## ⛔ ENFORCEMENT
 
-> Must run as a spawned agent executing every step below — the orchestrator never writes plan.md itself.
+Run in the assigned architecture session and apply the steps relevant to the approved scope.
 > Deliverable: `plan.md` with ADRs, a complete Security Architecture section, and component diagrams.
 > A plan.md missing the security section — attack surface census (Step 5.5), per-component STRIDE model, project-specific OWASP risk matrix (no placeholder "...") — is INCOMPLETE and must not be delivered.
 
@@ -91,9 +98,9 @@ Run **3-6 targeted `web_search` queries**, prioritizing technologies you're leas
 ## Step 3 — Model Capability Check
 
 Add a 2-3 line note only if applicable, else skip silently:
-- **>200 files**: analysis is sampling-based; recommend follow-up deep-dives on critical modules
+- **Large scope**: state actual inspected coverage and investigate critical modules; do not impose a fixed file-count cutoff
 - **Specialized domain** (real-time audio, FPGA, quant finance): suggest domain-expert verification
-- **Extreme scope**: suggest a more capable model (e.g., Opus) if not already in use
+- **Extreme scope**: split the investigation into bounded scopes; any model/provider change remains an explicit owner choice
 
 ---
 

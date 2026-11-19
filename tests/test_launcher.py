@@ -1,7 +1,43 @@
 import errno
+import os
+from pathlib import Path
+import shutil
+import socket
+import subprocess
+import sys
 from unittest.mock import Mock
 import pytest
 from appling import __main__ as launcher
+
+
+@pytest.mark.parametrize('missing',[False,True])
+def test_launcher_reuses_installed_runtime_and_bootstraps_only_missing_dependencies(tmp_path,missing):
+    shutil.copyfile(Path(__file__).parents[1]/'start.sh',tmp_path/'start.sh')
+    (tmp_path/'.venv/bin').mkdir(parents=True);(tmp_path/'ui/node_modules').mkdir(parents=True)
+    (tmp_path/'bin').mkdir()
+    trace=tmp_path/'calls'
+    python=tmp_path/'.venv/bin/python'
+    python.write_text('#!'+sys.executable+'\n'+'''
+import os,sys,json
+with open(os.environ['LAUNCH_TRACE'],'a') as f:f.write(json.dumps(['python',*sys.argv[1:]])+'\\n')
+if sys.argv[1:]==['-m','appling.service','status','--quiet']:sys.exit(1)
+if sys.argv[1]=='-c':sys.exit(int(os.environ['MISSING_RUNTIME']))
+''');python.chmod(0o755)
+    npm=tmp_path/'bin/npm'
+    npm.write_text('#!'+sys.executable+'\n'+'''
+import os,sys,json
+with open(os.environ['LAUNCH_TRACE'],'a') as f:f.write(json.dumps(['npm',*sys.argv[1:]])+'\\n')
+''');npm.chmod(0o755)
+    env=dict(os.environ,PATH=str(tmp_path/'bin')+':'+os.environ['PATH'],
+        LAUNCH_TRACE=str(trace),MISSING_RUNTIME=str(int(missing)))
+    result=subprocess.run(['bash','start.sh','--no-open','--port','9230'],cwd=tmp_path,env=env,capture_output=True,text=True)
+    assert result.returncode==0,result.stderr
+    import json
+    calls=[json.loads(line) for line in trace.read_text().splitlines()]
+    installs=[call for call in calls if call[:4]==['python','-m','pip','install']]
+    assert len(installs)==int(missing)
+    assert ['npm','run','build'] in calls
+    assert calls[-1]==['python','-m','appling.service','start','--no-open','--port','9230']
 
 
 def listener(port, failure=None):
@@ -54,3 +90,32 @@ def test_browser_and_server_use_the_reserved_port(monkeypatch):
     assert server.call_args.kwargs['fd']==17
     assert server.call_args.args==(app,)
     sock.close.assert_called_once()
+
+
+def test_restart_reuses_port_after_closed_connection_without_sharing_live_listener():
+    first=launcher.reserve_port(0)
+    port=first.getsockname()[1]
+    try:
+        with socket.create_connection(('127.0.0.1',port),timeout=2) as client:
+            connection,_=first.accept()
+            connection.sendall(b'closed')
+            connection.close()
+            assert client.recv(6)==b'closed'
+            assert client.recv(1)==b''
+    finally:
+        first.close()
+    replacement=launcher.reserve_port(port)
+    try:
+        with pytest.raises(OSError) as error:launcher.reserve_port(port)
+        assert error.value.errno==errno.EADDRINUSE
+    finally:
+        replacement.close()
+
+
+def test_sandbox_permission_denial_names_the_capability_and_recovery(monkeypatch,capsys):
+    monkeypatch.setattr(launcher,'reserve_port',Mock(side_effect=PermissionError(errno.EPERM,'Operation not permitted')))
+    monkeypatch.setattr(sys,'argv',['appling','--no-open'])
+    with pytest.raises(SystemExit):
+        launcher.main()
+    err=capsys.readouterr().err
+    assert 'binding was not permitted' in err and './start.sh' in err and 'normal Terminal' in err

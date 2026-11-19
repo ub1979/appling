@@ -16,7 +16,7 @@ invent data, quotes or results.
 ## When to Use
 
 - The project kind is **Slides** (this is its kind skill). A chosen
-  template's live demo is in `.lyra/kit/reference/index.html`.
+  template's live demo is in `.sdlc/template/reference/index.html`.
 - The owner asks for a pitch deck, sales or product demo deck, company
   intro, report, keynote, lesson or workshop slides.
 - An existing deck needs a redesign or a story rewrite.
@@ -26,20 +26,25 @@ invent data, quotes or results.
 - Approved `requirements.md`: audience, goal, length, format (HTML / PDF /
   PPTX), brand, the real numbers and pictures.
 - Node 20+ (`node -v`) for the deck check.
-- `.lyra/kit/imagine` for AI pictures (only after the owner agreed).
-- For `.pptx`: `skill_view(name="powerpoint")`.
+- Optional image-generation access for AI pictures, only when authorized and needed.
+- For `.pptx`, use an installed presentation library/tool if available;
+  otherwise report PPTX export as blocked rather than loading an absent skill.
 
 ## How to Run
 
+Resolve `<skills-directory>` to the absolute Skills directory supplied in the
+engine briefing before executing example commands. No project-kit installation
+is required; use the bundled scripts in place.
+
 ```
-node .lyra/kit/deck-check.mjs deck --pdf deck/deck.pdf
+node <skills-directory>/deck-builder/scripts/deck-check.mjs deck --pdf deck/deck.pdf
 ```
 
 (Outside an Appling project: `scripts/deck-check.mjs` in this skill.)
 `deck/` holds `index.html` (one file, reveal.js 5 from cdnjs, 1280 × 720,
 `hash: true`) and `assets/`. The check opens it in Chrome, shows every slide
 with all build-up steps, saves screenshots plus `sheet.png` under
-`.lyra/qa/deck-check/`, and lists content running off a slide, text under
+`.sdlc/evidence/deck-check/`, and lists content running off a slide, text under
 16 px and slides over 45 words. `--pdf` exports one page per slide. Exit
 0 = clean, 1 = problems listed, 3 = BLOCKED (no browser or not a reveal deck).
 
@@ -78,13 +83,13 @@ Design rules, layouts and chart guidance: `references/slide-design.md`.
    every slide's headline as a sentence; read them in order — they alone
    must tell the story. Show the owner this outline before designing.
 3. **Set the design system.** From the template, brand or `design-brief.md`:
-   colour tokens (checked with `ultimate-builder:color-and-ux`), one display
+   colour tokens (checked with `color-and-ux`), one display
    face and one text face, 4–6 layouts (title, statement, two-column,
-   picture-led, chart, quote). Use `skill_view(name="frontend-design")` to
+   picture-led, chart, quote). Use `skills/frontend-design/SKILL.md` to
    avoid the generic look. Every slide reuses these layouts.
 4. **Plan the visuals** for each slide: the owner's screenshots, photos and
    numbers first; charts drawn as SVG from their real data; AI pictures via
-   `.lyra/kit/imagine` for atmosphere or illustration only (record each in
+   an available image-generation tool for atmosphere or illustration only (record each in
    `assets/ASSETS.md`); a designed type slide when no picture helps.
 5. **Build.** One `<section>` per slide, speaker notes in
    `<aside class="notes">`, `class="fragment"` for build-ups, `data-auto-animate`

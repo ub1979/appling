@@ -17,7 +17,7 @@ scope. For non-visual products, assess the actual CLI/API/library user experienc
 
 ## Prerequisites
 
-Read `ultimate-builder:qa-evidence` completely, named in the delegation,
+Read `qa-evidence` completely, named in the delegation,
 and `.sdlc/qa-functional.md`. Compare its revision and dirty files to the
 current application. Use the existing browser setup, native browser tools and
 `terminal`; no MCP server is required. Test requirements define supported

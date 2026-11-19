@@ -13,6 +13,9 @@ def reserve_port(port, *, fallback=False):
     for candidate in range(port, min(port + (50 if fallback else 1), 65536)):
         listener=socket.socket(socket.AF_INET,socket.SOCK_STREAM)
         try:
+            # Allow an orderly restart on the same URL while closed HTTP/SSE
+            # connections drain in TIME_WAIT. This does not share a live port.
+            listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
             listener.bind(('127.0.0.1',candidate))
             listener.listen(2048)
             return listener
@@ -38,6 +41,12 @@ def main():
     except OSError as exc:
         if exc.errno==errno.EADDRINUSE:
             parser.error(f'Port {port} is already in use. Omit --port to select an available port, or choose another port.')
+        if exc.errno in {errno.EPERM,errno.EACCES}:
+            # Seen when Appling is launched from inside another agent's sandbox,
+            # which forbids binding localhost. The failed capability is reported as is.
+            parser.error(f'Cannot open a localhost listener on 127.0.0.1:{port}: binding was not permitted ({exc}). '
+                         'If you started Appling from inside another coding agent or sandboxed terminal, '
+                         'start it from your normal Terminal instead: ./start.sh')
         parser.error(f'Cannot open a localhost listener: {exc}')
     try:
         actual_port=listener.getsockname()[1]

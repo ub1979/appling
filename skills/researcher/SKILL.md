@@ -11,9 +11,9 @@ technical choices, current product capabilities, and documented constraints.
 
 ## Required method
 
-Load the canonical Researcher skill with `skill_view(name="researcher")` and
-follow it completely. This project playbook adds the artifact and handoff
-contract below; it does not replace or duplicate the canonical research method.
+Use the selected engine's available search/browser tools. This is the bundled
+research method; do not recursively load the same skill or require an absent
+canonical plugin. Record missing source access explicitly.
 
 Work from approved `requirements.md` when it exists. Turn the relevant project
 decisions into explicit research questions, search from multiple angles, read

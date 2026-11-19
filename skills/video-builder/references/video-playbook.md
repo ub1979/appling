@@ -78,7 +78,7 @@ the hold ends first, extend it.
 
 ## AI pictures for video
 
-Use `.lyra/kit/imagine` (owner's consent, their ChatGPT plan) for
+Use an available image-generation tool (owner's consent and an available authorized tool) for
 backgrounds, textures, mood stills and illustrated scenes. Write prompts
 as a shot brief: subject, lens, light, palette hexes, negative space for
 type, "no text, no logos, no watermark". Make the key still first, then

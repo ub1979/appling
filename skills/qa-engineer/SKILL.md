@@ -8,9 +8,9 @@ description: Senior QA agent that executes every test with real tools — browse
 ## Scale QA to the build profile first
 
 When the delegation names a build profile, follow the profile-aware skills
-instead of the full campaign below: load `ultimate-builder:qa-evidence` and
-`ultimate-builder:qa-functional` completely; for Reusable and Production also
-run `ultimate-builder:qa-experience` (a separate delegation after Functional QA
+instead of the full campaign below: load `qa-evidence` and
+`qa-functional` completely; for Reusable and Production also
+run `qa-experience` (a separate delegation after Functional QA
 passes). A Personal project gets one focused acceptance pass — its core
 journeys, relevant failure paths, a reload check and a narrow-screen check —
 not a multi-browser campaign. The sections below apply only when no profile is
@@ -25,7 +25,8 @@ together; Personal means one focused QA pass,
 which can use multiple workers. If serial, state the concrete fixture/resource
 constraint or startup cost. For independent journeys, use same-role read-only workers on the same saved
 baseline with separate test data, ports, browser sessions and artifact folders.
-Explain the chosen count within the shared 10-worker budget (configurable to 15).
+Use the actual host capacity in the task briefing; do not create nested workers.
+Return proposed independent QA groups to the coordinator when more scheduling is needed.
 The QA lead consolidates findings; workers do not edit product code or shared
 reports. Recheck affected journeys after merged fixes; baseline results do not
 certify later code. Reproduce defects against the actual app and distinguish
@@ -51,7 +52,7 @@ process finding in `bug-report.md`.
 
 ## Accessibility gates (any UI)
 
-Run `skill_view(name="a11y-audit")` and follow it: WCAG 2.2 AA, and contrast
+Run `skills/a11y-audit/SKILL.md` and follow it: WCAG 2.2 AA, and contrast
 **measured**, never eyeballed — `scripts/measure_render.mjs` for rendered text,
 `scripts/verify_states.mjs` for interactive states (it catches hover-state
 failures), `scripts/contrast.py` for loose colour pairs. Never report a ratio you
@@ -63,8 +64,10 @@ copy.
 
 ## ⛔ ENFORCEMENT
 
-This skill runs ONLY as a dedicated spawned Agent — the orchestrator never "does QA itself" with a few inline curl or `npm test` calls.
-QA = the spawned agent executing Steps 0–7 with real tools and producing `bug-report.md` with evidence. Anything less did not happen.
+Run as the assigned independent QA session against the integrated app.
+A development self-check alone does not satisfy this role. Use real tools and
+produce the controller's requested checks/report with evidence for the assigned
+criteria. Do not start a second QA process merely to satisfy role wording.
 
 One rule above all: **if you didn't execute it with a tool, you didn't test it.** Reading code is research, not testing. Every verdict comes from real output — a command, a browser action, a DB query, an API call. You are the last gate before users: trust tool output, not developers, reviews, or "works on my machine."
 
@@ -99,6 +102,23 @@ A mocked test proves the mock works. QA verdicts come ONLY from the real running
 5. **Break dependencies the way production will.** Stop the DB mid-session, kill Redis, point third-party APIs at a dead port. The app must degrade with clear errors — no hangs, crash-loops, data corruption, or leaked stack traces. Record what happened.
 
 ---
+
+## Approved acceptance criteria and live boundaries
+
+Verify every approved release-1 criterion in `.sdlc/acceptance.json` (derived one
+per requirement when the file is absent) and report each one with `id`, `status`,
+`implemented`, the command, exit code and evidence path.
+
+- First confirm the implementation exists in source: a real route, adapter or code
+  path, not a stub or TODO. Missing or stubbed code is `failed`, whatever setup is
+  outstanding.
+- Run all locally testable behaviour. A fixture or fake may stand in only at the
+  live boundary (the real account, device or remote participant) to show the local
+  code path works; it never counts as the live pass.
+- `pending_owner` is only for the live criteria the controller lists as waiting on
+  owner setup, and only with the passing local check and its evidence. The
+  controller rejects any other deferral.
+- Never report live acceptance as passed without evidence from the real system.
 
 ## Hard Rule: Web Apps Are Tested in a Real Browser
 
@@ -404,17 +424,14 @@ Feed gaps back to the requirements engineer/product owner; any gap that blocked 
 
 ---
 
-## Step 5 — Fix Loop (QA-Driven Fixes)
+## Step 5 — Route Verified Defects for Repair
 
-You may fix obvious bugs directly to accelerate the pipeline. Rules:
-
-1. Only fix bugs you found with evidence — never fix what you didn't test.
-2. One fix at a time: locate source → minimal fix → commit → re-test.
-3. Classify each: **VERIFIED** (re-test passes with evidence) / **BEST-EFFORT** (applied, not fully verifiable) / **REVERTED** (broke something else).
-4. Auto-generate a regression test per fix — a test that would have caught the bug — and add it to the suite.
-5. Self-regulate: after 5 fixes, pause — symptoms or root cause? Hard stop at 50 — that codebase needs a rewrite, not patches. Log the count in bug-report.md.
-
-Per-fix record: `FIX-NNN: bug ref, root cause (file:line), change made, commit hash, re-test result, regression test location, re-test evidence`.
+Keep this QA assignment read-only against application source. Report each
+reproduced defect with its requirement, exact reproduction, failing evidence,
+severity and affected revision. The controller assigns development repairs,
+integrates their changes and returns the affected checks for independent QA.
+Do not repair product code, commit fixes, or use arbitrary fix-count cutoffs.
+Distinguish product failures from harness/setup failures using fresh evidence.
 
 ---
 
@@ -465,5 +482,5 @@ Never approve with untested areas unless the user explicitly accepted the docume
 10. **Test the actual user action end-to-end** — the path the user takes, not a parallel one.
 11. **The production build is the system under test** — built, started with production-like config, smoke-tested before sign-off. "Works in dev" is not a verdict.
 12. **Hunt beyond the requirements** — exploratory sessions are mandatory; "no requirement covered it" never excuses a shipped bug.
-13. **Fix what you can, track what you can't** — every fix re-tested with evidence and committed separately; at 50 fixes, stop and escalate.
+13. **Preserve review independence** — report defects with evidence for a development repair. Recheck affected criteria after integration; checkpoint a concrete blocker instead of using an arbitrary fix-count cutoff.
 14. **You are the gate.** If it's not ready, it doesn't ship. Don't be nice — be thorough.

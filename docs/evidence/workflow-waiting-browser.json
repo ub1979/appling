@@ -1,0 +1,20 @@
+{
+  "url": "http://127.0.0.1:57678/#/p/fd64a309b2bb",
+  "home": "/var/folders/fq/k9567j_n5tz59hz7_whwfdtm0000gn/T/appling-workflow-ui-3bdtd5f6",
+  "project": "fd64a309b2bb",
+  "scope": "Disposable controller fixture; no real provider or product QA",
+  "attention": {
+    "reason": "prerequisites",
+    "message": "Waiting for setup or live verification; retained work is saved.\n- owner setup: Owner must sign in\n- live acceptance: Remote participant evidence is unavailable",
+    "blockers": [
+      {
+        "kind": "owner_setup",
+        "detail": "Owner must sign in"
+      },
+      {
+        "kind": "live_acceptance",
+        "detail": "Remote participant evidence is unavailable"
+      }
+    ]
+  }
+}

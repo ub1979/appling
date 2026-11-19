@@ -1,0 +1,7 @@
+{
+  "url": "http://127.0.0.1:9210/#/p/2a2446b9bab2",
+  "banners": [
+    "Work needs attention — 3 tasks are blocked.Finished work and checkpoints are saved.rp-browser · BlockedWorker reported a blocker: Implemented scoped meeting transport with exact signaling rules, host join-capability consumption and native-lease revocation. All 28 browser tests and 16 core tests passed. Production native verification, host wiring and live account/remote-participant acceptance remain blocked. Handoff: .sdlc/evidence/workers/a932a3e2184a/transport/integration-handoff.md.rp-speech · BlockedWorker reported a blocker: Implemented native helper, guarded speech service and pinned offline models. Builds, tests and integration pass. Synthetic 600-second ASR completed in 183.885s; warm 25-word TTS in 0.248s. Blocked by missing BlackHole, invalid installer signature, capture permission and remote-participant acceptance. Handoff: .sdlc/evidence/rp-speech/handoff.md.rp-ui · BlockedWorker reported a blocker: Extended the retained UI; 9 tests and 2 actual browser journeys pass. Blocked on upload owner identity, speech synthesis HTTP contract, and server feature wiring. Live account/native audio acceptance remains unverified. Details: .sdlc/evidence/rp-ui/handoff.json"
+  ],
+  "errors": []
+}

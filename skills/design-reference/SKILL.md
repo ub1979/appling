@@ -14,8 +14,9 @@ implementation phase all read it.
 
 ## Step 1 — Find references
 
-Ask for one thing first: **a site the user already likes**. One real reference
-beats ten generated adjectives. If they have none, browse a gallery.
+Reuse approved prototype/design first. Ask for a reference only if direction
+is unresolved and the owner has not asked you to decide. Otherwise research
+relevant examples with the selected engine's available browser/search tools.
 
 **Land-book** (`land-book.com`) — curated landing pages, filterable by colour,
 typography, style, industry, type and platform, plus section-level galleries
@@ -27,17 +28,17 @@ never scrape it or reproduce its prompts. If the user has access, ask them to
 paste the template or prompt they own; otherwise use it only to name the effect
 they want ("hero with a slow parallax gradient") and build it yourself.
 
-Pick **three** references, not one: one for layout, one for colour and type, one
-for motion. A single reference produces a clone; three produce a direction.
+Choose references that resolve actual layout, typography and motion questions.
+There is no fixed reference count and no reason to reopen an approved design.
 
 ## Step 2 — Open them properly
 
 Gallery sites block plain HTTP fetchers — Land-book returns 403 to a bare
-request. Use the browser tools (`browser_navigate` + `browser_snapshot`), and
-fall back to `web_extract` only for pages that allow it.
+request. Use the engine's available browser tools for rendered pages and an available
+source reader where plain extraction is sufficient.
 
 If neither tool is available, say so in chat, name the missing capability, and
-offer the exact recovery (`/tools enable web browser`). **Never describe a page
+record the concrete source-access blocker for the owner to resolve in the engine connection. **Never describe a page
 you did not open.** An invented reference is worse than no reference: it sends
 the whole build in a direction nobody chose.
 

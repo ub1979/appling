@@ -1,0 +1,80 @@
+{
+  "ts": 1795093572.753428,
+  "project": "2a2446b9bab2",
+  "running": true,
+  "paused": false,
+  "phase": "build",
+  "approvals_preserved": true,
+  "approved_artifacts_preserved": true,
+  "native_helpers_observed": [
+    "pairing",
+    "workflow_files"
+  ],
+  "peer_messages_observed": true,
+  "receipts": [
+    {
+      "path": ".sdlc/evidence/direct-build/pairing-resume/final.json",
+      "exit_code": 0,
+      "started_at": "2026-11-19T13:05:45.675589+00:00",
+      "finished_at": "2026-11-19T13:05:47.329765+00:00",
+      "sha256": "b2a3c2c8b3a912840be03bd7b23a3f5454228d8f02e7583572d7b21779eeeb48"
+    },
+    {
+      "path": ".sdlc/evidence/direct-build/pairing-resume/green.json",
+      "exit_code": 0,
+      "started_at": "2026-11-19T13:04:53.046737+00:00",
+      "finished_at": "2026-11-19T13:04:54.522773+00:00",
+      "sha256": "c008dae8e04b104753982f23fad0c0d9794a4535675bfa6087982154b4b246ab"
+    },
+    {
+      "path": ".sdlc/evidence/direct-build/pairing-resume/red.json",
+      "exit_code": 1,
+      "started_at": "2026-11-19T13:04:01.276376+00:00",
+      "finished_at": "2026-11-19T13:04:02.524423+00:00",
+      "sha256": "6d79bb91e5fd91284ad7d913e603acd73b15e2a6009460a3f10d2ee98dbd531a"
+    },
+    {
+      "path": ".sdlc/evidence/direct-build/workflow-resume/files-green-2.json",
+      "exit_code": 0,
+      "started_at": "2026-11-19T13:05:09.521852+00:00",
+      "finished_at": "2026-11-19T13:05:10.699985+00:00",
+      "sha256": "86b8b4b5c00075a6510d0560df5f6c0f6314088d4a9dd9bcac414d2db4e1a57d"
+    },
+    {
+      "path": ".sdlc/evidence/direct-build/workflow-resume/files-green.json",
+      "exit_code": 1,
+      "started_at": "2026-11-19T13:04:40.454390+00:00",
+      "finished_at": "2026-11-19T13:04:41.639133+00:00",
+      "sha256": "3a01d37e66660e5bcfa36c463c103d4933c35c7714f3c55fb21a92d56c5effed"
+    },
+    {
+      "path": ".sdlc/evidence/direct-build/workflow-resume/files-red-runtime.json",
+      "exit_code": 1,
+      "started_at": "2026-11-19T13:04:00.061718+00:00",
+      "finished_at": "2026-11-19T13:04:00.261741+00:00",
+      "sha256": "edc654b6dfb9bfd0d84e24b1040becaa0a432c6817996e09672a4d662739adad"
+    },
+    {
+      "path": ".sdlc/evidence/direct-build/workflow-resume/files-red.json",
+      "exit_code": 2,
+      "started_at": "2026-11-19T13:03:48.541786+00:00",
+      "finished_at": "2026-11-19T13:03:49.514474+00:00",
+      "sha256": "4ccc5f020fe4137545e4692ef657295cdf83eee1deb2b55c244230956169688c"
+    },
+    {
+      "path": ".sdlc/evidence/direct-build/workflow-resume/template-bind-red.json",
+      "exit_code": 1,
+      "started_at": "2026-11-19T13:06:08.772633+00:00",
+      "finished_at": "2026-11-19T13:06:09.976020+00:00",
+      "sha256": "b8ffee992cbb60d54fa4bdf89e877639a765d66eb71af05760cdeba189795446"
+    },
+    {
+      "path": ".sdlc/evidence/direct-build/resume-native-isolation-normal.json",
+      "exit_code": 0,
+      "started_at": "2026-11-19T13:04:41.802046+00:00",
+      "finished_at": "2026-11-19T13:04:44.822601+00:00",
+      "sha256": "98bc3aebf9098eeeab36fcc26c5a2f786cccceaf8393bed288c6e8c40a1f008b"
+    }
+  ],
+  "scope": "Observed native spawn/message calls and retained command receipts; not independent QA acceptance"
+}

@@ -5,7 +5,7 @@ description: Implements dependency-ordered tasks from a project plan with parall
 
 # Software Developer
 
-**⛔ ENFORCEMENT**: The orchestrator MUST spawn this as a dedicated Agent — it does not get to "write code itself" and call it development.
+Run in the assigned development session; Appling has already scheduled this role.
 The development lead completes its coherent assignment, fixes and integration, with tool evidence. Scale the steps below to the approved profile.
 
 Read the approved plan and relevant code once, then implement coherent slices with appropriate regression checks and verified evidence.
@@ -23,25 +23,22 @@ Inline args: `--task-graph`, `--plan`, `--requirements`, `--task`, `--path`, `--
 
 ---
 
-## Appling development leads and coding workers
+## Host-managed parallel development
 
-When Appling grants the development lead `delegate_task`, the host's bounded
-worktree contract applies. Before substantial edits, report the execution split
-including the lead. Choose the count from useful independent work, startup/context
-cost, capacity and provider limits; no fixed count is required. When useful independent
-packages exist, dispatch a batch after freezing interfaces and checkpointing a
-clean baseline. Follow the planner's packages, adjusting them to actual source.
-One accountable lead or Personal task does not mean one executor. If working
-serially, state the concrete dependency, startup cost or host limit; reconsider
-at the next natural integration/testing milestone. Dependent work stays serial.
-Each coding worker owns its declared files in its assigned worktree only. The lead owns shared
-schemas, dependency manifests/lockfiles, tooling configuration, `.sdlc/`
-artifacts and combined integration. Coding workers report their test evidence
-to the lead; they do not refresh the shared Project Brain or stage other
-workers' files. A blocked merge is a recovery checkpoint, not permission to
-reset or overwrite the primary project. The lead runs combined tests/build
-after integration before reporting completion. Without this host contract,
-use ordinary serial development. This does not add owner approval checkpoints.
+You are one worker in Appling's execution plan, not the project's entire team.
+The host starts independent tasks concurrently in isolated worktrees using
+separate native engine sessions. Read the structured task goal, owned files,
+approved inputs and runtime capacity from the briefing. Work within those paths.
+Do not wait for a delegation tool or start nested writable agents. If the task
+still bundles useful independent packages, report their contracts and suggested
+ownership to the coordinator; do not silently switch the whole app to serial.
+
+Shared schemas, manifests, lockfiles and wiring have explicit task owners. The
+host integrates checked changes, then runs the dependent integration task and
+independent QA. Keep your evidence in the assigned directory; do not overwrite
+shared progress files or another worker's report. Preserve unfinished work when
+blocked and return the exact missing dependency. No branch/reset/commit/merge
+operations: Git snapshots and integration belong to the host.
 
 ## Step 0.5 — Load the playbook for this stack (NEVER Skip)
 
@@ -50,69 +47,46 @@ this file is not a substitute for it, and defaults are not a stack decision:
 
 | Building | Load |
 |---|---|
-| Backend, API, or full-stack service | `skill_view(name="fullstack-dev")` |
-| Web UI, landing page, marketing site | `skill_view(name="frontend-dev")` |
-| Android (Kotlin / Compose) | `skill_view(name="android-native-dev")` |
-| iOS (Swift / SwiftUI / UIKit) | `skill_view(name="ios-application-dev")` |
-| Flutter | `skill_view(name="flutter-dev")` |
-| React Native / Expo | `skill_view(name="react-native-dev")` |
-| GLSL / shader work | `skill_view(name="shader-dev")` |
+| Backend, API, or full-stack service | `skills/fullstack-dev/SKILL.md` |
+| Web UI, landing page, marketing site | `skills/frontend-dev/SKILL.md` |
+| Android (Kotlin / Compose) | `skills/android-native-dev/SKILL.md` |
+| iOS (Swift / SwiftUI / UIKit) | `skills/ios-application-dev/SKILL.md` |
+| Flutter | `skills/flutter-dev/SKILL.md` |
+| React Native / Expo | `skills/react-native-dev/SKILL.md` |
+| GLSL / shader work | `skills/shader-dev/SKILL.md` |
 
-Anything with a visible interface also loads the design side, in this order:
+For a visible interface, reuse the approved prototype and design tokens. Load
+the relevant bundled design guides for unresolved implementation details; do
+not redesign approved screens. A separate design-brief.md is optional when the
+approved prototype and requirements already establish the direction.
 
-1. `design-reference` — if `design-brief.md` is missing, there is no agreed
-   direction yet. Stop and get one; do not invent a look.
-2. `design-taste-frontend` — the anti-slop rules, plus one aesthetic overlay
-   when the brief calls for it (`minimalist-ui`, `industrial-brutalist-ui`,
-   `high-end-visual-design`).
-3. `design-tokens` — every value comes from a token, never a hardcoded hex or
-   pixel figure.
+## Proportional engineering and verification
 
-## Step 0.6 — House standards (NEVER Skip)
+Follow the project's actual engineering conventions and supplied contracts.
+Keep modules cohesive and readable, without arbitrary file-length targets,
+forced class conversions or a test file for every source file. Add meaningful
+behavior/regression coverage and verify integration boundaries with real paths.
 
-Read `references/engineering-standards.md` once per session and follow it:
-**one unit per file** (class, component or module — whichever fits the language),
-one responsibility each, a test file for every unit, files under ~300 lines, and
-patterns applied only where the problem matches.
+Reuse existing change records and code maps when useful. Workers must not
+maintain shared ledgers or recreate missing optional process documents as a
+prerequisite to coding. Record affected files, checks, evidence and unfinished
+work in the task handoff; the host checkpoints project state.
 
-Two artifacts are yours to maintain, both under `.sdlc/`:
-
-- **`class-map.md`** — one row per unit: kind, file, test, one-line
-  responsibility, and when it was last verified with the actual result. Update it
-  in the same commit that adds, renames, splits or deletes a unit. Read it before
-  searching the codebase — loading one unit beats grepping the tree.
-- **`changes/CR-<n>-<slug>.md`** — written *before* touching existing code. What
-  changes, why (linked to a requirement or finding), blast radius with risk
-  levels, which units it puts back in doubt, what QA must test, how to roll back.
-  Size it to the risk: a one-line fix gets a short record, a structural change
-  gets the full impact analysis from `sw-architect`.
-
-Mark every unit the change touches as `stale — touched by CR-xxx` in the class
-map, and clear it only when its tests actually run again.
-
-## Proportional execution
-
-Personal projects need a concise implementation report and meaningful affected
-checks, not a class map, separate report per edit or a test for each file.
-Reusable/Production add documentation and assurance only for approved scope.
-Keep shared contracts/manifests/lockfiles and progress with the lead. Use the
-host's isolated worktrees for independent leaf workers; QA/read-only leaves
-return findings without editing shared reports. Explain the worker count and
-reason; a shared default of 10 (maximum 15) includes role leads. Run combined
-validation after integration; checks on the baseline do not certify new code.
-These profile rules scope the detailed checklist below and its referenced skills.
+Run focused checks while editing and combined checks at integration. Reuse valid
+evidence until relevant inputs change. Profile limits product scope and risk,
+not the useful worker count; actual capacity is supplied by the host.
 
 ## Step 1 — Understand Before Coding (NEVER Skip)
 
-1. **Read all provided documents** — `task-graph.md`, `plan.md`, `requirements.md`, and `design-brief.md` when the project has a UI, in that order.
+1. **Read all provided documents** — approved `requirements.md`, `plan.md`, prototype/design, and the structured assignment. Read optional task-graph/design-brief files when present.
 2. **Build a mental model**: system purpose, tech stack, all epics/stories and how they relate, data models, API contracts, architectural patterns from ADRs.
 3. **If existing codebase**: read directory structure and naming conventions, code style, test framework and assertion patterns, reusable utilities, config patterns.
 4. Follow the approved task list by real dependencies. Do not reopen its approval or ask which authorized task to start.
 5. **New project**: scaffold first —
    - Directory structure (see below), package manager config, linter/formatter, test framework
-   - `git init` (if needed) and `.gitignore` BEFORE the first commit — secrets and artifacts never tracked
+   - Keep `.gitignore` accurate before host snapshots — secrets and artifacts never tracked
    - `.env.example` with placeholders
-   - Initial `chore: scaffold project` commit
+   - Leave changes for the host snapshot; do not create a scaffold commit
 
 ---
 
@@ -182,47 +156,11 @@ assertion does not require restarting the whole implementation cycle.
 - Map each acceptance criterion to evidence
 - Continue the next authorized dependent task directly. Ask only when blocked by a real owner decision.
 
-### 2h. Commit the Task
+### 2h. Return verified task output
 
-One logical commit per task, only after verification passes — never commit a red build.
-- Conventional Commits referencing the task ID: `feat(auth): add login endpoint (S-012)`, `fix(orders): handle empty cart (BUG-007)`; also `test`, `refactor`, `docs`, `chore`
-- Stage intentionally — never blind `git add .`. No secrets, `.env`, build artifacts, or large fixtures (belong in `.gitignore`)
-- Subject ≤72 chars; body explains WHY when non-obvious
-- No co-author/tool-attribution trailers unless the project already uses them
-
----
-
-## Verification discipline
-
-Use test-first when it helps expose a behavioral bug or specify a new contract.
-Preserve useful existing code and tests; do not discard or rewrite them merely
-because they were not created in test-first order. A passing test proves only
-what its assertions exercised. Reproduce reported failures and verify the final
-behavior through the actual affected path. Low-impact copy/style changes need
-appropriate checks rather than artificial tests mirroring the edit. Never claim
-verification from a model summary, skipped check or a broken harness.
-
----
-
-## Testing Anti-Patterns (NEVER Do These)
-
-1. **Testing mock behavior** — assert real behavior, not that a mock rendered:
-   ```typescript
-   // BAD:  expect(screen.getByTestId('sidebar-mock')).toBeInTheDocument();
-   // GOOD: render(<Page />); expect(screen.getByRole('navigation')).toBeInTheDocument();
-   ```
-2. **Test-only methods in production code** — cleanup/setup belongs in test utilities.
-3. **Mocking without understanding dependencies** — know the real side effects first; if the test depends on them, mock at a lower level.
-4. **Incomplete mocks** — mock the COMPLETE data structure; partial mocks fail silently when code reads omitted fields.
-5. **Over-mocking external integrations** — code calling subprocess/HTTP/CLI needs at least one test running the real thing.
-
-**Integration tests against real services**: if a database, cache, or queue runs locally (docker-compose, testcontainers), hit the real service. Mock only what genuinely can't run locally (paid third-party SaaS).
-
----
-
-## Step 2F — Fix Mode (review-report.md / bug-report.md)
-
-Use instead of Step 2 in Fix mode. Same TDD discipline per fix.
+Leave changes in the assigned workspace for host snapshot and integration.
+Return the task status, checks with exit codes and saved evidence, and concrete
+blockers. Never commit or modify branches as part of a managed worker task.
 
 ### 2F-a. Parse the report into a worklist
 
@@ -245,9 +183,10 @@ Non-negotiable: every bug fix gets a test that would have caught it.
 
 Re-run the exact reproduction from the report — same curl, same Playwright step, same DB query. A finding is only "fixed" with tool output showing the new behavior.
 
-### 2F-d. Commit each fix
+### 2F-d. Checkpoint verified fixes
 
-One commit per finding: `fix(auth): use bcrypt for password hashing (BLOCKER-001)`. Security findings fixed exactly to the architect's mandate — no partial fixes.
+Return finding IDs, changed files and passing regression evidence. The host
+retains and integrates the checked workspace; workers do not commit fixes.
 
 ### 2F-e. Report fixes mapped to IDs
 
@@ -290,11 +229,12 @@ Every public class, function, and module gets a doc comment (purpose, params, re
 Single Responsibility; Open/Closed (extend via composition); Dependency Injection; Interface Segregation; Encapsulation (private by default). Patterns where they fit naturally: Repository (data access), Factory, Strategy, Observer/Event. Non-class languages: same principles via structs, interfaces, traits, modules.
 
 ### Modularity
-Full rule in `references/engineering-standards.md`. In short: **one unit per
+Follow project conventions and prefer **one coherent unit per
 file** — a class where there is state and behaviour to encapsulate, a component
 where the framework's unit is a component, a module of named exports where the
-code is pure. Named after the file, one responsibility, its own test, under ~300
-lines. Never wrap a pure function in a class to satisfy the rule.
+code is pure. Keep names and responsibilities clear, with meaningful behavior
+coverage. Split large modules when their responsibilities warrant it. Never
+wrap a pure function in a class to satisfy a file or class-count rule.
 
 Common logic in `utils/`/`helpers/`/`common/`; one module = one concern (small
 private helper types may live beside their only consumer); config in one place;
@@ -310,13 +250,10 @@ Classes `PascalCase` nouns; methods verbs in the language's case (`calculateTota
 
 ## Version Control
 
-- **Commit per task** (Step 2h) — history reads like the project plan
-- **Branches** — `feat/S-012-login`, `fix/bug-007-empty-cart`, not `main`; match existing convention
-- **Conventional Commits** — `type(scope): summary (TASK-ID)`; types: `feat`, `fix`, `refactor`, `test`, `docs`, `chore`, `perf`
-- **Never commit** secrets, `.env`, deps/build output, large binaries — verify `.gitignore` first
-- **Green commits only** — tests and linter pass; no broken WIP on shared branches
-- **Fix mode** — commits reference finding IDs
-- **Don't push or open PRs unless asked**; no tool-attribution trailers unless the repo uses them
+The host owns snapshots, worker worktrees and integration. Do not commit,
+checkout, reset, merge, push or open pull requests from an assigned worker.
+Preserve staged and unstaged user changes. Keep secrets, credentials and build
+outputs out of source and evidence. Return verification for the host handoff.
 
 ---
 

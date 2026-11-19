@@ -19,6 +19,8 @@ export interface InboxItem {
   env_var?: string;
   revision?: string;
   requester?: ApprovalRequester | null;
+  worker_id?: string;
+  task_id?: string;
 }
 
 export interface ProviderStatus {
@@ -96,6 +98,10 @@ export const emptyLive = (since = 0): LiveState => ({
 });
 
 const TOOL_WORDS: Record<string, string> = {
+  commandExecution: "Ran a command",
+  fileChange: "Edited files",
+  subAgentActivity: "Codex helper activity",
+  reasoning: "Working through the next step",
   terminal: "Ran a command",
   execute_code: "Ran a script",
   read_file: "Read a file",
@@ -120,6 +126,7 @@ export function toolWords(name: string): string {
 const MAX_ACTIVITY = 200;
 
 function addActivity(state: LiveState, item: ActivityItem): ActivityItem[] {
+  if (state.activity.some(existing => existing.key === item.key)) return state.activity;
   const next = [...state.activity, item];
   return next.length > MAX_ACTIVITY ? next.slice(-MAX_ACTIVITY) : next;
 }
@@ -128,6 +135,16 @@ const str = (v: unknown): string => (typeof v === "string" ? v : "");
 
 export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
   switch (evt.type) {
+    case "activity_history": {
+      const historical = evt.event as LyraEvent | undefined;
+      if (!historical || !["tool", "helper", "worker_commentary", "context_checkpoint", "native_agent"].includes(historical.type)) return state;
+      return { ...state, activity: applyEvent(state, historical).activity };
+    }
+    case "native_agent":
+      return { ...state, activity: addActivity(state, {
+        key: `native-${evt.ts}-${str(evt.tool)}`, ts: evt.ts, text: "Codex agent coordination",
+        detail: str(evt.tool), tone: "helper",
+      }) };
     case "queued": {
       const item = evt.item as { id: string; text: string; kind?: string; display?: string };
       if (state.queued.some((q) => q.id === item.id)) return state;
@@ -147,6 +164,25 @@ export function applyEvent(state: LiveState, evt: LyraEvent): LiveState {
       return { ...state, turn: { ...state.turn, reply: state.turn.reply + str(evt.text) } };
     case "status_update":
       return { ...state, conversationChanges: state.conversationChanges + 1 };
+    case "work_waiting":
+    case "build_continuation":
+      return { ...state, helperChanges: state.helperChanges + 1,
+        activity: addActivity(state, { key: `${evt.type}-${evt.ts}`, ts: evt.ts,
+          text: evt.type === "work_waiting" ? "Work is waiting" : "Continuing remaining coding",
+          detail: str(evt.text), tone: "work" }) };
+    case "worker":
+      // Refresh the persisted worker/task ledger after integration as well as
+      // after model execution, without injecting worker result JSON into chat.
+      return { ...state, helperChanges: state.helperChanges + 1 };
+    case "worker_commentary":
+      return { ...state, activity: addActivity(state, {
+        key: `commentary-${str(evt.thread_id)}-${evt.ts}`, ts: evt.ts,
+        text: "Agent progress", detail: str(evt.text), tone: "work",
+      }) };
+    case "context_checkpoint":
+      return { ...state, activity: addActivity(state, {
+        key: `context-${evt.ts}`, ts: evt.ts, text: "Agent context compacted", tone: "done",
+      }) };
     case "interim":
       return { ...state, conversationChanges: state.conversationChanges + 1,
         turn: state.turn ? { ...state.turn, reply: "" } : null };

@@ -140,10 +140,13 @@ def execute(connection, run):
         return result
     finally:
         if proc.poll() is None:
-            os.killpg(proc.pid,signal.SIGTERM)
+            try:os.killpg(proc.pid,signal.SIGTERM)
+            except ProcessLookupError:pass  # Exiting between poll and signal must not hide the real CLI error.
             try:
                 proc.wait(timeout=3)
             except subprocess.TimeoutExpired:
-                os.killpg(proc.pid,signal.SIGKILL);proc.wait()
+                try:os.killpg(proc.pid,signal.SIGKILL)
+                except ProcessLookupError:pass
+                proc.wait()
         for stream in [proc.stdout,proc.stderr]:
             stream.close()

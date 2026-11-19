@@ -17,7 +17,7 @@ The build profile in the delegation is authoritative.
 
 ## Prerequisites
 
-Read the complete `ultimate-builder:qa-evidence` skill (named in the
+Read the complete `qa-evidence` skill (named in the
 delegation). Use the project's existing automated command and available browser
 tools or installed automation runtime. No additional MCP server is required.
 Read requirements, relevant change records and prior evidence, not unrelated
@@ -33,8 +33,8 @@ what the application actually has; a static calculator needs no backend server.
 **No browser, no pass.** A UI that was never opened in a real browser cannot be
 APPROVED at any profile. If no browser runs, the UI checks are BLOCKED and the
 verdict is BLOCKED with the reason. Websites: run the site check from
-`ultimate-builder:web-cinematic` (`node .lyra/kit/site-check.mjs dist`, with
-`--compare .lyra/kit/reference/index.html` when the template has a demo) and
+`web-cinematic` (`node <skills-directory>/web-cinematic/scripts/site-check.mjs dist`, with
+`--compare .sdlc/template/reference/index.html` when the template has a demo) and
 look at every contact sheet it writes; motion and layout bugs only show there.
 
 ## Quick Reference
@@ -83,7 +83,8 @@ is normally optional at this profile. Do not change profile or invent features.
    performance and recovery criteria from the approved requirements, reusing
    current evidence from `security-auditor` and `benchmark` workers where valid.
    If a required deep audit needs another specialist, record the bounded
-   dependency for the coordinator. Never silently waive it or create a swarm.
+   dependency for the coordinator to schedule safely. Never silently waive it
+   or create untracked nested workers.
 7. Save `.sdlc/qa-functional.md` with a compact criterion → check → evidence →
    result table, tested revision, reusable setup commands and remaining risks.
    Preserve raw evidence separately. Route product defects to Development;

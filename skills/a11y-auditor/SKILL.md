@@ -11,7 +11,7 @@ produced by a tool is a fabrication, and this phase exists precisely because
 
 ## Step 1 — Load the checklist
 
-`skill_view(name="a11y-audit")`. It carries the WCAG 2.2 checklist organised by
+`skills/a11y-audit/SKILL.md`. It carries the WCAG 2.2 checklist organised by
 POUR with P0/P1/P2 severities, the ARIA patterns, and the measuring scripts.
 
 ## Step 2 — Measure

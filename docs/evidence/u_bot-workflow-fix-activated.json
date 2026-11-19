@@ -1,0 +1,23 @@
+{
+  "checked_at": 1795098806.549215,
+  "service": {
+    "instance": "06fb8bac41864d0e93240ac736776b20",
+    "pid": 95693,
+    "url": "http://127.0.0.1:9211"
+  },
+  "turn": "6fc35fc01c8649dfb3d10c70408396af",
+  "running": true,
+  "paused": false,
+  "pending_input": 0,
+  "completed_commands": 13,
+  "latest_command": {
+    "ts": 1795098726.391992,
+    "type": "tool",
+    "phase": "complete",
+    "id": "exec-a9d14ddb-b866-4918-a17e-d492d20b6a28",
+    "name": "commandExecution",
+    "exit_code": 0,
+    "thread_id": "01a1f16f-31b4-7092-9ced-4c14b3c5ee55"
+  },
+  "scope": "Restart and saved-session resume verified; automatic continuation on a future blocked handoff has not yet been observed in this live run."
+}

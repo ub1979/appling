@@ -128,7 +128,9 @@
   ],
   "REQUIRED": [
     "req-engineer",
-    "task-planner"
+    "ui-designer",
+    "sw-developer",
+    "qa-engineer"
   ],
   "STYLES": [
     {
@@ -136,7 +138,9 @@
       "name": "Let Appling guide me",
       "accent": "violet",
       "description": "Start with your idea. Appling asks a few questions and recommends the smallest useful team.",
-      "team": []
+      "team": [
+        "ui-designer"
+      ]
     },
     {
       "id": "sdlc",

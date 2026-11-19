@@ -174,7 +174,7 @@ export function Home() {
         {(catalog?.styles ?? []).map((s) => (
           <button key={s.id} className="style-card" onClick={() => go(`/new?style=${s.id}`)}>
             <span className={`bar accent-${s.accent}`} style={{ display: "block" }} />
-            <span className="count">{Math.max(2, new Set([...s.team, "req-engineer", "task-planner"]).size)} agents</span>
+            <span className="count">{new Set([...s.team, "req-engineer", "ui-designer", "sw-developer", "qa-engineer"]).size} agents</span>
             <b>{s.name}</b>
             <p>{s.description}</p>
           </button>

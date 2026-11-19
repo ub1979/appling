@@ -19,6 +19,8 @@ class Run:
     session: str | None = None
     readonly: bool = False
     connection_test: bool = False
+    managed_worker: bool = False
+    native_delegation: bool = False
     cancel: threading.Event = field(default_factory=threading.Event)
     emit: Callable = lambda *a, **k: None
     ask: Callable = lambda *a, **k: 'deny'
@@ -56,6 +58,7 @@ def environment():
     allowed = {'PATH','HOME','USER','LOGNAME','SHELL','TMPDIR','TEMP','TMP','LANG','LC_ALL','SYSTEMROOT',
                'OPENAI_API_KEY','ANTHROPIC_API_KEY','CLAUDE_CODE_OAUTH_TOKEN','GH_TOKEN','GITHUB_TOKEN',
                'GITHUB_COPILOT_TOKEN','COPILOT_GITHUB_TOKEN','CODEX_HOME','HTTPS_PROXY','HTTP_PROXY','NO_PROXY'}
+    allowed.update({'PLAYWRIGHT_BROWSERS_PATH','npm_config_cache'})
     return {k:v for k,v in os.environ.items() if k in allowed}
 
 

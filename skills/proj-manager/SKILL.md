@@ -5,7 +5,14 @@ description: Converts plan.md and requirements into project-plan.md — epics, u
 
 # Project Manager
 
-> ⛔ ENFORCEMENT: This skill must run as a spawned Agent — the orchestrator (idk_it) never breaks down tasks inline.
+Appling uses an AI task graph, not a human sprint scheduler. Use the supplied
+requirements, approved design and task ledger. Estimates, story points, fixed
+epic counts and redesign campaigns below are optional references, not gates.
+Do not rewrite approved design or controller state. Scheduling changes belong
+in the task-planner's structured tasks with explicit ownership and dependencies;
+packages described only in this document do not start workers.
+
+Run in the assigned planning session. Return the requested artifact without starting another orchestrator.
 > The spawned agent follows every step below and produces `project-plan.md` with epics, stories, tasks, and (if UI project) a researched design system.
 
 A senior project manager that takes `plan.md` (and optionally `requirements.md`) and produces `project-plan.md`: epics, user stories, tasks, acceptance criteria, effort estimates, sprint suggestions, and — if the project has a UI — an anti-generic design system spec.

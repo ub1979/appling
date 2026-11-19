@@ -11,14 +11,14 @@ to test. It does not add another QA job or expand the approved requirements.
 
 ## When to Use
 
-Load together with `ultimate-builder:qa-functional` or
-`ultimate-builder:qa-experience`. The coordinator names both skills in the
-delegation. Read each selected skill completely with `skill_view`.
+Load together with `qa-functional` or
+`qa-experience`. The coordinator names both skills in the
+delegation. Read each selected bundled skill completely using native file tools.
 
 ## Prerequisites
 
 The assigned workspace, the task from the delegation, approved requirements and revision.
-Use native `read_file`, `search_files`, `terminal` and available browser tools.
+Use the selected engine's native file, search, terminal and available browser tools.
 No MCP server is required; use an already configured one only when appropriate.
 Browser checks require a real browser runtime or the native browser tools.
 
@@ -27,14 +27,15 @@ Browser checks require a real browser runtime or the native browser tools.
 Project QA must never create, invoke or repair raw Chrome DevTools Protocol
 (CDP) automation. This prohibition includes direct DevTools WebSocket clients,
 `chrome-remote-interface`, hand-written `Runtime.evaluate` / `Input.dispatch*`
-drivers and project-local CDP harnesses. Hermes may use CDP internally behind
+drivers and project-local CDP harnesses. A supported browser integration may use CDP internally behind
 its supported browser tools; QA workers must not bypass those tools or build on
 that internal protocol.
 
 Use, in order: the project's working Playwright command, an already available
-Playwright runner/MCP, or Hermes' native browser tools. If none can perform a
+Playwright runner/MCP, or the selected engine's available browser tools. If none can perform a
 required check, record that check as **BLOCKED** with the missing capability.
-Never replace the missing capability with a custom browser driver.
+Use supported engine/browser automation capabilities; do not spend the QA
+assignment rebuilding a browser driver instead of testing the app.
 
 ## How to Run
 
@@ -119,8 +120,8 @@ replaying the whole campaign. Browser assertion counts are not journey counts.
    concise report for this scope; the Brain and ledger link to it. Do not paste
    entire repeated reports into every project document.
 7. Stop when this job's criteria have evidence or a concrete blocker. Save an
-   exact handoff before exhausting the existing call budget. Reuse Hermes task
-   comments and dependencies; do not launch nested QA copies.
+   exact handoff before exhausting the existing call budget. Reuse Appling task
+   checkpoints and dependencies; do not launch nested QA copies.
 
 ## Pitfalls
 

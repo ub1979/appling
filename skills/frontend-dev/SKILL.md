@@ -364,18 +364,12 @@ npm install three @react-three/fiber @react-three/drei  # 3D (lazy-load)
 
 ## 3.1 Tools
 
-Use Lyra's own media tools — this install has no MiniMax account, and the
-upstream `scripts/minimax_*.py` helpers were removed with their API reference.
-
-| Type | Tool | Notes |
-|------|------|-------|
-| Image | `image_generate` | Confirm the prompt with the user first |
-| Video | `video_generate` | Long-running; report progress |
-| Speech | `text_to_speech` | |
-| Reading an image | `vision_analyze` | Requires a vision-capable model |
-
-If a tool is unavailable this turn, say so plainly and offer the recovery in
-chat (`/tools enable <toolset>`) rather than silently skipping the asset.
+Use the selected engine's actual image, video, speech and vision tools when
+available and authorized. Inspect their schemas before calling them; a CLI login
+does not guarantee media-generation entitlement. If generation is unavailable,
+use supplied assets or designed placeholders where acceptable, and report the
+missing required asset/capability. Do not invent tool names, another runtime's
+setup commands or a subscription entitlement. Do not silently switch providers.
 
 ## 3.2 Workflow
 1. **Parse:** type, quantity, style, spec, usage

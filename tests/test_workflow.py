@@ -1,10 +1,13 @@
 import json
 import threading
 import time
+import subprocess
+import sys
 from pathlib import Path
 import pytest
 from appling.store import Store, safe_path
 from appling.workflow import Workflow, artifact_revision, parse_tasks
+from plan_fixtures import plan_result
 
 
 def wait_idle(workflow,pid):
@@ -28,15 +31,41 @@ class Builder:
             (run.root/'prototypes/index.html').write_text('<button onclick="this.textContent=1">0</button>')
             return {'summary':'Try the counter.','status':'completed'}
         if role=='task-planner':
-            return {'summary':'One task.','plan':'Build a working counter and test the click.',
-                    'tasks':[{'id':'counter','goal':'Build counter','depends_on':[]}]}
+            brief=json.loads(run.prompt)
+            if brief['goal'].startswith('Assess safe execution ownership'):
+                return dict(task_scopes=[dict(id=t['id'],files=['index.html','verify_counter.py'],additional_depends_on=[])
+                                         for t in brief['tasks'] if t['status']!='done'])
+            return plan_result([{'id':'counter','goal':'Build counter FR-1','files':['index.html'],
+                                'acceptance':[dict(command='verify counter',expect='counter contract holds')]},
+                             {'id':'counter-checks','goal':'Build FR-1 acceptance checker','files':['verify_counter.py']},
+                             {'id':'counter-integration','goal':'Verify integrated FR-1 counter','files':['index.html','verify_counter.py'],
+                              'depends_on':['counter','counter-checks']}])
+        if role=='sw-architect':
+            assert run.readonly
+            return dict(verdict='pass',summary='Counter click reaches the integrated counter and browser check.',findings=[])
         if role=='sw-developer':
-            (run.root/'index.html').write_text('<button onclick="this.textContent=1">0</button>')
-            return {'summary':'Counter implemented.','status':'completed'}
+            brief=json.loads(run.prompt);worker=brief.get('worker')
+            task=worker['task_id'] if worker else 'counter-integration'
+            if task in {'counter','counter-checks'} and getattr(self,'on_worker',None):self.on_worker(run)
+            if task=='counter':
+                (run.root/'index.html').write_text('<button onclick="this.textContent=1">0</button>')
+                command=[sys.executable,'-c','from pathlib import Path; assert "this.textContent=1" in Path("index.html").read_text(); print("counter contract checked")']
+            elif task=='counter-checks':
+                (run.root/'verify_counter.py').write_text('from pathlib import Path\nassert \'this.textContent=1\' in Path("index.html").read_text()\nprint("counter integration checked")\n')
+                command=[sys.executable,'-m','py_compile','verify_counter.py']
+            else:
+                command=[sys.executable,'verify_counter.py']
+            checked=subprocess.run(command,cwd=run.root,capture_output=True,text=True)
+            assert checked.returncode==0,checked.stderr
+            path=run.root/(worker['evidence'] if worker else '.sdlc/evidence/integration')/'check.txt'
+            path.parent.mkdir(parents=True,exist_ok=True);path.write_text(checked.stdout or 'Checker compiled successfully')
+            return {'summary':'Counter task verified.','status':'completed',
+                    'checks':[dict(command='verify '+task,exit_code=checked.returncode,evidence=str(path.relative_to(run.root)))]}
         if role=='qa-engineer':
             if getattr(self,'mutate_qa',False):
                 (run.root/'index.html').write_text('QA unexpectedly edited the application')
-            p=run.root/'.sdlc/evidence/check.json';p.parent.mkdir(parents=True,exist_ok=True)
+            worker=json.loads(run.prompt)['worker']
+            p=run.root/worker['evidence']/'check.json';p.parent.mkdir(parents=True,exist_ok=True)
             p.write_text('{"click": "0 becomes 1"}')
             return {'summary':'Checked.','verdict':'pass','browser_tested':not self.bad_qa,
                     'checks':[{'command':'browser click increment','exit_code':0,'evidence':str(p.relative_to(run.root)),'requirements':['FR-1']}]}
@@ -48,7 +77,7 @@ class Builder:
 @pytest.fixture
 def project(tmp_path):
     store=Store(tmp_path/'studio.db');builder=Builder();workflow=Workflow(store,builder)
-    p=store.add(tmp_path/'app',team=['req-engineer','task-planner','sw-developer','qa-engineer'])
+    p=store.add(tmp_path/'app',team=['req-engineer','task-planner','sw-developer','qa-engineer'],execution_mode='planned')
     yield store,workflow,p['id'],builder
     workflow.shutdown()
 
@@ -78,6 +107,26 @@ def test_full_pipeline_preserves_gates_and_follow_up(project):
     assert store.get(pid)['phase']=='delivered'
     assert builder.roles.count('req-engineer')==1
     assert builder.roles.count('qa-engineer')==2
+
+
+def test_new_plan_executes_real_parallel_workers_then_integration_and_qa(project):
+    store,w,pid,builder=project
+    barrier=threading.Barrier(2);workspaces=[]
+    def meet(run):
+        workspaces.append(run.root)
+        barrier.wait(timeout=5)
+    builder.on_worker=meet
+    w.submit(pid,'Build the counter');wait_idle(w,pid)
+    for kind in ['prototype','requirements','plan']:
+        approve(store,w,pid,kind)
+    state=store.get(pid)
+    assert state['phase']=='delivered'
+    assert len(set(workspaces))==2 and Path(state['root']) not in workspaces
+    assert all(worker['status']=='integrated' for worker in state['workers'])
+    assert all(task['status']=='done' for task in state['tasks'])
+    integration=next(w for w in state['workers'] if w['task_id']=='counter-integration')
+    assert (Path(state['root'])/integration['evidence']/'check.txt').read_text().strip()=='counter integration checked'
+    assert builder.roles[-1]=='qa-engineer'
 
 
 def test_modified_prototype_cannot_use_old_approval(project):
@@ -125,6 +174,7 @@ def test_qa_source_changes_invalidate_its_verdict(project):
     assert store.get(pid)['phase']=='qa'
     assert store.get(pid)['paused']
     assert any('changed application source' in m['content'] for m in store.messages(pid))
+    assert (Path(store.get(pid)['root'])/'index.html').read_text()=='<button onclick="this.textContent=1">0</button>'
 
 
 def test_restart_preserves_approvals_and_pauses_active_work(tmp_path):

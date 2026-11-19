@@ -5,9 +5,11 @@ description: "Interviews the user conversationally, researches supplied website 
 
 # Requirements Engineer
 
-> ⛔ EXCEPTION: this skill runs DIRECTLY in the main conversation (not as a spawned agent) — it requires multi-round user interviews.
-> The orchestrator must still execute EVERY step: full 2-3 round interview + The Grill (3.5) + Design Space Exploration (3.7) + prototype walkthrough choice (6.5).
-> Writing requirements.md from one user message without interviewing does NOT count.
+Run in the controller-managed requirements session. Ask only unanswered
+questions, one per turn. Reuse supplied documents and saved answers; the
+number of interview rounds is determined by actual gaps, not a fixed quota.
+The controller owns requirement and prototype approval. Already approved inputs
+remain approved during implementation replanning unless the owner changes scope.
 
 Interview the user conversationally, stress-test important assumptions, explore competing approaches, then generate `requirements.md` with prototypes the user can evaluate before any code exists. Output feeds `sw-architect`.
 
@@ -77,13 +79,13 @@ Adapt to Round 1 answers; ask each remaining question individually and skip what
 
 ## Step 3 — Round 3 (Only If Needed)
 
-Ask at most 5 targeted follow-ups, one per message, to resolve ambiguities or contradictions. If everything is clear, skip to Step 3.5.
+Ask targeted follow-ups only while consequential ambiguities remain, one per message. If everything is clear, skip to Step 3.5.
 
 ## Step 3.5 — The Grill (Stress Test)
 
 Run a short stress test for important risks. Keep the Conversation Contract: one question at a time, and honor Skip, Decide for me, or Use smart defaults. Log skipped or defaulted answers as assumptions or risks.
 
-After the interview, BEFORE writing requirements.md, choose up to 5 relevant adversarial questions from the categories below and ask them one at a time. Stop early when the important risks are resolved or the user chooses smart defaults:
+After the interview, BEFORE writing requirements.md, choose the relevant risk questions that still need an answer from the categories below and ask them one at a time. Stop early when the important risks are resolved or the user chooses smart defaults:
 
 **Assumption busters**: Why not use [existing tool] for [X]? · What evidence backs [scale target], or is it aspirational? · Define "fast/real-time/scalable" in numbers — ms latency, RPS, concurrent users · Is [tech choice] a hard constraint or are alternatives open?
 
@@ -119,18 +121,13 @@ Rules: approaches must differ at paradigm level ("traditional web app vs mobile-
 
 ## Step 4 — Domain and Reference Research
 
-When the user supplied URLs, execute `references/site-research.md` before
-general domain research. Open the exact URLs; do not replace them with search
-result summaries. Use `web_extract` first when available, then
-`browser_navigate` and `browser_snapshot` for dynamic, blocked, incomplete, or
-otherwise unsuitable extraction. If one capability is absent, use the other.
-If neither is available, follow the chat-first missing-tool protocol in that
-reference and tell the user before continuing. State that the URL has not been
-opened, then ask one focused question offering setup in this chat with the exact
-action `/tools enable web browser`. Do not use a vague “enable web access”
-instruction and do not direct the user to Settings.
+When the user supplied URLs, read `references/site-research.md` and open
+those sources with the selected engine's actual search/source-reader/browser
+tools. Use rendered browser interaction when extraction is incomplete. If no
+available tool can inspect the required source, name that source and capability
+as a blocker; do not invent tool-enablement commands or claim it was opened.
 
-Run 3-6 targeted `web_search` queries when the tool is available: domain
+Run targeted searches when the available engine tools can resolve a consequential gap: domain
 requirements the user missed (e.g., PCI-DSS for payments) · industry standards
 (healthcare → HL7/FHIR, finance → FIX) · common pitfalls in similar products.
 When `web_search` is absent but the browser is available, perform bounded
@@ -145,6 +142,28 @@ Keep functional revisions and acceptance criteria in requirement sections above
 bookkeeping only. Do not place changed scope beneath it as version-history notes;
 new scope must remain visible to revision checks. Preserve the owner's recorded
 approvals, and obtain a separate implementation-plan approval for a new scope.
+
+## Release slice, acceptance criteria and owner prerequisites
+
+Large first releases are the main reason builds stall. Before finishing:
+
+- Tag every FR/NFR `Release: 1` or `Release: later`. When release 1 is large or
+  depends on several external accounts, devices or services, offer the owner a
+  smaller first release as a question (with the deferred items named). Never move
+  a requirement to later unless the owner chooses it. There is no fixed limit.
+- Return `acceptance_criteria`: at least one per FR/NFR, each with a stable ID
+  (`AC-FR-001-1`), the requirement ID, an observable pass condition, `release`,
+  and `live`. Set `live: true` only when passing needs real accounts, devices,
+  OS permissions, other people or elapsed time (for example "five daily
+  briefings"). A live criterion's code must still be buildable and testable
+  locally; only its live check waits.
+- Return `prerequisites`: everything the owner must provide (accounts, drivers,
+  permissions, devices, time windows, external services), each with an ID
+  (`P-google-login`), kind, description and whether it is needed at build or
+  verification time. Every live criterion names the prerequisites it needs.
+
+The controller saves these to `.sdlc/acceptance.json`; they are approved with the
+requirements and cannot be changed later without a new owner approval.
 
 ## Step 5 — Generate requirements.md
 
@@ -238,7 +257,8 @@ requirements references. Simulate the primary journeys and key empty, error,
 loading and success states. For slides or video, make the sequence or storyboard
 clickable. For an update, show the revised journeys against the existing product.
 Tell the owner that **Prototype preview** is beside the chat and where to click
-first. Use `clarify` with choices exactly `["Approve prototype", "Request changes"]`.
+first. Return the prototype status to the controller, which offers
+`["Approve prototype", "Request changes"]` with a revision-bound review.
 If changes are requested, ask what to adjust, revise the files and repeat the
 checkpoint. For API or CLI projects without a visual surface, walk through
 realistic commands or requests and responses.
@@ -260,14 +280,15 @@ surface. Confirm the walkthrough before continuing to quality checks.
 
 ## Step 8 — Summary (Final Checkpoint)
 
-In Appling, delegate a focused `req-engineer:` draft review after writing
-`requirements.md`. Ask for missing, contradictory, or untestable requirements.
-Use the returned notes in the interview or draft before asking the owner to
-approve. Keep the interview and approval in the main conversation.
+Check the draft for missing, contradictory or untestable requirements.
+Return the complete requirements in the controller's response format; the
+controller saves the draft and presents its revision-bound approval. An
+independent reviewer may be scheduled by the host when useful; do not wait
+for an unavailable delegation tool or spawn duplicate interviews.
 
 Present: FR/NFR counts · MoSCoW breakdown · prototype coverage (X screens / Y commands / Z endpoints) · chosen approach one-liner · key risks/gaps needing stakeholder input · failure-mode count · path to `requirements.md`.
 
-In Appling, share the requirements summary and use `clarify` with choices exactly
+In Appling, return the requirements summary; the controller offers choices
 `["Approve requirements", "Request changes"]`. If the owner requests edits,
 revise the requirements and repeat the review. Mark `requirements.md` Approved
 after approval. For an update, hand off to Change management before planning.

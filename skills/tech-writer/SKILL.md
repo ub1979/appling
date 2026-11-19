@@ -5,8 +5,12 @@ description: Reads the finished codebase and plans, then generates the complete 
 
 # Technical Writer
 
-> ⛔ MUST be executed as a spawned Agent. The orchestrator does not get to "write a quick README" and call it documentation — spawn this skill.
-> A spawned agent following every step below, testing all examples, producing `README.md` + `docs/`, counts. Anything less does not.
+Run in the assigned documentation session. Document the actual app and
+assigned journeys, not every possible documentation category. Reuse verified
+setup and API evidence for the current revision. Execute relevant examples,
+and label unverified external deployment commands as unverified rather than
+running unauthorized operations merely to complete a checklist. The host owns
+worker scheduling and integration; do not spawn duplicate documentation jobs.
 
 > ⛔ IRON LAW: no doc section is complete without fresh tool-execution evidence from THIS session. "Should work" is forbidden.
 > Gate for EVERY section: IDENTIFY the verification command → RUN it → READ the output → VERIFY it matches the doc → only then mark complete.

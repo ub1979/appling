@@ -29,7 +29,8 @@ Listen to the user's description. Extract:
 - **Why** they want it (user need, bug impact, tech debt)
 - **Who** it affects (end users, developers, ops)
 
-If the description is too vague to act on, ask **at most 3 clarifying questions** — all in one batch:
+If the description is too vague to act on, ask focused questions only about unresolved consequential gaps, one per turn.
+The examples below are possible gaps, not a required batch:
 
 ```
 Before I spec this out, I need to clarify:

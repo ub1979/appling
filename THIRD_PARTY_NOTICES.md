@@ -10,3 +10,10 @@ The source repository's MIT notice is preserved in LICENSE (Nous Research,
 preserved; consult those notices before redistributing their reference assets.
 
 The new controller, project store and engine adapters do not depend on Hermes.
+
+The optional WhatsApp sidecar uses the upstream MIT-licensed
+[WhiskeySockets/Baileys](https://github.com/WhiskeySockets/Baileys) package
+(`baileys`, pinned to `7.0.0-rc14`). Its package and dependency notices are
+provided with installation; the package is not vendored into this checkout.
+Baileys is independent of WhatsApp/Meta. The sidecar and phone controller are
+new Appling code rather than a copy of Hermes's messaging gateway.

@@ -17,7 +17,7 @@ decided.
 
 ## Step 2 — Write
 
-Load `skill_view(name="ux-writing")` and apply it. House rules on top:
+Load `skills/ux-writing/SKILL.md` and apply it. House rules on top:
 
 - **Say what happens, not what the system did.** "Payment failed — the card was
   declined. Try another card." beats "Error 402".

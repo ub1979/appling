@@ -53,7 +53,7 @@ it and shows the QR code. For your own checks use `npx expo export --platform we
 1. **Plan for a phone.** One-handed use, thumb-reachable actions at the
    bottom, 44 pt touch targets, safe areas (`react-native-safe-area-context`),
    keyboard that never hides the field being typed in, light and dark mode.
-   Pick colours with `ultimate-builder:color-and-ux`.
+   Pick colours with `color-and-ux`.
 2. **Stay inside Expo Go.** Before adding any library, check it is in the
    Expo SDK or marked "Expo Go compatible". If a feature truly needs native
    code outside Expo Go (some payment SDKs, Bluetooth, custom native modules),

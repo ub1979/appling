@@ -92,4 +92,16 @@ describe("conversational questions and multiline composer", () => {
     expect(html).toContain("<textarea");expect(html).toContain('rows="6"');
     expect(html).toContain('aria-label="Message Appling"');expect(html).toContain("Shift+Enter");
   });
+  it("lets the user select the worker question while keeping one multiline composer", () => {
+    const html = renderToStaticMarkup(createElement(Composer, {
+      busy: true, inbox: [
+        { id: "frontend", kind: "question", created: 1, question: "[ui] Which layout?" },
+        { id: "backend", kind: "question", created: 2, question: "[api] Which database?" },
+      ], projectId: "test", onSend: async () => true, dropped: [], picks: [], onPicksChange: () => {},
+    }));
+    expect(html).toContain("Which question are you answering?");
+    expect(html).toContain('value="frontend"'); expect(html).toContain('value="backend"');
+    expect(html.match(/<textarea/g)).toHaveLength(1);
+    expect(html).toContain("Choose a question first");
+  });
 });
