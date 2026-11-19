@@ -114,8 +114,8 @@ def create_app(home=None,execute=None):
             if p['root']==str(root):
                 return detail(p['id'])
         team=list(dict.fromkeys([*CATALOG['REQUIRED'],*data.get('team',[])]))
-        execution_mode=data.get('execution_mode') or ('planned' if 'task-planner' in team or data.get('style')=='planning' else 'direct')
-        if execution_mode not in {'direct','planned'}:raise ValueError('Choose direct or planned execution.')
+        execution_mode=data.get('execution_mode') or 'blocks'
+        if execution_mode not in {'direct','planned','blocks'}:raise ValueError('Choose blocks, direct or planned execution.')
         p=store.add(root,team=team,style=data.get('style','app-it'),profile=data.get('profile','personal'),
                     kind=data.get('kind','app'),platforms=data.get('platforms') or ['web'],engine=workflow.settings()['provider'],execution_mode=execution_mode)
         if not (root/'.git').exists():
@@ -169,6 +169,33 @@ def create_app(home=None,execute=None):
         body=await request.json() if (await request.body()) else {}
         return workflow.set_prerequisite(pid,ident,bool(body.get('done',True)))
 
+    @app.get('/api/projects/{pid}/blocks')
+    def project_blocks(pid:str):
+        from . import blocks as block_plan
+        p=store.get(pid);root=Path(p['root'])
+        plan=block_plan.load(root)
+        if not plan:return dict(exists=False,blocks=[],phase=p['phase'])
+        from .acceptance import load as load_spec
+        later=block_plan.deferred(plan,load_spec(root))
+        status=p.get('block_status') or {}
+        workers={w['id']:w for w in p.get('workers',[])}
+        helpers=list((p.get('native_helpers') or {}).values()) if p.get('running') else []
+        rows=[]
+        for b in plan['blocks']:
+            info=status.get(b['id'],{})
+            state='later' if b['id'] in later else info.get('status') or 'planned'
+            worker=workers.get(info.get('worker')) if state=='building' else None
+            rows.append(dict(id=b['id'],name=b['name'],purpose=b['purpose'],status=state,label=block_plan.STATUS_LABELS.get(state,state),
+                reason=info.get('reason'),library=info.get('library') or (b['source'][8:] if b['source'].startswith('library:') else None),
+                depends_on=b['depends_on'],runtime=b['runtime'],agent=bool(worker and worker.get('status')=='running')))
+        return dict(exists=True,phase=p['phase'],blocks=rows,body=plan['body']['purpose'],helpers=helpers,
+                    approved=bool(p['approvals'].get('blocks')))
+
+    @app.get('/api/library')
+    def library():
+        from . import blocks as block_plan
+        return dict(home=str(block_plan.library_home()),blocks=block_plan.catalogue())
+
     @app.post('/api/projects/{pid}/stop')
     def stop(pid:str):
         workflow.stop(pid);return dict(ok=True)
@@ -194,16 +221,20 @@ def create_app(home=None,execute=None):
     def project_map(pid:str):
         p=store.get(pid);phase=p['phase'];labels=dict((a[0],a[1]) for a in CATALOG['AGENTS'])
         phases=[]
-        names=['requirements','prototype',*(['plan'] if p.get('execution_mode','planned')=='planned' else []),'build','qa']
+        mode=p.get('execution_mode','planned')
+        names=(['requirements','prototype','blocks','blocks_build','body','qa'] if mode=='blocks' else
+               ['requirements','prototype',*(['plan'] if mode=='planned' else []),'build','qa'])
         names += [name for name,role in [('code-review','code-reviewer'),('security','security-auditor'),('accessibility','a11y-auditor')] if role in p['team']]
-        stage={'criteria':'requirements','rescope':'requirements','implementation_verified':'qa'}.get(phase,phase.replace('_review',''))
+        stage={'criteria':'requirements','rescope':'requirements','implementation_verified':'qa','blocks_plan':'blocks'}.get(phase,phase.replace('_review',''))
         position=names.index(stage) if stage in names else len(names)
         role_map={'requirements':'req-engineer','prototype':'ui-designer','plan':'task-planner','build':'sw-developer','qa':'qa-engineer','security':'security-auditor','code-review':'code-reviewer','accessibility':'a11y-auditor'}
+        stage_labels={'blocks':'Block plan','blocks_build':'Building blocks','body':'Merging into the app'}
         for index,name in enumerate(names):
             if name=='security' and 'security-auditor' not in p['team']:
                 continue
             status='done' if index<position or phase=='delivered' else ('owner' if '_review' in phase or phase=='implementation_verified' else 'blocked' if p['paused'] else 'running') if index==position else 'pending'
-            phases.append(dict(name=labels[role_map[name]],state=status,status=status,note=''))
+            role={'blocks':'sw-architect','blocks_build':'sw-developer','body':'sw-developer'}.get(name) or role_map[name]
+            phases.append(dict(name=stage_labels.get(name) or labels[role_map[name]],state=status,status=status,note='',role=role,stage=name))
         markdown='| Phase | Status | Note |\n|---|---|---|\n'+'\n'.join(f'| {r["name"]} | {r["status"]} | |' for r in phases)
         return dict(exists=True,phases=phases,current_phase=phase,updated=str(p['updated']),markdown=markdown)
 

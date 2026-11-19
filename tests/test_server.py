@@ -111,16 +111,19 @@ def test_interleaved_worker_usage_is_counted_per_invocation(client):
     assert total['prompt']==50 and total['api_calls']==2
 
 
-def test_new_projects_default_to_direct_with_mandatory_design_and_qa(client):
+def test_new_projects_default_to_blocks_with_mandatory_design_and_qa(client):
     c,app,tmp=client
     p=c.post('/api/projects',json=dict(path=str(tmp/'simple'),create=True)).json()
-    assert p['execution_mode']=='direct'
+    assert p['execution_mode']=='blocks'
     assert {'req-engineer','ui-designer','sw-developer','qa-engineer'}<=set(p['team'])
-    assert 'task-planner' not in p['team']
     names=[row['name'] for row in c.get('/api/projects/'+p['id']+'/map').json()['phases']]
-    assert 'Task planning' not in names and 'Design' in names and 'Quality assurance' in names
-    planned=c.post('/api/projects',json=dict(path=str(tmp/'planned'),create=True,style='planning')).json()
-    assert planned['execution_mode']=='planned'
+    assert names[:6]==['Requirements','Design','Block plan','Building blocks','Merging into the app','Quality assurance']
+    assert c.get('/api/projects/'+p['id']+'/blocks').json()==dict(exists=False,blocks=[],phase='requirements')
+    assert 'blocks' in c.get('/api/library').json()
+    direct=c.post('/api/projects',json=dict(path=str(tmp/'direct'),create=True,execution_mode='direct')).json()
+    assert direct['execution_mode']=='direct'
+    names=[row['name'] for row in c.get('/api/projects/'+direct['id']+'/map').json()['phases']]
+    assert 'Task planning' not in names and 'Block plan' not in names and 'Development' in names
 
 
 def test_changing_coordination_preserves_approvals_files_and_retained_workers(client):

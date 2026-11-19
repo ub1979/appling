@@ -10,7 +10,7 @@ export function composerContext(inbox: InboxItem[], busy: boolean) {
     placeholder: "Write your answer to the selected question…",
     hint: "Choose which question to answer above. Your reply goes only to that worker. Enter to send · Shift+Enter for a new line.",
   };
-  const targets = inbox.filter((item) => ["question", "prototype", "requirements", "plan"].includes(item.kind));
+  const targets = inbox.filter((item) => ["question", "prototype", "requirements", "plan", "blocks"].includes(item.kind));
   if (targets.length === 1) {
     if (targets[0].kind === "question") return {
       placeholder: "Answer Appling’s question…",

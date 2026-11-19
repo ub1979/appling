@@ -35,7 +35,7 @@ export interface QueueItem {
 
 export interface ProjectDetail {
   phase?: string;
-  execution_mode?: "direct" | "planned";
+  execution_mode?: "direct" | "planned" | "blocks";
   id: string;
   name: string;
   root: string;
@@ -161,6 +161,8 @@ export interface MapPhase {
   status: string;
   state: "done" | "running" | "owner" | "blocked" | "pending";
   note: string;
+  role?: string;
+  stage?: string;
 }
 
 export interface ProjectMap {
@@ -311,6 +313,7 @@ export const api = {
   openApp: (id: string) => call<AppPreview>("POST", `/api/projects/${id}/preview/open`),
   openPrototype: (id: string) => call<AppPreview>("POST", `/api/projects/${id}/preview/prototype`),
   map: (id: string) => call<ProjectMap>("GET", `/api/projects/${id}/map`),
+  blocks: (id: string) => call<import("./components/blocks-view").BlocksStatus>("GET", `/api/projects/${id}/blocks`),
   acceptance: (id: string) => call<AcceptanceStatus>("GET", `/api/projects/${id}/acceptance`),
   prerequisite: (id: string, item: string, done: boolean) =>
     call<{ ok: boolean }>("POST", `/api/projects/${id}/prerequisites/${encodeURIComponent(item)}`, { done }),

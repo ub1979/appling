@@ -24,11 +24,11 @@ import { composerContext, questionTarget } from "./composer-context";
 import { BlockedWork, currentBlockedWorkers, projectIsDelivered } from "./project-outcome";
 import { BuildStatus } from "../components/BuildStatus";
 import { AcceptancePanel } from "../components/AcceptancePanel";
+import { BlocksPanel } from "../components/BlocksPanel";
+import { agentStatus } from "../components/blocks-view";
 import {
   extractAppItSkillSelection,
-  orderGuidedPhases,
   parseGuidedPhaseMarkers,
-  phasesFromProgressLedger,
   sanitizeGuidedResponse,
 } from "../studio";
 
@@ -235,39 +235,6 @@ export function Studio({ id }: { id: string }) {
   const busy = !!live.turn;
   const providerStatuses = Object.values(live.providerStatuses);
 
-  // Phase state from Appling's markers, then the project's own plan file.
-  const phases = useMemo(() => {
-    const started: string[] = [];
-    const completed = new Set<string>();
-    const raws = [...(detail?.messages ?? []).filter((m) => m.role === "assistant").map((m) => m.content), live.turn?.reply ?? ""];
-    for (const raw of raws) {
-      const p = parseGuidedPhaseMarkers(raw, ids);
-      started.push(...p.started);
-      p.completed.forEach((c) => completed.add(c));
-    }
-    if (detail?.requirements_started) {
-      started.push("req-engineer");
-      if (detail.review_pending) completed.delete("req-engineer");
-      else completed.add("req-engineer");
-    }
-    let current: string | null = [...started].reverse().find((s) => !completed.has(s)) ?? null;
-    if (map?.markdown) {
-      const labels = Object.fromEntries(agents.map((a) => [a.id, a.label]));
-      const section = detail?.active_update
-        ? map.markdown.split(new RegExp(`^## Revision ${detail.active_update.revision}\\s*$`, "im"))[1]
-        : map.markdown;
-      const ledger = phasesFromProgressLedger(section ?? "", labels);
-      ledger.completed.forEach((c) => completed.add(c));
-      if (ledger.current) current = ledger.current;
-    }
-    const ordered = orderGuidedPhases(Array.from(new Set([...team, ...started, ...completed])).filter((x) => ids.includes(x)));
-    // A current phase whose plan row is blocked is waiting (usually on the owner).
-    const currentAgent = agents.find((a) => a.id === current);
-    const waiting =
-      !!currentAgent &&
-      (map?.phases ?? []).some((row) => (row.state === "blocked" || row.state === "owner") && rowIsAgent(row.name, currentAgent));
-    return { ordered, completed, current, waiting };
-  }, [detail?.messages, detail?.active_update, detail?.requirements_started, detail?.review_pending, live.turn?.reply, ids, agents, map?.markdown, map?.phases, team]);
   const blockedWorkers = currentBlockedWorkers(detail);
   const helperAgent = (helper: { role?: string; goal: string }) => helper.role && ids.includes(helper.role) ? helper.role : agentForGoal(helper.goal, agents);
   const workingIds = new Set(helpers.map(helperAgent).filter((x): x is string => !!x));
@@ -480,26 +447,16 @@ export function Studio({ id }: { id: string }) {
               <button className="mini-icon" onClick={() => setShowTeam(true)} title="Change the team" aria-label="Change the team"><UsersRound size={15} /></button>
             </h3>
             {orderedTeamAgents(agents, team).map((a) => {
-              const working = workingIds.has(a.id) || (busy && helpers.length === 0 && phases.current === a.id && !phases.waiting);
-              const done = phases.completed.has(a.id);
-              const tool = working
-                ? liveHelpers.find((h) => agentForGoal(h.goal, agents) === a.id)?.lastTool ?? "Working"
-                : undefined;
-              const line = working
-                ? tool
-                : phases.current === a.id && phases.waiting
-                  ? "Waiting on you"
-                  : done
-                    ? "Done ✓"
-                    : phases.current === a.id
-                      ? (live.inbox.length ? "Waiting for your answer" : "In progress")
-                      : "Not started yet";
+              // Status comes from the controller's stage list, never from chat text.
+              const status = agentStatus(a.id, map?.phases ?? [], !!detail.running);
+              const working = status.working || workingIds.has(a.id);
+              const tool = working ? liveHelpers.find((h) => agentForGoal(h.goal, agents) === a.id)?.lastTool : undefined;
               return (
                 <div key={a.id} className={`agent-row ${working ? "working" : ""}`} title={a.description}>
                   <Avatar id={a.id} size={36} />
                   <div className="who">
                     <b>{a.label}</b>
-                    <span>{line}</span>
+                    <span>{tool ? `${status.line} · ${tool}` : status.line}</span>
                   </div>
                 </div>
               );
@@ -513,18 +470,18 @@ export function Studio({ id }: { id: string }) {
                 return (
                   <div key={h.id} style={{ marginBottom: 10 }}>
                     <div className="tiny muted">{lh?.lastTool ?? "Working"}{h.started ? ` · since ${timeOf(h.started)}` : ""}</div>
-                    <div className="helper-goal">{h.goal}</div>
+                    <div className="helper-goal">{h.goal.length > 140 ? h.goal.slice(0, 140) + "…" : h.goal}</div>
                   </div>
                 );
               })}
             </section>
           )}
-          {!!detail.task_workers?.length && (
+          {!!detail.task_workers?.length && detail.execution_mode !== "blocks" && (
             <section className="panel">
               <h3>Development tasks</h3>
               {detail.task_workers.map((worker) => <div key={worker.id} style={{ marginBottom: 12 }}>
                 <div className="tiny muted">{worker.task_id} · {labelOf(worker.role)} · {WORKER_STATUS[worker.status] ?? worker.status}</div>
-                <div className="helper-goal">{worker.goal}</div>
+                <div className="helper-goal">{worker.goal.length > 140 ? worker.goal.slice(0, 140) + "…" : worker.goal}</div>
               </div>)}
             </section>
           )}
@@ -574,6 +531,7 @@ export function Studio({ id }: { id: string }) {
               })}
             </ol>
           </section>
+          <BlocksPanel id={id} refresh={live.turnsEnded} />
           <AcceptancePanel id={id} refresh={live.turnsEnded} />
           <UsagePanel id={id} refresh={live.turnsEnded + live.helperChanges} agents={agents} />
           <section className="panel" style={{ flex: 1 }}>
@@ -678,10 +636,6 @@ function useAttentionSignals(name: string, live: LiveState): void {
   }, [live.turnsEnded, live.inbox.length, live.turn, live.queued.length, name]);
 }
 
-function rowIsAgent(row: string, agent: Agent): boolean {
-  const r = row.toLowerCase();
-  return r.includes(agent.label.toLowerCase()) || r.includes(agent.id) || (agent.id === "qa-engineer" && /\bqa\b/.test(r));
-}
 
 const GOAL_HINTS: Record<string, RegExp> = {
   "qa-engineer": /\bqa\b|quality assurance/i,
@@ -1026,6 +980,21 @@ export function NeedCard({ item, onAnswer, seenPrototype, onOpenPrototype, requi
       </div>}
       {requirementsInterview && <div className="answer-row"><QuestionShortcuts onAnswer={onAnswer} /></div>}
     </Message>;
+  }
+  if (item.kind === "blocks") {
+    return (
+      <div className="need-card">
+        <b>Review the block plan</b>
+        <p>Appling will build these reusable blocks, independent ones at the same time, then merge them into your app.
+          To leave a block for later, choose Request changes and say which.</p>
+        <div className="md"><ReactMarkdown remarkPlugins={[remarkGfm]}>{item.question ?? ""}</ReactMarkdown></div>
+        <div className="answer-row">
+          <button className="btn primary small" disabled={!item.revision}
+            onClick={() => onAnswer({ choice: "Approve block plan", revision: item.revision })}>Approve block plan</button>
+          <button className="btn small" onClick={() => onAnswer("Request changes")}>Request changes</button>
+        </div>
+      </div>
+    );
   }
   if (item.kind === "plan") {
     return (

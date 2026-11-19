@@ -16,10 +16,11 @@ from .workspaces import ownership
 from . import planning
 from . import acceptance
 
-ARTIFACTS = {'prototype':'prototypes/index.html','requirements':'requirements.md','plan':'plan.md'}
+ARTIFACTS = {'prototype':'prototypes/index.html','requirements':'requirements.md','plan':'plan.md','blocks':'blocks.md'}
 CHOICES = {'prototype':['Approve prototype','Request changes'],
            'requirements':['Approve requirements','Request changes'],
-           'plan':['Approve implementation plan','Request changes']}
+           'plan':['Approve implementation plan','Request changes'],
+           'blocks':['Approve block plan','Request changes']}
 ROLES = {'requirements':'req-engineer','prototype':'ui-designer','plan':'task-planner',
          'build':'sw-developer','qa':'qa-engineer','security':'security-auditor','deploy':'devops-engineer'}
 
@@ -32,8 +33,15 @@ class WorkWaiting(Exception):
         self.blockers = blockers
 
 
+def coding_phase(state):
+    """Where coding work (repairs, continuations, in-scope fixes) goes in each mode."""
+    return 'body' if state.get('execution_mode')=='blocks' else 'build'
+
+
 def artifact_revision(root, kind):
     names=[ARTIFACTS[kind]]
+    if kind=='blocks' and safe_path(root,'.sdlc/blocks.json').is_file():
+        names.append('.sdlc/blocks.json')
     if kind=='requirements' and safe_path(root,acceptance.SPEC).is_file():
         # Criteria and owner prerequisites are approved with the requirements.
         names.append(acceptance.SPEC)
@@ -334,8 +342,11 @@ class Workflow:
                 self.store.close(pid,iid)
                 if choice==CHOICES[kind][0]:
                     approvals={**state['approvals'],kind:revision}
-                    phase={'prototype':'requirements_review','requirements':'plan','plan':'build'}[kind]
+                    phase={'prototype':'requirements_review','requirements':'plan','plan':'build','blocks':'blocks_build'}[kind]
                     if kind=='requirements' and state.get('execution_mode')=='direct':phase='build'
+                    elif kind=='requirements' and state.get('execution_mode')=='blocks':
+                        valid=approvals.get('blocks') and approvals['blocks']==artifact_revision(root,'blocks')
+                        phase='blocks_build' if valid else 'blocks_plan'
                     elif kind=='requirements' and approvals.get('plan') and approvals['plan']==artifact_revision(root,'plan'):phase='build'
                     self.store.update(pid,approvals=approvals,phase=phase)
                     self.store.message(pid,'assistant',f'{kind.capitalize()} approved.','status')
@@ -344,7 +355,11 @@ class Workflow:
                     self.submit(pid,f'Continue from approved {kind}.',kind='auto')
                 else:
                     feedback=answer.get('feedback','Please ask what needs changing.') if isinstance(answer,dict) else 'Ask what needs changing.'
-                    phase={'prototype':'prototype','requirements':'requirements','plan':'plan'}[kind]
+                    phase={'prototype':'requirements','requirements':'requirements','plan':'plan','blocks':'blocks_plan'}[kind]
+                    if kind=='prototype':
+                        # Design changes are recorded in the requirements first; the prototype is then regenerated.
+                        feedback=('Prototype feedback from the owner: '+feedback+'\nRecord this change in requirements.md '
+                                  '(keep requirement IDs stable) and return the complete updated requirements.')
                     approvals=dict(state['approvals'])
                     for k in list(approvals):
                         if kind=='requirements' or k==kind or k=='plan':
@@ -352,11 +367,14 @@ class Workflow:
                     self.store.update(pid,phase=phase,approvals=approvals)
                     self.store.message(pid,'user',feedback)
                     self.submit(pid,feedback,kind='auto')
+            elif item.get('blocks_scope'):
+                from .blockbuild import answer as blocks_answer
+                blocks_answer(self,pid,item,choice)
             elif item.get('scope'):
                 from .direct import KEEP_ALL, PROVIDE_FIRST
                 self.store.close(pid,iid);self.store.message(pid,'user',choice,'answer')
                 if choice==KEEP_ALL:
-                    self.store.update(pid,phase='build',stalled_attempts=0,last_wait_signature=None)
+                    self.store.update(pid,phase=coding_phase(state),stalled_attempts=0,last_wait_signature=None)
                     self.submit(pid,'The owner chose to keep all remaining parts in this release. Continue building them.',kind='auto')
                 elif choice==PROVIDE_FIRST:
                     self.store.update(pid,paused=True)
@@ -395,9 +413,18 @@ class Workflow:
             if table:question+='\n\n'+table
         self.store.ask(pid,kind,question,CHOICES[kind],revision=revision)
 
+    def authorized_inputs(self,pid):
+        """Planning needs approved requirements and prototype (not yet a plan)."""
+        state=self.store.get(pid);root=Path(state['root'])
+        for kind in ['requirements','prototype']:
+            if not state['approvals'].get(kind) or state['approvals'][kind]!=artifact_revision(root,kind):
+                raise PermissionError(f'The current {kind} needs approval before planning.')
+
     def authorized(self,pid):
         state=self.store.get(pid);root=Path(state['root'])
-        kinds=['requirements','prototype'] if state.get('execution_mode')=='direct' else list(ARTIFACTS)
+        mode=state.get('execution_mode')
+        kinds=(['requirements','prototype'] if mode=='direct' else ['requirements','prototype','blocks'] if mode=='blocks'
+               else ['requirements','prototype','plan'])
         for kind in kinds:
             if state['approvals'].get(kind)!=artifact_revision(root,kind) or not state['approvals'].get(kind):
                 raise PermissionError(f'The current {kind} needs approval before implementation can continue.')
@@ -446,7 +473,8 @@ class Workflow:
         key,conn,selection=self.connection(role)
         state=self.store.get(pid)
         # A changed model/skill gets a new session; existing prefixes stay unchanged.
-        instructions=context.instructions(role,state.get('execution_mode','planned'))
+        mode=state.get('execution_mode','planned')
+        instructions=context.instructions(role,'direct' if mode=='blocks' and not worker else mode)
         if self.settings().get('about_me'):
             instructions+='\nOwner preferences (apply only where compatible with project requirements):\n'+self.settings()['about_me']
         instruction_hash=hashlib.sha256(instructions.encode()).hexdigest()
@@ -491,8 +519,9 @@ class Workflow:
         self.store.event(pid,'helper',event='start',subagent_id=helper_id,goal=display_goal,role=role,run_id=invocation_id)
         try:
             run=Run(root=Path(workspace or state['root']),instructions=instructions,
-                managed_worker=bool(worker) or (state['phase']=='build' and state.get('execution_mode')!='direct'),
-                native_delegation=not worker and state['phase']=='build' and state.get('execution_mode')=='direct',
+                managed_worker=bool(worker) or (state['phase']=='build' and state.get('execution_mode') not in {'direct','blocks'}),
+                native_delegation=not worker and ((state['phase']=='build' and state.get('execution_mode')=='direct')
+                                                  or (state['phase']=='body' and state.get('execution_mode')=='blocks')),
                 prompt=context.briefing(self.store,pid,role,goal,workspace=workspace,worker=worker,planning_context=planning_context),model='' if selection.get('model')=='default' else selection.get('model',''),effort=selection.get('effort',''),
                 readonly=readonly,session=state['sessions'].get(session_key),cancel=self.cancelled[pid],
                 emit=emit_event,
@@ -664,7 +693,8 @@ class Workflow:
                 before=artifact_revision(root,'requirements')
                 self._write(pid,'requirements.md',result['requirements']);acceptance.write(root,spec)
                 if artifact_revision(root,'requirements')==before:
-                    self.store.update(pid,phase='build',rescope=None);text='Continue building; the release scope did not change.';continue
+                    self.store.update(pid,phase='blocks_build' if state.get('execution_mode')=='blocks' else 'build',rescope=None)
+                    text='Continue building; the release scope did not change.';continue
                 approvals={k:v for k,v in state['approvals'].items() if k!='requirements'}
                 self.store.update(pid,phase='requirements_review',approvals=approvals,rescope=None)
                 self.review(pid,'requirements');return
@@ -691,6 +721,23 @@ class Workflow:
                 self.review(pid,'plan');return
             elif phase=='plan_review':
                 self.review(pid,'plan');return
+            elif phase=='blocks_plan':
+                self.authorized_inputs(pid)
+                from .blockbuild import plan as plan_blocks
+                plan_blocks(self,pid,text);return
+            elif phase=='blocks_review':
+                self.review(pid,'blocks');return
+            elif phase=='blocks_build':
+                from .blockbuild import build as build_blocks
+                build_blocks(self,pid,text);text='All release-1 blocks are built. Build the app body.';continue
+            elif phase=='body':
+                self.authorized(pid)
+                from .direct import build
+                from .blockbuild import body_goal
+                plan_=__import__('appling.blocks',fromlist=['load']).load(Path(state['root']))
+                build(self,pid,text,goal_prefix=body_goal(plan_,acceptance.load(Path(state['root']))),
+                      session_scope='body-v1',protect=['blocks/'])
+                continue
             elif phase=='build':
                 self.authorized(pid)
                 if state.get('execution_mode')=='direct':
@@ -743,8 +790,8 @@ class Workflow:
                         if cycles>3:
                             raise RuntimeError('Verification still has unresolved findings after 3 repair cycles. Evidence and findings are saved; review them before continuing.')
                         repair=dict(findings=result.get('findings',[]),failed_criteria={i:results[i] for i in failed})
-                        if state.get('execution_mode')=='direct':
-                            self.store.update(pid,phase='build',repair_cycles=cycles)
+                        if state.get('execution_mode') in {'direct','blocks'}:
+                            self.store.update(pid,phase=coding_phase(state),repair_cycles=cycles)
                             text='Fix these independent review findings without adding scope: '+json.dumps(repair)
                             continue
                         tasks=state['tasks']+[dict(id=f'repair-{state["revision"]}-{cycles}',goal=json.dumps(repair),depends_on=[],role='sw-developer',status='pending')]
@@ -761,8 +808,8 @@ class Workflow:
                         cycles=state.get('repair_cycles',0)+1
                         if cycles>3 or result.get('verdict')=='blocked' or not valid:
                             raise RuntimeError('Verification is blocked or has unresolved findings. Evidence and findings are saved; review them before continuing.')
-                        if state.get('execution_mode')=='direct':
-                            self.store.update(pid,phase='build',repair_cycles=cycles)
+                        if state.get('execution_mode') in {'direct','blocks'}:
+                            self.store.update(pid,phase=coding_phase(state),repair_cycles=cycles)
                             text='Fix these independent review findings without adding scope: '+json.dumps(result)
                             continue
                         tasks=state['tasks']+[dict(id=f'repair-{state["revision"]}-{cycles}',goal=json.dumps(result),depends_on=[],role='sw-developer',status='pending')]
@@ -775,6 +822,9 @@ class Workflow:
                 spec=acceptance.load(root)
                 final=acceptance.current(root,spec,acceptance.load_results(root),source_revision(root))
                 outcome=acceptance.outcome(final)
+                if outcome in {'pending_owner','passed'} and state.get('execution_mode')=='blocks':
+                    from .blockbuild import publish_passed
+                    publish_passed(self,pid)
                 if outcome=='pending_owner':
                     waiting=[(i,r) for i,r in final.items() if r['status']=='pending_owner']
                     self.store.update(pid,phase='implementation_verified',repair_cycles=0)
@@ -832,7 +882,7 @@ class Workflow:
             return result.get('goal',text)
         if result.get('action')=='fix':
             tasks=[dict(id='change-'+uuid.uuid4().hex[:6],goal=result.get('goal',text),depends_on=[],role='sw-developer',status='pending')]
-            self.store.update(pid,tasks=tasks,phase='build',repair_cycles=0)
+            self.store.update(pid,tasks=tasks if state.get('execution_mode')!='blocks' else state['tasks'],phase=coding_phase(state),repair_cycles=0)
             return result.get('goal',text)
         return None
 

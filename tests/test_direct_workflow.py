@@ -157,7 +157,8 @@ def test_prototype_feedback_requires_review_of_the_new_revision_before_coding(tm
         wait_idle(workflow,pid)
         current=store.inbox(pid)[0]
         assert current['kind']=='prototype' and current['revision']!=original['revision']
-        assert engine.calls==['req-engineer','ui-designer','ui-designer']
+        # Prototype feedback is recorded in the requirements first, then the prototype is regenerated.
+        assert engine.calls==['req-engineer','ui-designer','req-engineer','ui-designer']
         with pytest.raises(ValueError,match='changed'):
             workflow.answer(pid,current['id'],dict(choice='Approve prototype',revision=original['revision']))
         assert 'sw-developer' not in engine.calls

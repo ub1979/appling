@@ -38,7 +38,8 @@ def publish_due(store, pid, *, now=None, interval=INTERVAL):
         failed = sum(type(e.get('exit_code')) is int and e['exit_code']!=0 for e in commands)
         # Plain language for the owner: what stage the project is in, what the
         # builder says it is working on, and whether anything needs them.
-        labels = {'build':'building and testing the app','qa':'independently checking the app','security':'reviewing security',
+        labels = {'blocks_plan':'planning the blocks','blocks_build':'building blocks in parallel','body':'merging the blocks into the app',
+                  'build':'building and testing the app','qa':'independently checking the app','security':'reviewing security',
                   'prototype':'designing the prototype','requirements':'writing the requirements','plan':'planning the build',
                   'code-review':'reviewing the code','accessibility':'checking accessibility','criteria':'drafting acceptance checks'}
         lines = [f"Still working on {state.get('name','your project')}: {labels.get(state['phase'],state['phase'])}."]
@@ -56,6 +57,11 @@ def publish_due(store, pid, *, now=None, interval=INTERVAL):
                 lines.append(f'Checks passed at the last QA run: {passed} of {len(results)}.')
         except Exception:
             pass
+        status = state.get('block_status') or {}
+        if state.get('execution_mode')=='blocks' and status:
+            words={'tested':'done','merged':'done','building':'being built','planned':'waiting to start','failed':'fixing its tests',
+                   'blocked':'needs your decision','later':'left for later'}
+            lines.append('Blocks: '+', '.join(f"{ident} {words.get(info.get('status'),info.get('status'))}" for ident,info in status.items())+'.')
         current = {t['id'] for t in state.get('tasks',[]) if t.get('status')!='done'}
         latest = {w['task_id']:w for w in state.get('workers',[])}
         blocked = [w['task_id'] for w in latest.values() if w['task_id'] in current and w['status'] in {'blocked','conflict'}]

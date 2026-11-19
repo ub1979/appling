@@ -108,8 +108,8 @@ def actionable(blockers, spec):
 
 
 def set_mode(workflow, pid, mode):
-    if mode not in {'direct', 'planned'}:
-        raise ValueError('Choose direct or planned execution.')
+    if mode not in {'direct', 'planned', 'blocks'}:
+        raise ValueError('Choose direct, planned or blocks execution.')
     with workflow.lock:
         state = workflow.store.get(pid)
         if pid in workflow.active or state['running']:
@@ -131,7 +131,17 @@ def set_mode(workflow, pid, mode):
             'Build coordination changed. Files, approvals and retained work are saved. Send a message to continue.', 'status')
 
 
-def build(workflow, pid, feedback):
+def _folder_digest(root, folders):
+    digest = hashlib.sha256()
+    for folder in folders:
+        base = Path(root) / folder
+        for p in sorted(base.rglob('*')) if base.is_dir() else []:
+            if p.is_file() and not p.is_symlink() and 'node_modules' not in p.parts:
+                digest.update(str(p.relative_to(root)).encode()); digest.update(p.read_bytes())
+    return digest.hexdigest()
+
+
+def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v1', protect=()):
     from .workflow import WorkWaiting, source_revision
     workflow.authorized(pid)
     state = workflow.store.get(pid)
@@ -145,7 +155,7 @@ def build(workflow, pid, feedback):
         id=task_id, goal=worker['goal'], role='sw-developer', depends_on=[], status='running')])
     swarm.save_worker(workflow, pid, worker, status='running', error=None)
     try:
-        goal = f'{feedback}\nBuild and integrate the approved requirements in this project using your native tools. ' + (
+        goal = f'{feedback}\n{goal_prefix}\nBuild and integrate the approved requirements in this project using your native tools. ' + (
             'Inspect current source, saved progress and retained handoffs first; preserve useful work. '
             'There is no mandatory implementation-plan document, task graph, host worktree pool or task ownership split in direct mode. '
             'You own implementation and wiring across the application; organize the work using the execution engine. '
@@ -176,7 +186,16 @@ def build(workflow, pid, feedback):
         retries = saved.get('retries', 0) if saved.get('turn') == turn else 0
         last_signature = None
         while True:
-            result = workflow.invoke(pid, 'sw-developer', goal, session_scope='direct-build-v1')
+            protected_before = _folder_digest(state['root'], protect) if protect else None
+            result = workflow.invoke(pid, 'sw-developer', goal, session_scope=session_scope)
+            if protect and _folder_digest(state['root'], protect) != protected_before:
+                raise ValueError('The app body changed files inside ' + ', '.join(protect) +
+                                 '. Blocks change only through their own builder; report the needed interface change instead.')
+            reopen = [b for b in (result.get('blockers') or []) if isinstance(b, dict) and b.get('block') and protect]
+            if reopen:
+                from .blockbuild import reopen_blocks
+                reopen_blocks(workflow, pid, reopen)
+                return
             swarm.save_worker(workflow, pid, worker, result=result)
             workflow.authorized(pid)
             if workflow.cancelled[pid].is_set():

@@ -12,6 +12,20 @@ that the app does not need. Preserve approved design choices and report only
 concrete unresolved contracts. Do not replace the controller's implementation
 plan or spawn a second workflow. Use the owner-selected engine/model.
 
+## Block plans (Appling blocks mode)
+
+When asked for a block plan, split the approved requirements into reusable
+blocks plus one project-specific body. A block is a generic package in
+`blocks/<id>/` with a small documented interface, its own tests, README and
+`block.json`, usable by another project unchanged: AI-provider connectors,
+messaging integrations, admin panels, authentication, schedulers, speech engines.
+Prefer a compatible block from the supplied library catalogue. Keep blocks
+independent; declare `depends_on` only for real interface use. Put screens,
+project data and wiring in the body (`app/`). Every release-1 criterion must be
+covered. Give each block one self-contained test command run from the project
+root. Use a separate service only for parts that must run as their own process.
+Return only the requested JSON; the controller writes and validates the plan.
+
 ## ⛔ ENFORCEMENT
 
 Run in the assigned architecture session and apply the steps relevant to the approved scope.
