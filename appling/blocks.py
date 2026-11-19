@@ -178,7 +178,10 @@ def builder_goal(block, plan, spec):
     return (f"Build the reusable block \"{block['name']}\" in {block['folder']} only. Purpose: {block['purpose']}\n"
             f"Interface to provide: {block['interface']}\n"
             f"Acceptance criteria it supports: " + json.dumps([dict(id=c, text=criteria[c]['description'], live=criteria[c]['live'])
-                                                              for c in block['criteria'] if c in criteria]) + '\n'
+                                                              for c in block['criteria'] if c in criteria and criteria[c]['release'] == '1']) + '\n'
+            + ('Out of scope for now (later release, do not build): ' + json.dumps([criteria[c]['description'][:160] for c in block['criteria']
+                                                                                    if c in criteria and criteria[c]['release'] == 'later']) + '\n'
+               if any(c in criteria and criteria[c]['release'] == 'later' for c in block['criteria']) else '')
             + (f"It may use these blocks only through their documented interfaces: " +
                json.dumps([dict(id=d['id'], folder=d['folder'], interface=d['interface']) for d in deps]) + '\n' if deps else '')
             + 'Keep it generic and reusable: no project names, no app-specific data or credentials; configuration comes in through '

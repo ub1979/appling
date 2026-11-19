@@ -477,3 +477,13 @@ def test_leaving_a_block_moves_its_checks_even_when_the_body_lists_them(tmp_path
         assert next(c for c in spec['criteria'] if c['id'] == 'AC-FR-3-1')['release'] == 'later'
     finally:
         workflow.shutdown()
+
+
+def test_block_builder_only_gets_release_one_checks():
+    spec = acceptance.normalize(CRITERIA, PREREQS, REQUIREMENTS)
+    for c in spec['criteria']:
+        if c['id'] == 'AC-FR-3-1':
+            c['release'] = 'later'
+    plan = blocks.validate(plan_for(), acceptance.normalize(CRITERIA, PREREQS, REQUIREMENTS))
+    goal = blocks.builder_goal(plan['blocks'][1], plan, spec)
+    assert 'AC-FR-3-1' not in goal.split('Out of scope')[0] and 'Out of scope for now' in goal
