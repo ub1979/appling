@@ -186,7 +186,9 @@ def builder_goal(block, plan, spec):
               '{"name","purpose","interface","runtime","config":[...],"setup":"command","test":"command","prerequisites":[...]}. '
               f"Its approved test command is: {block['test']}" + (f" (setup: {block['setup']})" if block['setup'] else '') + '. '
               'Do not edit anything outside your block folder. Live parts that need owner accounts or devices must still be '
-              'implemented behind the interface and tested with local fakes; report them as live_acceptance, not as done.')
+              'implemented behind the interface and tested with local fakes; report them as live_acceptance, not as done. '
+              'If a block you depend on lacks something you need, report an integration blocker with "block":"<its id>" and exactly what it '
+              'must add. Report things the app itself must provide (wiring, host services) as integration blockers without "block".')
 
 
 def _run(command, root, log, timeout=900):

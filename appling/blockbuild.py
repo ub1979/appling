@@ -18,6 +18,7 @@ from . import acceptance, blocks, swarm
 LEAVE = 'Leave these blocks for later'
 RETRY = 'Try them again'
 PROVIDE = "I'll provide the access first"
+EXTEND = 'Extend the blocks they need, then rebuild them'
 BLOCK_CHOICES = [LEAVE, RETRY, PROVIDE]
 MAX_TEST_REPAIRS = 1
 
@@ -180,8 +181,15 @@ def build(workflow, pid, feedback=''):
                     continue
                 except Exception as exc:   # run_worker already saved the worker as blocked
                     swarm._task_status(workflow, pid, task['id'], 'pending')
-                    stuck[task['id']] = str(exc)
-                    _set_status(workflow, pid, task['id'], status='blocked', reason=str(exc)[:600])
+                    result = worker.get('result') or {}
+                    gaps = swarm.dependency_gaps(result, task.get('depends_on', []))
+                    if gaps:
+                        names = ', '.join(by_id[d]['name'] for d in gaps)
+                        stuck[task['id']] = f'Needs changes in {names} before it can be built'
+                        _set_status(workflow, pid, task['id'], status='blocked', reason=stuck[task['id']], needs=gaps)
+                    else:
+                        stuck[task['id']] = str(exc)
+                        _set_status(workflow, pid, task['id'], status='blocked', reason=str(exc)[:600])
                     continue
                 try:
                     swarm.integrate_worker(workflow, pid, task, worker)
@@ -196,9 +204,11 @@ def build(workflow, pid, feedback=''):
                     _set_status(workflow, pid, task['id'], status='blocked', reason=stuck[task['id']][:600])
                     continue
                 block = by_id[task['id']]
+                notes = [str(b.get('detail', ''))[:600] for b in (worker.get('result') or {}).get('blockers') or []
+                         if isinstance(b, dict) and b.get('kind') == 'integration']
                 test = _test_and_record(workflow, pid, root, block)
                 if test['passed']:
-                    _set_status(workflow, pid, block['id'], status='tested', test=test, reason=None)
+                    _set_status(workflow, pid, block['id'], status='tested', test=test, reason=None, host_notes=notes)
                     save_checkpoint(workflow, pid, f"Appling checkpoint: block {block['name']} built and tested")
                     try:
                         swarm.workspaces.remove(root, worker['workspace'])
@@ -224,7 +234,11 @@ def build(workflow, pid, feedback=''):
     if stuck or remaining:
         waiting = sorted(set(stuck) | {t['id'] for t in remaining})
         parts = [f"{by_id[i]['name']}: {(stuck.get(i) or 'waits for a block that could not be finished')[:240]}" for i in waiting]
-        ask_blocks(workflow, pid, waiting, parts)
+        needs = {}
+        for ident in waiting:
+            for dep, details in ((workflow.store.get(pid).get('block_status') or {}).get(ident, {}).get('needs') or {}).items():
+                needs.setdefault(dep, []).extend(details)
+        ask_blocks(workflow, pid, waiting, parts, needs, by_id)
         raise WorkWaiting('Some blocks could not be finished. The others are built and tested. Decide what to do with:\n'
                           + '\n'.join('- ' + p for p in parts), reason='blocks', blockers=[dict(kind='implementation', detail=p, owner='you',
                                                                                                  next_action='Choose: leave for later, try again, or provide access') for p in parts])
@@ -232,14 +246,22 @@ def build(workflow, pid, feedback=''):
     workflow.store.update(pid, phase='body', block_change_requests={}, blocks_digest=_folder_digest(root, ['blocks/']))
 
 
-def ask_blocks(workflow, pid, ids, parts):
+def ask_blocks(workflow, pid, ids, parts, needs=None, by_id=None):
     for item in workflow.store.inbox(pid):
         if item.get('blocks_scope'):
             workflow.store.close(pid, item['id'])
-    question = ('These blocks could not be finished; the other blocks are built and tested:\n\n' + '\n'.join('- ' + p for p in parts) +
-                '\n\nYou can leave them for a later release (their checks move to "later" and you review that change), '
-                'try them again, or set up the access they need first. You can also type which ones to keep.')
-    return workflow.store.ask(pid, 'question', question, BLOCK_CHOICES, blocks_scope=True, block_ids=ids)
+    needs = needs or {}
+    lines = ['These blocks could not be finished; the other blocks are built and tested:', ''] + ['- ' + p for p in parts]
+    if needs:
+        lines += ['', 'Some of them need a block they depend on to offer more:']
+        for dep, details in needs.items():
+            name = by_id[dep]['name'] if by_id and dep in by_id else dep
+            lines += [f'- {name} needs: ' + '; '.join(d[:200] for d in details[:4])]
+        lines += ['', f'"{EXTEND}" sends those requests to that block\'s builder, then rebuilds the blocks that need it.']
+    lines += ['', 'You can also leave them for a later release (their checks move to "later" and you review that change), '
+              'try them again as they are, or set up the access they need first. You can type which ones to keep.']
+    choices = ([EXTEND] if needs else []) + BLOCK_CHOICES
+    return workflow.store.ask(pid, 'question', '\n'.join(lines), choices, blocks_scope=True, block_ids=ids, needs=needs)
 
 
 def answer(workflow, pid, item, choice):
@@ -248,6 +270,17 @@ def answer(workflow, pid, item, choice):
     state = workflow.store.get(pid); root = Path(state['root'])
     workflow.store.close(pid, item['id']); workflow.store.message(pid, 'user', choice, 'answer')
     ids = item.get('block_ids', [])
+    if choice == EXTEND and item.get('needs'):
+        needs = item['needs']
+        status = dict(state.get('block_status') or {})
+        for dep in needs:
+            status.setdefault(dep, {}).update(status='planned', local=True,
+                                              reason='Extending its interface for the blocks that need it')
+        for ident in ids:
+            status.setdefault(ident, {}).update(status='planned')
+        workflow.store.update(pid, phase='blocks_build', block_status=status, block_change_requests=needs)
+        workflow.submit(pid, 'Extend ' + ', '.join(needs) + ' as requested, then rebuild the blocks that need it.', kind='auto')
+        return
     if choice == RETRY:
         status = dict(state.get('block_status') or {})
         for ident in ids:
@@ -282,13 +315,15 @@ def answer(workflow, pid, item, choice):
         workflow.submit(pid, choice if choice != BUILD_SOME else 'Build some blocks now, leave the rest for later', kind='auto')
 
 
-def body_goal(plan_, spec):
+def body_goal(plan_, spec, status=None):
     usable = [b for b in plan_['blocks'] if b['id'] not in blocks.deferred(plan_, spec)]
     return ('Build the app body in app/ (and the root files it owns: ' + ', '.join(plan_['body']['files']) + ') and wire in the finished blocks. '
             f"Body purpose: {plan_['body']['purpose']}. Use blocks only through their documented interfaces (README.md and block.json): "
             + json.dumps([dict(id=b['id'], folder=b['folder'], interface=b['interface']) for b in usable]) + '. '
             'Do not edit anything under blocks/. If a block interface must change, report an implementation blocker with "block":"<id>" '
             'and what must change, instead of editing it. Blocks moved to a later release are out of scope. '
+            + (('Block builders left these items for the app to provide: ' + json.dumps({k: v.get('host_notes') for k, v in (status or {}).items()
+                                                                                          if v.get('host_notes')}) + '. ') if status else '')
             + (f"Run the body test: {plan_['body']['test']}. " if plan_['body'].get('test') else ''))
 
 

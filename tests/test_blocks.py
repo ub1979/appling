@@ -69,7 +69,7 @@ class Engine:
             assert not run.session            # fresh, independent planner session
             return plan_for(self.sources)
         if role == 'sw-developer' and brief.get('worker'):
-            ident = 'notifier' if 'blocks/notifier/' in brief['goal'] else 'poster'
+            ident = 'notifier' if 'in blocks/notifier/ only' in brief['goal'] else 'poster'
             with self.lock:
                 self.calls.append('block:' + ident)
             if len(self.barrier_parties()) == 2:
@@ -415,3 +415,43 @@ def test_block_with_red_test_history_and_live_parts_pending_is_not_stuck(tmp_pat
     validate_checks(tmp_path, task, worker, live)   # does not raise
     with pytest.raises(RuntimeError, match='blocker'):
         validate_checks(tmp_path, task, worker, dict(live, blockers=[dict(kind='implementation', detail='adapter unfinished')]))
+
+
+def test_dependency_gap_can_be_extended_then_dependent_rebuilt_and_host_notes_reach_body(tmp_path):
+    from appling.blockbuild import EXTEND
+    plan = plan_for(); plan['blocks'][1]['depends_on'] = ['notifier']
+    state = dict(gap=True, body_goals=[])
+    orig = Engine.__call__
+    def call(self, connection, run):
+        role = self.role(run); brief = json.loads(run.prompt)
+        if role == 'sw-architect':
+            with self.lock: self.calls.append('sw-architect')
+            return plan
+        if role == 'sw-developer' and brief.get('worker') and 'in blocks/poster/ only' in brief['goal'] and state['gap']:
+            with self.lock: self.calls.append('block:poster')
+            return dict(status='blocked', summary='needs notifier', checks=[],
+                        blockers=[dict(kind='integration', detail='notifier must return a message id', block='notifier')])
+        if role == 'sw-developer' and brief.get('worker') and 'in blocks/notifier/ only' in brief['goal']:
+            if 'message id' in brief['goal']:
+                state['gap'] = False   # the requested change reached the notifier builder
+            result = orig(self, connection, run)
+            result['status'] = 'blocked'
+            result['blockers'] = [dict(kind='integration', detail='The app must supply the Telegram bot token store')]
+            return result
+        if role == 'sw-developer' and not brief.get('worker'):
+            state['body_goals'].append(brief['goal'])
+        return orig(self, connection, run)
+    engine = type('Gap', (Engine,), {'__call__': call})(); engine.barrier_parties = lambda: []
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        status = store.get(pid)['block_status']
+        assert status['notifier']['status'] == 'tested'   # host note did not block it
+        question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
+        assert question['choices'][0] == EXTEND and 'notifier must return a message id' in question['question']
+        workflow.answer(pid, question['id'], EXTEND); wait_idle(workflow, pid)
+        assert engine.calls.count('block:notifier') == 2 and engine.calls.count('block:poster') == 2
+        assert store.get(pid)['block_status']['poster']['status'] in {'tested', 'merged'}
+        assert any('Telegram bot token store' in g for g in state['body_goals'])
+    finally:
+        workflow.shutdown()

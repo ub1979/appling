@@ -744,7 +744,7 @@ class Workflow:
                 from .direct import build
                 from .blockbuild import body_goal
                 plan_=__import__('appling.blocks',fromlist=['load']).load(Path(state['root']))
-                build(self,pid,text,goal_prefix=body_goal(plan_,acceptance.load(Path(state['root']))),
+                build(self,pid,text,goal_prefix=body_goal(plan_,acceptance.load(Path(state['root'])),state.get('block_status')),
                       session_scope='body-v1',protect=['blocks/'])
                 continue
             elif phase=='build':

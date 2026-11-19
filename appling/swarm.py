@@ -73,19 +73,35 @@ class IncompleteEvidence(ValueError):
     """A recoverable handoff omission; it never counts as a passing check."""
 
 
-def block_handoff(result):
-    """A block builder's handoff. Live parts waiting on owner setup do not stop a block, and failing
-    runs recorded on the way (for example tests written first, before the code) are history: the
-    controller runs the block's approved test command itself after integration."""
+def dependency_gaps(result, depends_on):
+    """Blockers saying a block it depends on lacks something: {dependency id: [details]}."""
+    gaps={}
+    for b in result.get('blockers') or []:
+        if not isinstance(b,dict) or b.get('kind') not in {'integration','implementation'}:
+            continue
+        detail=str(b.get('detail',''))
+        named=[b['block']] if b.get('block') in depends_on else [d for d in depends_on if d in detail]
+        for dep in named:
+            gaps.setdefault(dep,[]).append(detail[:600])
+    return gaps
+
+
+def block_handoff(result, depends_on=()):
+    """A block builder's handoff. Live parts waiting on owner setup do not stop a block; integration
+    notes that name no dependency are for the app body; failing runs recorded on the way (for example
+    tests written first) are history. The controller runs the block's approved test itself afterwards."""
     blockers=[b for b in result.get('blockers') or [] if isinstance(b,dict)]
-    if result.get('status')=='blocked' and blockers and all(b.get('kind') in {'owner_setup','live_acceptance'} for b in blockers):
+    if result.get('status')!='blocked' or not blockers or dependency_gaps(result,depends_on):
+        return result
+    if all(b.get('kind') in {'owner_setup','live_acceptance'} or (b.get('kind')=='integration' and not b.get('block'))
+           for b in blockers):
         return dict(result,status='completed')
     return result
 
 
 def validate_checks(root,task,worker,result):
     if task.get('block'):
-        result=block_handoff(result)
+        result=block_handoff(result,task.get('depends_on',[]))
         if result.get('status')!='completed':
             summary=result.get('summary')
             raise RuntimeError('Worker reported a blocker: '+(summary[:1200] if isinstance(summary,str) and summary.strip() else 'Inspect its retained workspace.'))
