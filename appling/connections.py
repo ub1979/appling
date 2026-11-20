@@ -10,6 +10,7 @@ import threading
 import time
 from pathlib import Path
 import httpx
+from . import __version__
 from .engines import Run, environment, execute
 from .engines.claude_support import MODEL_IDS, CliError, claude_environment
 
@@ -112,7 +113,7 @@ def discover(connection):
             with tempfile.TemporaryDirectory(prefix='appling-models-') as cwd:
                 rpc=RpcProcess([binary,'app-server','--listen','stdio://'],cwd)
                 try:
-                    rpc.call('initialize',dict(clientInfo=dict(name='appling_c',version='0.1.0')))
+                    rpc.call('initialize',dict(clientInfo=dict(name='appling_c',version=__version__)))
                     rpc.send(dict(jsonrpc='2.0',method='initialized',params={}))
                     account=rpc.call('account/read',dict(refreshToken=False))
                     cursor=None
@@ -135,7 +136,7 @@ def discover(connection):
             with tempfile.TemporaryDirectory(prefix='appling-models-') as cwd:
                 rpc=RpcProcess([binary,'--acp','--disable-builtin-mcps'],cwd)
                 try:
-                    rpc.call('initialize',dict(protocolVersion=1,clientCapabilities={},clientInfo=dict(name='appling_c',version='0.1.0')))
+                    rpc.call('initialize',dict(protocolVersion=1,clientCapabilities={},clientInfo=dict(name='appling_c',version=__version__)))
                     result=rpc.call('session/new',dict(cwd=cwd,mcpServers=[]))
                     models=result.get('models') or {}
                     names=[m['modelId'] for m in models.get('availableModels',[]) if m.get('modelId')]

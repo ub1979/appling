@@ -19,6 +19,7 @@ from .context import CATALOG, ROOT
 from .engines import available
 from .preview import Previews
 from .store import Store, safe_path
+from . import DISPLAY_VERSION
 from .workflow import Workflow, ARTIFACTS, artifact_revision
 from . import connections
 from .messaging import PhoneConnections
@@ -94,7 +95,7 @@ def create_app(home=None,execute=None):
 
     @app.get('/api/projects')
     def projects():
-        return dict(projects=[dict(p,inbox=len(store.inbox(p['id']))) for p in store.projects()],default_root=str(default_root),version='C 0.1.0')
+        return dict(projects=[dict(p,inbox=len(store.inbox(p['id']))) for p in store.projects()],default_root=str(default_root),version='C '+DISPLAY_VERSION)
 
     @app.get('/api/catalog')
     def catalog():

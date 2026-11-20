@@ -14,6 +14,7 @@ import signal
 import subprocess
 import threading
 import time
+from .. import __version__
 from . import environment, result_json
 
 _TASK_ACTIVITY = {
@@ -304,7 +305,7 @@ def execute(connection, run):
             raise RuntimeError(_diagnostic(p.get('error',p)))
 
     try:
-        rpc('initialize', dict(clientInfo=dict(name='appling_c',version='0.1.0')))
+        rpc('initialize', dict(clientInfo=dict(name='appling_c',version=__version__)))
         send(dict(method='initialized',params={}))
         params = dict(cwd=str(run.root), developerInstructions=run.instructions,
                       approvalPolicy='on-request', sandbox='read-only' if run.readonly else 'workspace-write')
