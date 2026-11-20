@@ -79,18 +79,17 @@ def dependency_gaps(result, depends_on):
     for b in result.get('blockers') or []:
         if not isinstance(b,dict) or b.get('kind') not in {'integration','implementation'}:
             continue
-        detail=str(b.get('detail',''))
-        named=[b['block']] if b.get('block') in depends_on else [d for d in depends_on if d in detail]
-        for dep in named:
-            gaps.setdefault(dep,[]).append(detail[:600])
+        # Only the explicit "block" field names a gap: notes such as "no reviewed-actions change is
+        # needed" mention a dependency without asking it for anything.
+        if b.get('block') in depends_on:
+            gaps.setdefault(b['block'],[]).append(str(b.get('detail',''))[:600])
     if gaps:
         # A block that names what its dependencies lack sends its other unnamed requests along too.
         for b in result.get('blockers') or []:
             if isinstance(b,dict) and b.get('kind') in {'integration','implementation'} and not b.get('block'):
                 detail=str(b.get('detail',''))[:600]
-                if not any(d in detail for d in depends_on):
-                    for dep in gaps:
-                        if detail not in gaps[dep]:gaps[dep].append(detail)
+                for dep in gaps:
+                    if detail not in gaps[dep]:gaps[dep].append(detail)
     return gaps
 
 
@@ -353,6 +352,18 @@ def verify_project(workflow,pid,role,goal):
             workspace=directory,worker=worker)
         commit=workspaces.snapshot(directory,base,include=[worker['evidence']])
         names=workspaces.changes(directory,base,commit)
+        foreign=[n for n in names if not workspaces.owns([worker['evidence']],n)]
+        if foreign:
+            # Running the project's own tests can add new receipts to other evidence folders. New files there are
+            # dropped (never integrated); editing or deleting source or existing evidence still invalidates QA.
+            new=set(workspaces.added(directory,base,commit))
+            stray=[n for n in foreign if n in new and n.startswith('.sdlc/evidence/')]
+            if len(stray)==len(foreign):
+                for name in stray:
+                    safe_path(directory,name).unlink()
+                commit=workspaces.snapshot(directory,base,include=[worker['evidence']])
+                names=workspaces.changes(directory,base,commit)
+                workflow.store.event(pid,'verification_output_dropped',worker=ident,files=stray[:50],count=len(stray))
         if any(not workspaces.owns([worker['evidence']],name) for name in names):
             raise ValueError('Verification changed application source or prior evidence. Its evidence is invalid; inspect its retained workspace.')
         workflow.authorized(pid)

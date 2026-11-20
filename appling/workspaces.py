@@ -91,6 +91,11 @@ def changes(workspace, base, commit):
     return [p.decode('utf-8') for p in raw.split(b'\0') if p]
 
 
+def added(workspace, base, commit):
+    raw = git(workspace, 'diff', '--no-renames', '--name-only', '--diff-filter=A', '-z', base, commit, binary=True)
+    return [p.decode('utf-8') for p in raw.split(b'\0') if p]
+
+
 def matches(root, commit, name):
     """Compare working bytes and executable bit with a Git tree entry."""
     path=Path(root)/name

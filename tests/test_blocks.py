@@ -2,6 +2,7 @@
 import json
 import sys
 import threading
+import time
 from pathlib import Path
 
 import pytest
@@ -9,7 +10,7 @@ import pytest
 from appling import acceptance, blocks
 from appling.blockbuild import LEAVE
 from appling.store import Store
-from appling.workflow import Workflow
+from appling.workflow import Workflow, CHOICES
 from test_workflow import approve, wait_idle
 
 REQUIREMENTS = ('# App\n\n- FR-1: Show the saved number on the home screen.\n'
@@ -52,6 +53,7 @@ class Engine:
         self.root_file_once = set()     # block ids whose first attempt writes outside the block folder
         self.body_blocker_once = None   # block id the body asks to change on its first run
         self.body_output = False        # body leaves build output inside blocks/
+        self.not_run = set()            # criteria QA reports as not run
 
     def role(self, run):
         return run.instructions.split('Role: ', 1)[1].splitlines()[0]
@@ -118,7 +120,9 @@ class Engine:
         for c in spec['criteria']:
             if c['release'] != '1':
                 continue
-            if c['live'] and not self.ready:
+            if c['id'] in self.not_run:
+                entries.append(dict(id=c['id'], status='not_run', implemented=True, command='qa', exit_code=0, evidence=rel))
+            elif c['live'] and not self.ready:
                 entries.append(dict(id=c['id'], status='pending_owner', implemented=True, command='qa', exit_code=0, evidence=rel))
             else:
                 entries.append(dict(id=c['id'], status='passed', implemented=True, command='qa', exit_code=0, evidence=rel))
@@ -531,6 +535,47 @@ def test_requirements_change_during_build_keeps_design_and_plan_and_reopens_only
         workflow.shutdown()
 
 
+def test_owner_change_after_build_rebuilds_only_the_block_owning_a_reworded_check(tmp_path, library):
+    engine = Engine()
+    reworded = 'A change sends one notification listing every available model'
+    seen = dict(notifier_goals=[], body_briefs=[])
+    orig = Engine.__call__
+    def call(self, connection, run):
+        role = self.role(run); brief = json.loads(run.prompt) if run.prompt.startswith('{') else {}
+        if role == 'req-engineer' and 'Owner change request' in run.prompt:
+            spec = json.loads((run.root / acceptance.SPEC).read_text())
+            criteria = [dict(c, description=reworded) if c['id'] == 'AC-FR-2-1' else c for c in spec['criteria']]
+            return dict(summary='Reworded AC-FR-2-1', requirements=REQUIREMENTS, acceptance_criteria=criteria, prerequisites=PREREQS)
+        if role == 'sw-developer' and brief.get('worker') and 'in blocks/notifier/ only' in brief['goal']:
+            seen['notifier_goals'].append(brief['goal'])
+        return orig(self, connection, run)
+    engine.__class__ = type('Change', (Engine,), {'__call__': call})
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        assert store.get(pid)['phase'] == 'implementation_verified'
+        with pytest.raises(ValueError, match='Say what to change'):
+            workflow.submit(pid, '/change')
+        bodies = engine.calls.count('body')
+        workflow.submit(pid, '/change list every available model in the notification'); wait_idle(workflow, pid)
+        state = store.get(pid)
+        assert state['phase'] == 'requirements_review' and state['criteria_changed'] == {'AC-FR-2-1': reworded}
+        assert state['approvals'].get('blocks') and not state['approvals'].get('requirements')
+        assert 'list every available model in the notification' in state['owner_guidance']
+        review = next(i for i in store.inbox(pid) if i['kind'] == 'requirements')
+        workflow.answer(pid, review['id'], dict(choice=CHOICES['requirements'][0], revision=review['revision']))
+        deadline = time.monotonic() + 30   # the rebuilt block's tests, the body and QA really run
+        while pid in workflow.active and time.monotonic() < deadline:
+            time.sleep(.05)
+        assert pid not in workflow.active and store.get(pid)['phase'] == 'implementation_verified'
+        assert engine.calls.count('block:notifier') == 2 and engine.calls.count('block:poster') == 1
+        assert 'Changed check AC-FR-2-1' in seen['notifier_goals'][-1] and reworded in seen['notifier_goals'][-1]
+        assert engine.calls.count('body') > bodies and engine.calls.count('sw-architect') == 1
+        assert not store.get(pid).get('criteria_changed')
+    finally:
+        workflow.shutdown()
+
+
 def test_requirements_update_cannot_add_requirements_or_drop_checks(tmp_path):
     engine = Engine(); engine.stuck = {'poster'}
     replies = []
@@ -658,3 +703,38 @@ def test_controller_block_checks_and_agent_briefs_ask_for_headless_browsers(tmp_
     assert 'headless' in brief['browser_policy']
     before = context.instructions('sw-developer', 'direct')
     assert 'APPLING_HEADLESS' not in before   # the rule lives in the brief, so running sessions are not reset
+
+
+def test_a_note_that_only_mentions_a_dependency_does_not_block_the_block():
+    from appling import swarm
+    result = dict(status='blocked', summary='Built and tested; live parts need the owner.', blockers=[
+        dict(kind='integration', detail='The host must wire the routes. No reviewed-actions interface changes are needed.',
+             requires_tasks=['model-connections']),
+        dict(kind='live_acceptance', detail='Real pairing needs the owner phone.')])
+    assert swarm.dependency_gaps(result, ['reviewed-actions']) == {}
+    assert swarm.block_handoff(result, ['reviewed-actions'])['status'] == 'completed'
+    named = dict(result, blockers=[*result['blockers'],
+                                   dict(kind='integration', detail='must return a message id', block='reviewed-actions')])
+    gaps = swarm.dependency_gaps(named, ['reviewed-actions'])
+    assert list(gaps) == ['reviewed-actions'] and 'must return a message id' in gaps['reviewed-actions']
+    assert swarm.block_handoff(named, ['reviewed-actions'])['status'] == 'blocked'
+
+
+def test_a_check_qa_did_not_run_holds_back_only_the_block_that_owns_it(tmp_path, library):
+    engine = Engine(); engine.not_run = {'AC-FR-1-1'}   # owned by the body
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        assert store.get(pid)['acceptance_outcome'] == 'not_run'
+        assert {(b['name'], b['status']) for b in blocks.catalogue(library)} == {('notifier', 'candidate'), ('poster', 'candidate')}
+    finally:
+        workflow.shutdown()
+    engine = Engine(); engine.not_run = {'AC-FR-2-1'}   # owned by the notifier block
+    store, workflow, pid = make(tmp_path, engine, 'second')
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        status = store.get(pid)['block_status']
+        assert status['poster'].get('library') and status['poster']['status'] == 'merged'
+        assert not status['notifier'].get('library') and status['notifier']['status'] == 'tested'
+    finally:
+        workflow.shutdown()

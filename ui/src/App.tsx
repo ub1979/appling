@@ -2,6 +2,7 @@ import { Home } from "./pages/Home";
 import { Settings } from "./pages/Settings";
 import { Setup } from "./pages/Setup";
 import { Studio } from "./pages/Studio";
+import { StaleBanner } from "./components/StaleBanner";
 import { PrefsProvider } from "./prefs";
 import { useRoute } from "./router";
 
@@ -17,6 +18,7 @@ function Pages() {
 export function App() {
   return (
     <PrefsProvider>
+      <StaleBanner />
       <Pages />
     </PrefsProvider>
   );

@@ -238,9 +238,20 @@ async function call<T>(method: string, path: string, body?: unknown): Promise<T>
     headers: { "content-type": "application/json", "x-lyra-token": token() },
     body: body === undefined ? undefined : JSON.stringify(body),
   });
+  if (res.status === 401) {
+    markStale();
+    throw new Error(STALE_MESSAGE);
+  }
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error((data as { detail?: string }).detail ?? `Request failed (${res.status})`);
   return data as T;
+}
+
+/** A restart gives Appling a new access key; an open tab keeps the old one and every request is refused. */
+export const STALE_EVENT = "appling:stale";
+export const STALE_MESSAGE = "Appling was restarted, so this tab is out of date. Reload it to continue. Nothing you clicked here was sent.";
+function markStale() {
+  if (typeof window !== "undefined" && typeof window.dispatchEvent === "function") window.dispatchEvent(new Event(STALE_EVENT));
 }
 
 /** Upload one file into the project's assets/uploads/, reporting progress (0–1). */
@@ -254,6 +265,7 @@ export function uploadFile(id: string, file: File, onProgress: (p: number) => vo
     xhr.onload = () => {
       let data: { path?: string; size?: number; detail?: string } = {};
       try { data = JSON.parse(xhr.responseText); } catch { /* not JSON */ }
+      if (xhr.status === 401) { markStale(); reject(new Error(STALE_MESSAGE)); return; }
       if (xhr.status >= 200 && xhr.status < 300 && data.path) resolve({ path: data.path, size: data.size ?? file.size });
       else reject(new Error(data.detail ?? `Upload failed (${xhr.status})`));
     };

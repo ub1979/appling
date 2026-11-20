@@ -142,6 +142,10 @@ class Workflow:
             return self.replan(pid,text)
         if kind=='user' and text.split(maxsplit=1)[0]=='/criteria':
             return self.propose_criteria(pid,text)
+        if kind=='user' and text.split(maxsplit=1)[0]=='/later':
+            return self.move_to_later(pid,text)
+        if kind=='user' and text.split(maxsplit=1)[0]=='/change':
+            return self.change_requirements(pid,text)
         with self.lock:
             pending=[i for i in self.store.inbox(pid) if (i['kind']=='question' or i['kind'] in ARTIFACTS)
                      and not (i.get('runtime') and self.cancelled.get(pid,threading.Event()).is_set())]
@@ -159,6 +163,45 @@ class Workflow:
             self.store.event(pid,'queued',item=item)
             self._start(pid)
             return item
+
+    def change_requirements(self,pid,text):
+        """Owner command: change approved requirements after building started. Keeps the design and block plan;
+        the owner reviews the edited requirements, then only the blocks that own new or changed checks rebuild."""
+        with self.lock:
+            state=self.store.get(pid)
+            if pid in self.active or state['running']:
+                raise ValueError('Stop the project and wait for its worker to finish before changing requirements.')
+            change=text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1))>1 else ''
+            if not change:
+                raise ValueError('Say what to change, for example: /change show every available model with a Test button')
+            if state.get('execution_mode')!='blocks' or not state['approvals'].get('blocks') or not state['approvals'].get('requirements'):
+                raise ValueError('/change works once the requirements and block plan are approved. Before that, use Request changes on the review.')
+            for item in self.store.inbox(pid):self.store.close(pid,item['id'])
+            approvals={k:v for k,v in state['approvals'].items() if k!='requirements'}
+            self.store.checkpoint(pid,'change-history:'+uuid.uuid4().hex,dict(phase=state['phase'],approvals=state['approvals']))
+            # The owner's words also reach the builders, so the change is implemented as asked, not only as re-worded checks.
+            self.store.update(pid,phase='requirements_update',approvals=approvals,queue=[],paused=False,attention=None,
+                              owner_guidance=[*state.get('owner_guidance',[]),change][-10:])
+            self.store.message(pid,'user',text)
+            return self.submit(pid,change,kind='auto')
+
+    def move_to_later(self,pid,text):
+        """Owner command: move named parts to a later release. Only the owner starts this; they review the change."""
+        with self.lock:
+            state=self.store.get(pid)
+            if pid in self.active or state['running']:
+                raise ValueError('Stop the project and wait for its worker to finish before moving parts to a later release.')
+            parts=text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1))>1 else ''
+            if not parts:
+                raise ValueError('Say what to leave for later, for example: /later meetings and WhatsApp')
+            if not state['approvals'].get('requirements') and state['phase'] not in {'requirements_review'}:
+                raise ValueError('Moving parts to later works once the requirements have been approved.')
+            if any(item['kind'] not in {'requirements','question'} for item in self.store.inbox(pid)):
+                raise ValueError('Resolve the pending review before moving parts to later.')
+            for item in self.store.inbox(pid):self.store.close(pid,item['id'])
+            self.store.update(pid,phase='rescope',rescope=dict(choice=parts,parts=[parts]),queue=[],paused=False,attention=None)
+            self.store.message(pid,'user',text)
+            return self.submit(pid,'Leave these for a later release: '+parts,kind='auto')
 
     def propose_criteria(self,pid,text):
         """Add acceptance criteria to existing approved requirements; the owner re-approves them."""
@@ -353,7 +396,7 @@ class Workflow:
                             plan_=block_plan.load(root);spec=acceptance.load(root)
                             ids={c['id'] for c in spec['criteria']}
                             owned=set(plan_['body']['criteria']).union(*(set(b['criteria']) for b in plan_['blocks']))
-                            if not (owned<=ids and all(c['id'] in owned for c in acceptance.release_one(spec))):
+                            if state.get('criteria_changed') or not (owned<=ids and all(c['id'] in owned for c in acceptance.release_one(spec))):
                                 from .blockbuild import adopt_new_criteria
                                 fitted=adopt_new_criteria(self,pid,root)
                                 valid=bool(fitted)
@@ -389,9 +432,19 @@ class Workflow:
                 from .blockbuild import answer as blocks_answer
                 blocks_answer(self,pid,item,choice)
             elif item.get('scope'):
-                from .direct import KEEP_ALL, PROVIDE_FIRST
+                from .direct import KEEP_ALL, PROVIDE_FIRST, QA_NOW, save_checkpoint
                 self.store.close(pid,iid);self.store.message(pid,'user',choice,'answer')
-                if choice==KEEP_ALL:
+                if choice==QA_NOW:
+                    # The owner's call: independent QA checks what exists now. Failed or live checks stay recorded,
+                    # never passes; QA decides each criterion from its own evidence.
+                    save_checkpoint(self,pid,'Appling checkpoint: owner asked to test what is built')
+                    tasks=self.store.get(pid)['tasks']
+                    for task in tasks:task['status']='done'
+                    self.store.update(pid,tasks=tasks,phase='qa',direct_continuation=None,attention=None,
+                                      builder_blockers=state.get('last_wait_blockers') or [],last_wait_signature=None,stalled_attempts=0)
+                    self.store.message(pid,'assistant','Testing what is built now. Checks that need your setup stay pending, never passed.','status')
+                    self.submit(pid,'The owner asked independent QA to verify what is built now; owner setup comes later.',kind='auto')
+                elif choice==KEEP_ALL:
                     self.store.update(pid,phase=coding_phase(state),stalled_attempts=0,last_wait_signature=None)
                     self.submit(pid,'The owner chose to keep all remaining parts in this release. Continue building them.',kind='auto')
                 elif choice==PROVIDE_FIRST:
@@ -757,7 +810,11 @@ class Workflow:
                     self.store.message(pid,'assistant',problem,'status')
                     self.store.update(pid,phase='requirements_review');self.review(pid,'requirements');return
                 if old_spec.get('deferred_blocks'):spec['deferred_blocks']=old_spec['deferred_blocks']
+                before={c['id']:(c['description'],c.get('release')) for c in old_spec['criteria']}
+                changed={c['id']:c['description'] for c in spec['criteria']
+                         if c['id'] in before and before[c['id']]!=(c['description'],c.get('release'))}
                 self._write(pid,'requirements.md',result['requirements']);acceptance.write(root,spec)
+                self.store.update(pid,criteria_changed={**(state.get('criteria_changed') or {}),**changed})
                 if result.get('summary'):self.store.message(pid,'assistant',str(result['summary'])[:1200],'status')
                 self.store.update(pid,phase='requirements_review')
                 self.review(pid,'requirements');return
@@ -863,6 +920,11 @@ class Workflow:
                     # The controller judges release-1 criteria itself; a verifier's overall "blocked"
                     # caused only by later-release or owner-pending items does not block.
                     if missing or not valid or result.get('verdict') not in {'pass','blocked'}:
+                        if valid and state.get('execution_mode')=='blocks':
+                            # Nothing failed: blocks whose own checks are clean are saved even though
+                            # some other check (often the body's) was not run.
+                            from .blockbuild import publish_passed
+                            publish_passed(self,pid)
                         detail=('Not verified: '+', '.join(missing[:20])) if missing else 'Evidence is incomplete or the verdict is blocked.'
                         raise RuntimeError('Verification is blocked or has unresolved findings. Evidence and findings are saved; review them before continuing. '+detail)
                 else:

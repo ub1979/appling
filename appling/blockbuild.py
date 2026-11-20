@@ -347,7 +347,8 @@ def body_goal(plan_, spec, status=None):
 
 
 def publish_passed(workflow, pid):
-    """Save blocks that passed their own tests and project QA to the shared library."""
+    """Save blocks whose own tests passed and whose own release-1 checks QA passed or left to the owner.
+    A check owned by the body or another block never holds a block back."""
     state = workflow.store.get(pid); root = Path(state['root'])
     plan_ = blocks.load(root)
     if not plan_:
@@ -355,6 +356,7 @@ def publish_passed(workflow, pid):
     spec = acceptance.load(root)
     status = state.get('block_status') or {}
     results = acceptance.load_results(root)
+    release = {c['id']: str(c.get('release', '1')) for c in spec['criteria']}
     commit = None
     try:
         commit = swarm.workspaces.git(root, 'rev-parse', 'HEAD')
@@ -365,8 +367,9 @@ def publish_passed(workflow, pid):
         info = status.get(block['id'], {})
         if info.get('status') not in {'tested', 'merged'} or block['id'] in blocks.deferred(plan_, spec):
             continue
-        if any(results.get(c, {}).get('status') == 'failed' for c in block['criteria']):
-            continue
+        now = [c for c in block['criteria'] if release.get(c) == '1']
+        if any(results.get(c, {}).get('status') not in {'passed', 'pending_owner'} for c in now):
+            continue   # failed, not run or never checked by QA
         fully = all(results.get(c, {}).get('status') == 'passed' for c in block['criteria'])
         meta = blocks.publish(root, block, state.get('name') or pid, commit=commit, evidence=(info.get('test') or {}).get('evidence'),
                               verified=fully)
@@ -398,6 +401,15 @@ def adopt_new_criteria(workflow, pid, root):
     described = {c['id']: c['description'] for c in spec['criteria']}
     notes = dict(workflow.store.get(pid).get('block_change_requests') or {})
     reopened = []
+    # Existing checks the owner's change reworded go back to the blocks that own them.
+    changed = {cid: text for cid, text in (workflow.store.get(pid).get('criteria_changed') or {}).items() if cid in described}
+    for cid in changed:
+        for block in fitted['blocks']:
+            if cid in block['criteria'] and block['id'] not in blocks.deferred(fitted, spec):
+                notes.setdefault(block['id'], []).append(f'Changed check {cid}: {described[cid]}')
+                if status.get(block['id'], {}).get('status') in FINISHED:
+                    _set_status(workflow, pid, block['id'], status='planned', local=True, reason=f'Check {cid} changed by the owner')
+                    reopened.append(block['id'])
     for cid, owners in added.items():
         for ident in owners:
             if ident == 'body':
@@ -406,7 +418,12 @@ def adopt_new_criteria(workflow, pid, root):
             if status.get(ident, {}).get('status') in FINISHED:
                 _set_status(workflow, pid, ident, status='planned', local=True, reason=f'New check {cid} added by the owner')
                 reopened.append(ident)
-    workflow.store.update(pid, block_change_requests=notes)
+    workflow.store.update(pid, block_change_requests=notes, criteria_changed={})
+    if changed and not added:
+        names = {b['id']: b['name'] for b in fitted['blocks']}
+        workflow.store.message(pid, 'assistant', 'Changed checks: ' + ', '.join(changed) + '. '
+                               + (f"Reopening blocks to apply them: {', '.join(names[i] for i in dict.fromkeys(reopened))}. " if reopened
+                                  else 'They belong to the app body. ') + 'Other blocks stay built.', 'status')
     if added:
         names = {b['id']: b['name'] for b in fitted['blocks']}
         parts = [f"{cid} → " + ', '.join(names.get(o, 'the app body') for o in owners) for cid, owners in added.items()]

@@ -66,7 +66,8 @@ class Engine:
             evidence.parent.mkdir(parents=True, exist_ok=True)
             # Real receipts differ every run; progress detection must not depend on bytes.
             evidence.write_text(f'command: unit tests\nexit: 0\nok at {time.time_ns()}\n')
-            blockers = [dict(kind='owner_setup', detail='Owner must sign in to the posting account', criteria=['AC-FR-2-1'])] \
+            blockers = [dict(kind='owner_setup', detail='Owner must sign in to the posting account', criteria=['AC-FR-2-1'],
+                             **({'evidence': '.sdlc/evidence/direct-build/live.txt'} if self.failed_check == 'shared_evidence' else {}))] \
                 if self.owner_blocker else []
             if self.impl_blocker and not self.scope_resolved(root):
                 blockers.insert(0, dict(kind='implementation', detail='Posting adapter needs the real site to finish',
@@ -401,7 +402,7 @@ def test_evaluate_rejects_old_evidence_and_live_pass_before_setup(tmp_path):
     assert ready['AC-FR-2-1']['status'] == 'passed'
 
 
-from appling.direct import BUILD_SOME, KEEP_ALL, LEAVE_ALL, PROVIDE_FIRST
+from appling.direct import BUILD_SOME, KEEP_ALL, LEAVE_ALL, PROVIDE_FIRST, QA_NOW
 
 
 def scope_question(store, pid):
@@ -421,7 +422,7 @@ def test_unfinishable_parts_are_put_to_the_owner_as_a_choice(tmp_path):
     engine, store, workflow, pid = stuck(tmp_path)
     try:
         item = scope_question(store, pid)
-        assert item['choices'] == [BUILD_SOME, LEAVE_ALL, KEEP_ALL, PROVIDE_FIRST]
+        assert item['choices'] == [BUILD_SOME, LEAVE_ALL, KEEP_ALL, PROVIDE_FIRST, QA_NOW]
         assert 'Build the account posting adapter' in item['question']
         assert engine.calls.count('sw-developer') == 2 and 'qa-engineer' not in engine.calls
     finally:
@@ -497,5 +498,76 @@ def test_typed_build_instructions_keep_scope_and_reach_the_builder(tmp_path):
         assert 'requirements' in store.get(pid)['approvals']                 # no requirements review needed
         assert len(seen) > builds and 'test mode of the site' in seen[builds]
         assert any('test mode' in g for g in json.loads(seen[-1]).get('owner_guidance', []))
+    finally:
+        workflow.shutdown()
+
+
+def test_owner_later_command_moves_named_parts_and_asks_for_review(tmp_path):
+    engine = Engine(owner_blocker=False)
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_build(store, workflow, pid); wait_idle(workflow, pid)
+        with pytest.raises(ValueError, match='Say what to leave'):
+            workflow.submit(pid, '/later')
+        workflow.submit(pid, '/later posting to the social account'); wait_idle(workflow, pid)
+        assert 'posting to the social account' in engine.rescope_prompts[-1]
+        state = store.get(pid)
+        assert state['phase'] == 'requirements_review' and 'requirements' not in state['approvals']
+        assert next(c for c in acceptance.load(Path(state['root']))['criteria'] if c['id'] == 'AC-FR-2-1')['release'] == 'later'
+    finally:
+        workflow.shutdown()
+
+
+def test_owner_can_send_what_is_built_to_qa_without_passing_unfinished_checks(tmp_path):
+    engine, store, workflow, pid = stuck(tmp_path)
+    try:
+        workflow.answer(pid, scope_question(store, pid)['id'], QA_NOW); wait_idle(workflow, pid)
+        assert 'qa-engineer' in engine.calls
+        results = workflow.acceptance_status(pid)['results']
+        assert results['AC-FR-1-1']['status'] == 'passed'
+        assert results.get('AC-FR-2-1', {}).get('status') != 'passed'      # unfinished work is never a pass
+        assert store.get(pid)['phase'] != 'delivered'
+    finally:
+        workflow.shutdown()
+
+
+@pytest.mark.parametrize('mode', ['adds_receipt', 'edits_prior_evidence'])
+def test_qa_running_project_tests_may_add_receipts_but_not_edit_prior_evidence(tmp_path, mode):
+    engine = Engine()
+    orig = engine.__call__
+    def call(connection, run):
+        role = run.instructions.split('Role: ', 1)[1].splitlines()[0]
+        if role == 'qa-engineer':
+            prior = run.root / '.sdlc/evidence/direct-build/build.txt'
+            if mode == 'adds_receipt':
+                (prior.parent / 'test-run-receipt.json').write_text('{"exit": 0}')   # written by the app's own tests
+            else:
+                prior.write_text('rewritten by QA')
+        return orig(connection, run)
+    store = Store(tmp_path / 'state'); pid = store.add(tmp_path / 'app')['id']
+    workflow = Workflow(store, call)
+    try:
+        to_build(store, workflow, pid)
+        root = Path(store.get(pid)['root'])
+        results = workflow.acceptance_status(pid)['results']
+        if mode == 'adds_receipt':
+            assert store.get(pid)['phase'] == 'implementation_verified'
+            assert results['AC-FR-1-1']['status'] == 'passed'
+            assert not (root / '.sdlc/evidence/direct-build/test-run-receipt.json').exists()   # dropped, never integrated
+        else:
+            assert results.get('AC-FR-1-1', {}).get('status') != 'passed'
+            assert 'rewritten' not in (root / '.sdlc/evidence/direct-build/build.txt').read_text()
+    finally:
+        workflow.shutdown()
+
+
+def test_failing_check_sharing_evidence_with_a_setup_blocker_reaches_qa_without_asking(tmp_path):
+    engine = Engine(); engine.failed_check = 'shared_evidence'
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_build(store, workflow, pid)
+        assert store.get(pid)['phase'] == 'implementation_verified'
+        assert not any(i.get('scope') for i in store.inbox(pid))          # no repeated owner question
+        assert workflow.acceptance_status(pid)['results']['AC-FR-2-1']['status'] != 'passed'
     finally:
         workflow.shutdown()

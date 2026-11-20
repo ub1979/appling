@@ -11,7 +11,8 @@ KEEP_ALL = 'Keep building all of them'
 BUILD_SOME = 'Build some now, leave the rest for later'
 LEAVE_ALL = 'Leave all of them for later'
 PROVIDE_FIRST = "I'll provide the access first"
-SCOPE_CHOICES = [BUILD_SOME, LEAVE_ALL, KEEP_ALL, PROVIDE_FIRST]
+QA_NOW = "Test what's built now; I'll do the setup later"
+SCOPE_CHOICES = [BUILD_SOME, LEAVE_ALL, KEEP_ALL, PROVIDE_FIRST, QA_NOW]
 
 
 def ask_scope(workflow, pid, parts, intro):
@@ -63,11 +64,20 @@ def progress_signature(root, state, result=None):
 def deferred_failures(result, spec, state):
     """Split failing builder checks: those tied only to deferrable live criteria may wait."""
     deferrable = {c['id'] for c in acceptance.release_one(spec) if acceptance.deferrable(spec, c, state)}
+    # A failing check whose receipt is the evidence of an owner-setup or live blocker belongs to that blocker's
+    # criteria (for example a live-prerequisites test that fails until the owner signs in).
+    by_evidence = {}
+    for b in result.get('blockers') or []:
+        if (isinstance(b, dict) and b.get('kind') in {'owner_setup', 'live_acceptance'} and isinstance(b.get('evidence'), str)
+                and isinstance(b.get('criteria'), list) and b['criteria']):
+            by_evidence.setdefault(b['evidence'], set()).update(b['criteria'])
     allowed, unlinked = [], []
     for check in result.get('checks') or []:
         if not isinstance(check, dict) or check.get('exit_code') == 0:
             continue
         linked = check.get('criteria') if isinstance(check.get('criteria'), list) else []
+        if not linked and isinstance(check.get('evidence'), str):
+            linked = sorted(by_evidence.get(check['evidence'], ()))
         (allowed if linked and set(linked) <= deferrable else unlinked).append(check)
     return allowed, unlinked
 
