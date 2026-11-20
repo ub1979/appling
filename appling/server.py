@@ -118,7 +118,8 @@ def create_app(home=None,execute=None):
         execution_mode=data.get('execution_mode') or 'blocks'
         if execution_mode not in {'direct','planned','blocks'}:raise ValueError('Choose blocks, direct or planned execution.')
         p=store.add(root,team=team,style=data.get('style','app-it'),profile=data.get('profile','personal'),
-                    kind=data.get('kind','app'),platforms=data.get('platforms') or ['web'],engine=workflow.settings()['provider'],execution_mode=execution_mode)
+                    kind=data.get('kind','app'),platforms=data.get('platforms') or ['web'],engine=workflow.settings()['provider'],execution_mode=execution_mode,
+                    decide_for_me=bool(data.get('decide_for_me',True)))
         if not (root/'.git').exists():
             subprocess.run(['git','init','-b','main',str(root)],capture_output=True,check=True)
         ignore=root/'.gitignore'

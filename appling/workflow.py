@@ -33,9 +33,23 @@ class WorkWaiting(Exception):
         self.blockers = blockers
 
 
+NEEDED_CHECKS=(' Write only the checks the owner needs: what they asked for, plus basic safety (no data loss, secrets kept out of '
+    'the app and its logs, nothing reachable beyond this machine unless asked). Do not add performance targets, load or volume '
+    'tests, security hardening, accessibility audits, stress or failure-injection scenarios unless the brief asks for them or the '
+    'app handles money, other people or their personal data. Prefer one clear check per requirement; more checks make a slower, '
+    'harder build.')
+DECIDE_FOR_ME=(' The owner chose "decide sensibly for me": ask a question only about money, accounts, privacy, other people '
+    'or anything hard to undo. Settle every other gap with the safest sensible default, list those defaults under Assumptions '
+    'in the requirements, and keep release 1 as small as the brief allows. The owner reviews the requirements before any building.')
+
+
 def coding_phase(state):
-    """Where coding work (repairs, continuations, in-scope fixes) goes in each mode."""
-    return 'body' if state.get('execution_mode')=='blocks' else 'build'
+    """Where coding work (repairs, continuations, in-scope fixes) goes in each mode. In blocks mode,
+    unfinished blocks are built before the body, which only wires finished ones."""
+    if state.get('execution_mode')!='blocks':
+        return 'build'
+    unfinished={'planned','building','blocked','failed'}
+    return 'blocks_build' if any(v.get('status') in unfinished for v in (state.get('block_status') or {}).values()) else 'body'
 
 
 def artifact_revision(root, kind):
@@ -711,7 +725,8 @@ class Workflow:
                     'If release 1 is large or depends on several external integrations, offer the owner a smaller first release as a question before finishing; '
                     'never move a requirement to later without the owner choosing it. '
                     'Recommend only specialists useful for this project. '
-                    'Do not implement the app. Do not ask for approvals yourself; the controller handles those.',readonly=True)
+                    'Do not implement the app. Do not ask for approvals yourself; the controller handles those.'
+                    +NEEDED_CHECKS+(DECIDE_FOR_ME if state.get('decide_for_me') else ''),readonly=True)
                 if result.get('question'):
                     self.store.ask(pid,'question',result['question'],result.get('choices',[]));return
                 if not isinstance(result.get('requirements'),str) or not result['requirements'].strip():
@@ -791,7 +806,7 @@ class Workflow:
                     'Keep every existing criterion ID and Release tag unless the owner asked to change it; give new criteria new IDs. '
                     'If the change needs a new requirement or a design change, ask one question explaining that. '
                     'Return {"summary":"...","question":"only if needed","choices":["..."]} or {"summary":"plain list of what changed",'
-                    '"requirements":"complete updated Markdown","acceptance_criteria":[...all criteria...],"prerequisites":[...]}.',readonly=True)
+                    '"requirements":"complete updated Markdown","acceptance_criteria":[...all criteria...],"prerequisites":[...]}.'+NEEDED_CHECKS,readonly=True)
                 if result.get('question'):
                     self.store.ask(pid,'question',result['question'],result.get('choices',[]));return
                 if not isinstance(result.get('requirements'),str) or not result.get('acceptance_criteria'):
@@ -826,7 +841,7 @@ class Workflow:
                     '"release":"1","live":false,"prerequisites":[]}],"prerequisites":[{"id":"P-name","kind":"account|driver|permission|device|time|service|other",'
                     '"description":"what the owner must provide","needed_at":"build|verification"}]}. '
                     'Keep every requirement in release 1 unless requirements.md already says otherwise. Set live=true only for checks that need real accounts, '
-                    'devices, permissions, other people or elapsed time, and name the prerequisite. The owner approves these criteria.',readonly=True)
+                    'devices, permissions, other people or elapsed time, and name the prerequisite. The owner approves these criteria.'+NEEDED_CHECKS,readonly=True)
                 spec=acceptance.normalize(result.get('acceptance_criteria'),result.get('prerequisites',[]),requirements)
                 acceptance.write(root,spec)
                 approvals={k:v for k,v in state['approvals'].items() if k!='requirements'}

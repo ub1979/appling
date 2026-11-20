@@ -226,6 +226,7 @@ export interface NewProject {
   kind: ProjectKind;
   template: string | null;
   platforms?: Platform[];
+  decide_for_me?: boolean;
 }
 
 export type Platform = "web" | "phone" | "computer";

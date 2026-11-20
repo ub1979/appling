@@ -46,7 +46,10 @@ def plan(workflow, pid, text):
             'Return {"summary":"plain one-paragraph overview","blocks":[{"id":"telegram-bot","name":"Telegram bot","purpose":"...",'
             '"interface":"exported functions/routes/events with types","runtime":"in-process|service","criteria":["AC-..."],'
             '"depends_on":[],"prerequisites":["P-..."],"source":"new","setup":"","test":"..."}],'
-            '"body":{"purpose":"...","criteria":["AC-..."],"files":["package.json"],"test":"..."}}.')
+            '"body":{"purpose":"...","criteria":["AC-..."],"files":["package.json"],"test":"..."}}.'
+            + (f' This is a small app (at most {blocks.SMALL_APP_FEATURES} release-1 features): use at most '
+               f'{blocks.SMALL_APP_NEW_BLOCKS} new blocks besides reused library blocks, and let the body own the rest. '
+               'Here that is faster than many blocks.' if blocks.small_app(spec) else ''))
     error = None; fallback = None
     for attempt in range(2):
         result = workflow.invoke(pid, 'sw-architect', goal + (f'\nCorrect this problem in the previous proposal: {error}' if error else ''),
@@ -61,13 +64,19 @@ def plan(workflow, pid, text):
                 checked = fallback   # the earlier valid plan; its review shows the body-size warning
             else:
                 continue
-        if not attempt and blocks.body_heavy(checked, spec):
+        extra = blocks.too_many_new_blocks(checked, spec)
+        if not attempt and extra:
+            fallback = checked
+            error = (f'This small app plans {len(extra)} new blocks ({", ".join(extra)}). Use at most {blocks.SMALL_APP_NEW_BLOCKS} new blocks '
+                     'besides reused library blocks; merge the rest or let the body own them.')
+            continue
+        if not attempt and not blocks.small_app(spec) and blocks.body_heavy(checked, spec):
             alone = blocks.body_only(checked, spec)
             fallback = checked
             error = (f'The body alone covers {len(alone)} release-1 checks ({", ".join(alone)}). The body is built by one agent '
                      'after the blocks, so it is not parallel. Move those feature areas into blocks and keep the body to wiring.')
             continue
-        if attempt and fallback is not None and len(blocks.body_only(checked, spec)) > len(blocks.body_only(fallback, spec)):
+        if attempt and fallback is not None and not blocks.small_app(spec) and len(blocks.body_only(checked, spec)) > len(blocks.body_only(fallback, spec)):
             checked = fallback
         blocks.write(root, checked, spec)
         workflow.store.update(pid, phase='blocks_review', block_status={}, tasks=blocks.block_tasks(checked, spec))
@@ -103,9 +112,27 @@ def _tasks(workflow, pid, plan_, spec):
     return tasks
 
 
+def _refresh_workspace_lock(root, block):
+    """When the body made the project an npm workspace, a block added later is missing from the root lockfile and
+    "npm ci" inside it refuses to install. The controller refreshes the lockfile; block builders may not touch it."""
+    package, lock = Path(root) / 'package.json', Path(root) / 'package-lock.json'
+    if not (lock.is_file() and package.is_file() and (Path(root) / block['folder'] / 'package.json').is_file()):
+        return
+    try:
+        if not json.loads(package.read_text()).get('workspaces'):
+            return
+        if block['folder'].rstrip('/') in (json.loads(lock.read_text()).get('packages') or {}):
+            return
+    except (OSError, ValueError):
+        return
+    log = Path(root) / '.sdlc/evidence/blocks' / block['id'] / 'workspace-lock.log'
+    blocks._run('npm install --package-lock-only --ignore-scripts --no-audit --no-fund', Path(root), log, timeout=300)
+
+
 def _test_and_record(workflow, pid, root, block):
     """Controller-run block test; any crash is a failed test, never an untested pass."""
     try:
+        _refresh_workspace_lock(root, block)
         return blocks.run_block_tests(root, block)
     except Exception as exc:
         return dict(passed=False, exit_code=-1, evidence=None, error=str(exc)[:600])
@@ -129,6 +156,7 @@ def build(workflow, pid, feedback=''):
     state = workflow.store.get(pid)
     status_now = state.get('block_status') or {}
     changes_now = state.get('block_change_requests') or {}
+    installing = []
     for task in tasks:
         block = by_id[task['id']]
         info = status_now.get(block['id'], {})
@@ -149,9 +177,12 @@ def build(workflow, pid, feedback=''):
             continue
         try:
             blocks.install(root, block)
-            test = _test_and_record(workflow, pid, root, block)
+            installing.append((block, None))
         except (ValueError, OSError) as exc:
-            test = dict(passed=False, exit_code=-1, evidence=None, error=str(exc)[:600])
+            installing.append((block, dict(passed=False, exit_code=-1, evidence=None, error=str(exc)[:600])))
+    # Every library copy is in place before any is tested, so blocks that use each other find each other.
+    for block, test in installing:
+        test = test or _test_and_record(workflow, pid, root, block)
         _set_status(workflow, pid, block['id'], status='tested' if test['passed'] else 'failed', test=test,
                     library=block['source'][8:], library_failed=not test['passed'])
         if test['passed']:
@@ -362,7 +393,7 @@ def publish_passed(workflow, pid):
         commit = swarm.workspaces.git(root, 'rev-parse', 'HEAD')
     except Exception:
         pass
-    published = []
+    published, skipped = [], []
     for block in plan_['blocks']:
         info = status.get(block['id'], {})
         if info.get('status') not in {'tested', 'merged'} or block['id'] in blocks.deferred(plan_, spec):
@@ -370,14 +401,22 @@ def publish_passed(workflow, pid):
         now = [c for c in block['criteria'] if release.get(c) == '1']
         if any(results.get(c, {}).get('status') not in {'passed', 'pending_owner'} for c in now):
             continue   # failed, not run or never checked by QA
+        hidden = blocks.undeclared_imports(root, block, plan_)
+        if hidden:
+            skipped.append(f"{block['name']} (uses {', '.join(hidden)} without declaring it)")
+            continue
         fully = all(results.get(c, {}).get('status') == 'passed' for c in block['criteria'])
+        by_id = {b['id']: b for b in plan_['blocks']}
         meta = blocks.publish(root, block, state.get('name') or pid, commit=commit, evidence=(info.get('test') or {}).get('evidence'),
-                              verified=fully)
+                              verified=fully, depends_on=[blocks.library_name(by_id[d]) for d in block['depends_on'] if d in by_id])
         if meta:
             published.append(f"{meta['name']} {meta['version']} ({meta['status']})")
             _set_status(workflow, pid, block['id'], status='merged', library=f"{meta['name']}@{meta['version']}")
     if published:
         workflow.store.message(pid, 'assistant', 'Saved to your block library: ' + ', '.join(published) + '.', 'status')
+    if skipped:
+        workflow.store.message(pid, 'assistant', 'Not saved to the library, because they would break in another project: '
+                               + '; '.join(skipped) + '.', 'status')
     return published
 
 

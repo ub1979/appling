@@ -54,6 +54,7 @@ class Engine:
         self.body_blocker_once = None   # block id the body asks to change on its first run
         self.body_output = False        # body leaves build output inside blocks/
         self.not_run = set()            # criteria QA reports as not run
+        self.hidden_import = False      # notifier code reaches into the poster folder without declaring it
 
     def role(self, run):
         return run.instructions.split('Role: ', 1)[1].splitlines()[0]
@@ -87,6 +88,8 @@ class Engine:
                 self.root_file_once.discard(ident)
                 (root / 'package-lock.json').write_text('{}')   # outside its ownership
             (folder / 'ok').write_text('ok')
+            if self.hidden_import and ident == 'notifier':
+                (folder / 'send.test.js').write_text("import { post } from '../../poster/src/index.js';\n")
             (folder / 'README.md').write_text(f'# {ident}\n')
             (folder / 'block.json').write_text(json.dumps(dict(name=ident, test=block_test(ident))))
             ev = root / brief['worker']['evidence'] / 'test.txt'; ev.parent.mkdir(parents=True, exist_ok=True)
@@ -738,3 +741,168 @@ def test_a_check_qa_did_not_run_holds_back_only_the_block_that_owns_it(tmp_path,
         assert not status['notifier'].get('library') and status['notifier']['status'] == 'tested'
     finally:
         workflow.shutdown()
+
+
+def test_library_blocks_are_all_installed_before_any_is_tested(tmp_path, library):
+    first = Engine(); store, workflow, pid = make(tmp_path, first, 'first')
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+    finally:
+        workflow.shutdown()
+    both = f'"{PY}" -c "import pathlib,sys; sys.exit(0 if pathlib.Path(\'blocks/notifier/ok\').exists() and pathlib.Path(\'blocks/poster/ok\').exists() else 1)"'
+    def call(self, connection, run):
+        if self.role(run) == 'sw-architect':
+            plan_ = plan_for({'notifier': 'library:notifier@v1'})
+            plan_['blocks'][0]['test'] = both          # the notifier's test also needs the poster next to it
+            plan_['blocks'][1]['source'] = 'library:poster@v1'
+            return plan_
+        return Engine.__call__(self, connection, run)
+    second = type('Together', (Engine,), {'__call__': call})(); second.barrier_parties = lambda: []
+    store, workflow, pid = make(tmp_path, second, 'second')
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        assert 'block:notifier' not in second.calls and 'block:poster' not in second.calls
+        status = store.get(pid)['block_status']
+        assert not status['notifier'].get('library_failed') and not status['poster'].get('library_failed')
+    finally:
+        workflow.shutdown()
+
+
+def test_a_block_that_secretly_uses_another_block_is_not_saved_to_the_library(tmp_path, library):
+    engine = Engine(); engine.hidden_import = True
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        assert {b['name'] for b in blocks.catalogue(library)} == {'poster'}
+        notes = [m['content'] for m in store.messages(pid) if 'Not saved to the library' in str(m.get('content'))]
+        assert notes and 'uses poster without declaring it' in notes[0]
+    finally:
+        workflow.shutdown()
+
+
+def test_hidden_block_imports_ignore_docs_and_declared_dependencies(tmp_path):
+    root = tmp_path / 'p'; (root / 'blocks/a/src').mkdir(parents=True)
+    (root / 'blocks/a/README.md').write_text('Works well beside ../b/ and blocks/c/.')
+    (root / 'blocks/a/src/index.js').write_text("import x from '../../c/src/index.js';\nimport y from '../../b/index.js';\n")
+    plan_ = dict(blocks=[dict(id='a', folder='blocks/a/', depends_on=['b']), dict(id='b', folder='blocks/b/'), dict(id='c', folder='blocks/c/')])
+    assert blocks.undeclared_imports(root, plan_['blocks'][0], plan_) == ['c']
+
+
+def test_typed_build_instructions_for_a_stuck_block_rebuild_it_before_the_body(tmp_path, library):
+    def call(self, connection, run):
+        if self.role(run) == 'req-engineer' and 'Owner decision:' in run.prompt:
+            self.stuck.clear()   # the instructions unblock the builder
+            return dict(summary='Instructions only', build_guidance='Use the normal signed-in route')
+        return Engine.__call__(self, connection, run)
+    engine = type('Guided', (Engine,), {'__call__': call})(); engine.stuck = {'poster'}
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
+        workflow.answer(pid, question['id'], 'Keep it and use the normal signed-in route')
+        deadline = time.time() + 30
+        while store.get(pid)['phase'] not in {'implementation_verified', 'delivered'} and time.time() < deadline:
+            time.sleep(0.2)
+        assert engine.calls.count('block:poster') == 2
+        assert engine.calls.index('body') > len(engine.calls) - 1 - engine.calls[::-1].index('block:poster')
+        assert any('normal signed-in route' in g for g in store.get(pid).get('owner_guidance', []))
+    finally:
+        workflow.shutdown()
+
+
+def test_a_small_app_planned_as_many_new_blocks_is_sent_back_once(tmp_path, library):
+    prompts = []
+    def call(self, connection, run):
+        if self.role(run) == 'sw-architect':
+            prompts.append(run.prompt)
+            plan_ = plan_for()
+            if len(prompts) == 1:   # first try splits a three-check app into three new blocks
+                plan_['blocks'].append(dict(id='history', name='History', purpose='Keep results', interface='list() -> list',
+                                            criteria=['AC-FR-1-1'], source='new', test=block_test('history')))
+            return plan_
+        return Engine.__call__(self, connection, run)
+    engine = type('Splitter', (Engine,), {'__call__': call})()
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid)
+        assert 'small app' in prompts[0] and len(prompts) == 2 and 'plans 3 new blocks' in prompts[1]
+        assert [b['id'] for b in blocks.load(Path(store.get(pid)['root']))['blocks']] == ['notifier', 'poster']
+    finally:
+        workflow.shutdown()
+
+
+def test_reusing_a_library_block_requires_the_blocks_it_was_built_next_to():
+    spec = acceptance.normalize(CRITERIA, PREREQS, REQUIREMENTS)
+    catalogue = [dict(name='notifier', version='v1', depends_on=['poster']), dict(name='poster', version='v1', depends_on=[])]
+    alone = plan_for({'notifier': 'library:notifier@v1'})
+    with pytest.raises(ValueError, match='needs these blocks too'):
+        blocks.validate(alone, spec, catalogue)       # poster exists but notifier does not list it
+    alone['blocks'][0]['depends_on'] = ['poster']
+    assert blocks.validate(alone, spec, catalogue)['blocks'][0]['depends_on'] == ['poster']
+    missing = plan_for({'notifier': 'library:notifier@v1'}); missing['blocks'] = missing['blocks'][:1]
+    missing['body']['criteria'] = ['AC-FR-1-1', 'AC-FR-3-1']
+    with pytest.raises(ValueError, match='poster'):
+        blocks.validate(missing, spec, catalogue)
+
+
+def test_published_blocks_record_what_they_depend_on(tmp_path, library):
+    def call(self, connection, run):
+        if self.role(run) == 'sw-architect':
+            plan_ = plan_for(); plan_['blocks'][0]['depends_on'] = ['poster']; return plan_
+        return Engine.__call__(self, connection, run)
+    engine = type('Deps', (Engine,), {'__call__': call})(); engine.barrier_parties = lambda: []
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        meta = {b['name']: b for b in blocks.catalogue(library)}
+        assert meta['notifier']['depends_on'] == ['poster'] and meta['poster']['depends_on'] == []
+    finally:
+        workflow.shutdown()
+
+
+def test_a_block_added_after_the_body_made_a_workspace_gets_into_the_root_lockfile(tmp_path):
+    import subprocess
+    from appling.blockbuild import _refresh_workspace_lock
+    root = tmp_path / 'p'; (root / 'blocks/old').mkdir(parents=True)
+    (root / 'package.json').write_text(json.dumps(dict(name='p', private=True, workspaces=['blocks/*'])))
+    (root / 'blocks/old/package.json').write_text(json.dumps(dict(name='old', version='1.0.0')))
+    subprocess.run(['npm', 'install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund'], cwd=root, check=True, capture_output=True)
+    (root / 'blocks/new').mkdir(); (root / 'blocks/new/package.json').write_text(json.dumps(dict(name='new', version='1.0.0')))
+    assert 'blocks/new' not in json.loads((root / 'package-lock.json').read_text())['packages']
+    _refresh_workspace_lock(root, dict(id='new', folder='blocks/new/'))
+    assert 'blocks/new' in json.loads((root / 'package-lock.json').read_text())['packages']
+    assert subprocess.run(['npm', 'ci', '--ignore-scripts', '--no-audit', '--no-fund'], cwd=root / 'blocks/new', capture_output=True).returncode == 0
+
+
+def test_decide_for_me_tells_the_requirements_writer_to_ask_only_about_money_accounts_and_privacy(tmp_path):
+    prompts = []
+    def call(self, connection, run):
+        if self.role(run) == 'req-engineer':
+            prompts.append(run.prompt)
+        return Engine.__call__(self, connection, run)
+    engine = type('Asker', (Engine,), {'__call__': call})()
+    for name, flag in (('on', True), ('off', False)):
+        store = Store(tmp_path / ('state-' + name))
+        pid = store.add(tmp_path / name, execution_mode='blocks', decide_for_me=flag)['id']
+        workflow = Workflow(store, engine)
+        try:
+            workflow.submit(pid, 'Build a number app'); wait_idle(workflow, pid)
+        finally:
+            workflow.shutdown()
+    assert 'decide sensibly for me' in prompts[0] and 'decide sensibly for me' not in prompts[1]
+
+
+def test_requirements_writer_is_told_to_write_only_needed_checks(tmp_path):
+    prompts = []
+    def call(self, connection, run):
+        if self.role(run) == 'req-engineer':
+            prompts.append(run.prompt)
+        return Engine.__call__(self, connection, run)
+    engine = type('Asker', (Engine,), {'__call__': call})()
+    store = Store(tmp_path / 'state'); pid = store.add(tmp_path / 'app', execution_mode='blocks')['id']
+    workflow = Workflow(store, engine)
+    try:
+        workflow.submit(pid, 'Build a number app'); wait_idle(workflow, pid)
+    finally:
+        workflow.shutdown()
+    assert 'Do not add performance targets' in prompts[0] and 'Write only the checks the owner needs' in prompts[0]

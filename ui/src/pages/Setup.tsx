@@ -37,6 +37,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
   const [team, setTeam] = useState<string[]>(REQUIRED);
   const [customizing, setCustomizing] = useState(false);
   const [brief, setBrief] = useState("");
+  const [decideForMe, setDecideForMe] = useState(true);
   const [profile, setProfile] = useState<BuildProfile>("personal");
   const [kind, setKind] = useState<ProjectKind>("app");
   const [platforms, setPlatforms] = useState<Platform[]>(["web"]);
@@ -106,7 +107,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
     if (!path) return;
     setSaving(true);
     try {
-      const res = await api.addProject({ path, create: mode === "new", team: orderedTeam, style, brief, profile: kind === "website" ? "reusable" : profile, kind, template: templateId, platforms: kind === "app" ? platforms : undefined });
+      const res = await api.addProject({ path, create: mode === "new", team: orderedTeam, style, brief, profile: kind === "website" ? "reusable" : profile, kind, template: templateId, platforms: kind === "app" ? platforms : undefined, decide_for_me: decideForMe });
       go(`/p/${res.id}`);
     } catch (e) {
       setProblem(e instanceof Error ? e.message : String(e));
@@ -306,6 +307,10 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
               }
               onChange={(e) => setBrief(e.target.value)}
             />
+            <label className="small" style={{ display: "flex", gap: 8, alignItems: "center", marginTop: 12 }}>
+              <input type="checkbox" checked={decideForMe} onChange={(e) => setDecideForMe(e.target.checked)} />
+              Decide small questions for me. Appling still asks about money, accounts and privacy, and you approve the requirements.
+            </label>
           </section>}
         </div>
 
