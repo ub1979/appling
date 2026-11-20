@@ -118,6 +118,14 @@ def refresh(store, pid):
                 store.forget(pid,source)
 
 
+# In the per-run brief, not the role instructions, so adding it never resets a running session.
+BROWSER_POLICY = ('Automated browser checks run headless: never open visible browser windows on the owner\'s screen. '
+                  'Launch browsers with headless: true, including in tests you write or change. Code that can show a window '
+                  '(for example an observable browser for the owner) must default to headless when APPLING_HEADLESS=1, which '
+                  'Appling sets for agents and controller checks. Save screenshots in the evidence folder as proof; Appling shows them. '
+                  'Open a visible window only for a live check the owner is doing themself.')
+
+
 def briefing(store, pid, role, goal, workspace=None, worker=None, planning_context=None):
     if workspace is None:
         refresh(store, pid)
@@ -146,7 +154,8 @@ def briefing(store, pid, role, goal, workspace=None, worker=None, planning_conte
         plan_contract=state.get('plan_contract',{}),
         browser_runner=str(ROOT/'scripts/browser-check.mjs'),
         worker=worker and {k:worker[k] for k in ['id','task_id','role','evidence']},
-        browser_setup=f'bash {ROOT / "scripts/setup-browser.sh"}')
+        browser_setup=f'bash {ROOT / "scripts/setup-browser.sh"}',
+        browser_policy=BROWSER_POLICY)
     if state.get('execution_mode')=='direct':
         payload['execution']['scheduler']='native engine coordination, independent controller QA'
         # Recovery context only while there is unfinished retained work to resume.
@@ -154,6 +163,8 @@ def briefing(store, pid, role, goal, workspace=None, worker=None, planning_conte
                                   for w in state.get('workers',[]) if w.get('kind')!='verification'
                                   and w.get('status') in {'running','blocked','interrupted','pending','completed'}]
     payload['acceptance']=acceptance_handoff(root,state)
+    if state.get('owner_guidance'):
+        payload['owner_guidance']=state['owner_guidance']   # the owner's standing build instructions, in their words
     if planning_context is not None:
         # Saved execution metadata is not the replacement proposal. In particular,
         # the independent reviewer must not treat the old task ledger as a second

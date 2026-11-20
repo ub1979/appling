@@ -473,3 +473,29 @@ def test_owner_can_type_which_parts_to_build_and_scope_change_cannot_drop_requir
         assert 'FR-2' in (root / 'requirements.md').read_text()
     finally:
         workflow.shutdown()
+
+
+def test_typed_build_instructions_keep_scope_and_reach_the_builder(tmp_path):
+    engine, store, workflow, pid = stuck(tmp_path)
+    seen = []
+    orig = engine.__call__
+    def call(connection, run):
+        role = run.instructions.split('Role: ', 1)[1].splitlines()[0]
+        if role == 'req-engineer' and 'Owner decision:' in run.prompt:
+            engine.calls.append(role)
+            return dict(summary='Instructions, not a scope change', build_guidance='Use the posting site test mode for the adapter')
+        if role == 'sw-developer':
+            seen.append(run.prompt)
+        return orig(connection, run)
+    workflow.execute = call
+    try:
+        root = Path(store.get(pid)['root']); before = (root / 'requirements.md').read_text()
+        builds = len(seen)
+        workflow.answer(pid, scope_question(store, pid)['id'], 'Build the adapter against the test mode of the site')
+        wait_idle(workflow, pid)
+        assert (root / 'requirements.md').read_text() == before
+        assert 'requirements' in store.get(pid)['approvals']                 # no requirements review needed
+        assert len(seen) > builds and 'test mode of the site' in seen[builds]
+        assert any('test mode' in g for g in json.loads(seen[-1]).get('owner_guidance', []))
+    finally:
+        workflow.shutdown()

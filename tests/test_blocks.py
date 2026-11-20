@@ -644,3 +644,17 @@ def test_body_heavy_ignores_tiny_apps_and_block_owned_checks():
     assert blocks.body_only(plan, spec) == ['AC-FR-9-1', 'AC-FR-10-1'] and not blocks.body_heavy(plan, spec)
     small = acceptance.normalize(CRITERIA, PREREQS, REQUIREMENTS)
     assert not blocks.body_heavy(dict(blocks=[], body=dict(criteria=[c['id'] for c in CRITERIA])), small)
+
+
+def test_controller_block_checks_and_agent_briefs_ask_for_headless_browsers(tmp_path):
+    from appling import context
+    from appling.engines import environment
+    block = dict(id='probe', test=f'"{PY}" -c "import os,sys; sys.exit(0 if os.environ.get(\'APPLING_HEADLESS\')==\'1\' else 1)"', setup='')
+    (tmp_path / 'blocks/probe').mkdir(parents=True)
+    assert blocks.run_block_tests(tmp_path, block)['passed']
+    assert environment()['APPLING_HEADLESS'] == '1'
+    store = Store(tmp_path / 'state'); pid = store.add(tmp_path / 'app', execution_mode='blocks')['id']
+    brief = json.loads(context.briefing(store, pid, 'qa-engineer', 'check the app'))
+    assert 'headless' in brief['browser_policy']
+    before = context.instructions('sw-developer', 'direct')
+    assert 'APPLING_HEADLESS' not in before   # the rule lives in the brief, so running sessions are not reset

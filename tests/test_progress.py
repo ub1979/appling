@@ -23,6 +23,9 @@ def test_written_updates_are_due_every_five_minutes_and_persist_without_changing
     assert len(messages)==2 and all(m['kind']=='progress' for m in messages)
     assert 'building and testing the app' in messages[0]['content'] and 'nonzero' not in messages[0]['content']
     assert 'No activity in the last five minutes' in messages[1]['content']
+    import time
+    stamp=time.strftime('%a %d %b %Y, %H:%M',time.localtime(started+300))
+    assert messages[0]['content'].startswith(stamp) and messages[0]['ts']==started+300   # the owner sees when it was written
     assert len([e for e in store.events(pid) if e['type']=='status_update'])==2
 
 

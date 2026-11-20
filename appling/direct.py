@@ -22,6 +22,7 @@ def ask_scope(workflow, pid, parts, intro):
     lines += [f'- {p}' for p in parts[:12]]
     lines += ['', 'These usually need real accounts, devices or services to build and test properly. '
               'You can keep them, build only some (say which), leave them for a later release, or set up access first. '
+              'You can also type instructions for how to build them; everything stays in this release and the builder follows them. '
               'Moving anything to later changes the requirements, so you will review that change before coding continues.']
     return workflow.store.ask(pid, 'question', '\n'.join(lines), SCOPE_CHOICES, scope=True, parts=parts[:12])
 

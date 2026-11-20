@@ -59,7 +59,9 @@ def environment():
                'OPENAI_API_KEY','ANTHROPIC_API_KEY','CLAUDE_CODE_OAUTH_TOKEN','GH_TOKEN','GITHUB_TOKEN',
                'GITHUB_COPILOT_TOKEN','COPILOT_GITHUB_TOKEN','CODEX_HOME','HTTPS_PROXY','HTTP_PROXY','NO_PROXY'}
     allowed.update({'PLAYWRIGHT_BROWSERS_PATH','npm_config_cache'})
-    return {k:v for k,v in os.environ.items() if k in allowed}
+    env={k:v for k,v in os.environ.items() if k in allowed}
+    env['APPLING_HEADLESS']='1'   # automated browser checks never open windows on the owner's screen
+    return env
 
 
 def execute(connection, run):

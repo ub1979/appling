@@ -43,7 +43,8 @@ def publish_due(store, pid, *, now=None, interval=INTERVAL):
                   'prototype':'designing the prototype','requirements':'writing the requirements','plan':'planning the build',
                   'code-review':'reviewing the code','accessibility':'checking accessibility','criteria':'drafting acceptance checks',
                   'requirements_update':'updating the requirements','rescope':'updating what is in this release'}
-        lines = [f"Still working on {state.get('name','your project')}: {labels.get(state['phase'],state['phase'])}."]
+        stamp = time.strftime('%a %d %b %Y, %H:%M %Z', time.localtime(now)).strip()
+        lines = [f"{stamp} · Still working on {state.get('name','your project')}: {labels.get(state['phase'],state['phase'])}."]
         reports = [e for e in recent if e['type']=='worker_commentary' and isinstance(e.get('text'),str)]
         if reports:
             lines.append('What the builder says it is doing (its own words, not yet checked): '+safe_diagnostic(reports[-1]['text'])[:400])
@@ -69,7 +70,7 @@ def publish_due(store, pid, *, now=None, interval=INTERVAL):
         if blocked:lines.append('Some work is paused and needs attention: '+', '.join(blocked)+'.')
         waiting = db.execute('SELECT COUNT(*) FROM inbox WHERE project=?',(pid,)).fetchone()[0]
         lines.append(f'You have {waiting} question(s) or approval(s) waiting.' if waiting else 'Nothing is needed from you right now.')
-        message = dict(role='assistant',kind='progress',content='\n\n'.join(lines))
+        message = dict(role='assistant',kind='progress',content='\n\n'.join(lines),ts=now)
         cursor = db.execute('SELECT COALESCE(MAX(seq),0) FROM events WHERE project=?',(pid,)).fetchone()[0]
         db.execute('INSERT INTO messages(project,data) VALUES (?,?)',(pid,json.dumps(message)))
         db.execute('INSERT INTO events(project,data) VALUES (?,?)',(pid,json.dumps(dict(type='status_update',ts=now,text=message['content'],turn=turn['id']))))

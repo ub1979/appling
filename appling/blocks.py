@@ -250,7 +250,8 @@ def _run(command, root, log, timeout=900):
     output = log.with_suffix('.out')
     with open(output, 'w', errors='replace') as fh:
         proc = subprocess.Popen(command, shell=True, cwd=root, stdout=fh, stderr=subprocess.STDOUT,
-                                stdin=subprocess.DEVNULL, start_new_session=True)
+                                stdin=subprocess.DEVNULL, start_new_session=True,
+                                env={**os.environ, 'APPLING_HEADLESS': '1'})   # controller checks never open windows
         try:
             code = proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:

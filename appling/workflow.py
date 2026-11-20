@@ -698,11 +698,22 @@ class Workflow:
                 result=self.invoke(pid,'req-engineer',f'Owner decision: {text}\nParts that could not be finished: '+json.dumps(request.get('parts',[]))+
                     '\nApply only the owner\'s decision to release scope. Keep every requirement and criterion; change only Release tags '
                     '(in requirements.md and the acceptance criteria) for the parts the owner chose to leave for later. '
-                    'If the owner said to build some, keep those in release 1 and move the rest. If the decision is unclear, ask one question. '
+                    'If the owner said to build some, keep those in release 1 and move the rest. '
+                    'If the owner instead gave instructions for how to build these parts (not a release change), change nothing and return '
+                    '{"summary":"...","build_guidance":"the owner\'s instructions, restated faithfully and completely for the builder"}. '
+                    'If the decision is unclear, ask one question. '
                     'Return {"summary":"...","question":"only if unclear","choices":["..."]} or {"summary":"plain list of what moved to later and what stays",'
                     '"requirements":"complete updated Markdown","acceptance_criteria":[...all criteria...],"prerequisites":[...]}.',readonly=True)
                 if result.get('question'):
                     self.store.ask(pid,'question',result['question'],result.get('choices',[]));return
+                if isinstance(result.get('build_guidance'),str) and result['build_guidance'].strip() and not result.get('requirements'):
+                    # Keep everything in scope; the builder continues with the owner's own words plus the restatement.
+                    guidance=f'Owner instructions: {text}\nRestated: {result["build_guidance"].strip()}'
+                    self.store.update(pid,phase=coding_phase(state),rescope=None,stalled_attempts=0,last_wait_signature=None,
+                                      owner_guidance=[*state.get('owner_guidance',[]),guidance][-10:])
+                    self.store.message(pid,'assistant','Keeping every part in this release and passing your instructions to the builder.','status')
+                    text=('The owner kept these parts in release 1 and gave instructions for building them. Follow them:\n'+guidance)
+                    continue
                 if not isinstance(result.get('requirements'),str) or not result.get('acceptance_criteria'):
                     raise ValueError('The scope change is incomplete. Send your decision again.')
                 if set(acceptance.requirement_ids(result['requirements']))!=set(acceptance.requirement_ids(old_requirements)):
