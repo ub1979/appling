@@ -750,5 +750,12 @@ Real-model run on Appling C 0.2.0 beta (Codex `gpt-6.1-sol`), project
   and left an unrelated localStorage key intact. Its own unit tests: 4 of 4.
   Evidence: `docs/evidence/direct-default/01-tip-split-result.jpg`,
   `02-tip-split-clear-confirm.jpg`.
+- Appling's own project page for tip_split (browser, 1400x900): project map
+  Requirements → Design → Development → Quality assurance all Done,
+  Acceptance "Delivered: all 7 criteria passed", four team roles, no Blocks
+  panel; every Appling API request returned 200. Evidence:
+  `docs/evidence/direct-default/03-appling-studio-delivered.jpg`.
+- Blocks mode can be chosen only through the API (`execution_mode: "blocks"`);
+  the Settings picker offers direct and planned.
 - Not covered: apps needing accounts or live services, larger apps, Claude or
   Ollama as the builder.
