@@ -115,8 +115,8 @@ def create_app(home=None,execute=None):
             if p['root']==str(root):
                 return detail(p['id'])
         team=list(dict.fromkeys([*CATALOG['REQUIRED'],*data.get('team',[])]))
-        execution_mode=data.get('execution_mode') or 'blocks'
-        if execution_mode not in {'direct','planned','blocks'}:raise ValueError('Choose blocks, direct or planned execution.')
+        execution_mode=data.get('execution_mode') or 'direct'   # blocks mode is opt-in; see block_branch
+        if execution_mode not in {'direct','planned','blocks'}:raise ValueError('Choose direct, blocks or planned execution.')
         p=store.add(root,team=team,style=data.get('style','app-it'),profile=data.get('profile','personal'),
                     kind=data.get('kind','app'),platforms=data.get('platforms') or ['web'],engine=workflow.settings()['provider'],execution_mode=execution_mode,
                     decide_for_me=bool(data.get('decide_for_me',True)))
