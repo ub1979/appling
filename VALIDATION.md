@@ -719,3 +719,36 @@ saved builder session key (`sw-developer:ca186d142f9c4778:direct-build-v1`) stil
 matches. Its first resume will commit untracked `.sdlc/handoffs/` (about 60 KB)
 as a checkpoint; `.sdlc/evidence/` (about 4 MB) is excluded.
 
+
+## Direct mode as the default — 21 November 2026
+
+New projects default to direct mode again; blocks mode is opt-in and kept as
+the default on `block_branch`. Automated: 274 backend and 82 UI tests passed,
+UI build passed.
+
+Real-model run on Appling C 0.2.0 beta (Codex `gpt-6.1-sol`), project
+`tip_split` (a tip calculator with five-entry local history):
+
+- Created through `POST /api/projects` without `execution_mode`; stored state
+  was `direct`. The event log shows roles req-engineer, ui-designer, one
+  sw-developer and an independent qa-engineer; no task-planning, block-plan,
+  block-build or body stage ran.
+- Owner input: one question (currency; answered "No currency symbol") plus the
+  two expected approvals (prototype, requirements). "Decide small questions for
+  me" was on. The requirements writer produced 7 checks, one per requirement,
+  with no performance, load or accessibility extras.
+- Timings: requirements and prototype about 6 minutes after the answer, build
+  6 minutes, QA 3 minutes. QA: 7 of 7 passed; phase `delivered`.
+- Native Codex helpers were enabled for the build, but Codex did not start any
+  for this small app; parallel helpers in direct mode remain unproven on a real
+  project.
+- Independent browser check of the built app (`npm start`, port 5191):
+  100 / 15% / 4 → 28.75 each, tip 15.00, total 115.00; -5 rejected inline with
+  no history entry; 10 / custom 0% / 3 → 3.33 with the rounding note; six
+  calculations kept exactly the newest five through reload; Cancel kept
+  history; confirmed Clear emptied it through reload ("No calculations yet.")
+  and left an unrelated localStorage key intact. Its own unit tests: 4 of 4.
+  Evidence: `docs/evidence/direct-default/01-tip-split-result.jpg`,
+  `02-tip-split-clear-confirm.jpg`.
+- Not covered: apps needing accounts or live services, larger apps, Claude or
+  Ollama as the builder.
