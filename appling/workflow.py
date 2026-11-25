@@ -552,7 +552,21 @@ class Workflow:
             return
         signature=hashlib.sha256(json.dumps(dict(plan=state['approvals'].get('plan'),revision=state['revision'],
             tasks=[{k:t.get(k) for k in ['id','goal','depends_on']} for t in state['tasks']]),sort_keys=True).encode()).hexdigest()
-        if state.get('scope_assessed')==signature:return
+        if state.get('scope_assessed')!=signature:
+            self._assess_ownership(pid,state,pending)
+        # A task the assessment left without ownership (typically a repair listing review findings) may touch
+        # anything the project already owns. Shared ownership makes it run alone, as the assessment promised.
+        tasks=self.store.get(pid)['tasks'];orphans=[t for t in tasks if t['status']!='done' and not t.get('files')]
+        if orphans:
+            root=Path(state['root']);skip={'.git','.appling','.sdlc','requirements.md','plan.md','prototypes','node_modules','.venv'}
+            shared=list(dict.fromkeys(f for t in tasks for f in t.get('files') or [])) or [
+                p.name+('/' if p.is_dir() else '') for p in sorted(root.iterdir())
+                if p.name not in skip and not p.name.startswith('.env') and not p.is_symlink() and not any(c in p.name for c in '*?[]:\\')]
+            for task in orphans:
+                task['files']=ownership(shared)
+            self.store.update(pid,tasks=tasks)
+
+    def _assess_ownership(self,pid,state,pending):
         self.authorized(pid)
         result=self.invoke(pid,'task-planner',
             'Assess safe execution ownership for these existing unfinished tasks: '+json.dumps(pending)+'. '
