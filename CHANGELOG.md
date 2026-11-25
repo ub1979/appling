@@ -28,12 +28,18 @@ the original Appling `main` branch.
 - Apps may not point into Appling's own folder. Files that do are sent back
   to the builder.
 - `/change` and `/replan` explain themselves on a direct project.
+- Programs left running by a force-quit or crashed Appling (AI programs, test
+  commands, phone previews) are stopped at the next start. Appling records
+  each program it starts and signals one only when its process id and start
+  time both match the record. Anything it cannot prove is its own is left
+  running and named in the server log.
 
 **New:** the setup form asks how to build the app: one builder step by step,
 or blocks built in parallel. Settings lists blocks mode too.
 
-**Not done:** child processes left behind after a crash or `kill -9` are
-still not cleaned up on the next start.
+**Not done:** leftovers from a crash that happened before this fix are not
+cleaned, because nothing recorded them. The WhatsApp bridge and helper
+processes that share Appling's own process group are not recorded either.
 
 **Validation:** backend and interface test suites pass. The setup form and
 Settings changes were type-checked and built but not checked in a browser.

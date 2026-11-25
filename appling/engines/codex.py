@@ -14,7 +14,7 @@ import signal
 import subprocess
 import threading
 import time
-from .. import __version__
+from .. import __version__, children
 from . import environment, result_json
 
 _TASK_ACTIVITY = {
@@ -75,6 +75,7 @@ def execute(connection, run):
     proc = subprocess.Popen([connection.get('binary','codex'), 'app-server', '--listen', 'stdio://'],
         cwd=run.root, env=environment(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
         stderr=subprocess.PIPE, text=True, bufsize=1, start_new_session=True)
+    children.track(proc)
     incoming = queue.Queue()
     errors = []
     closed = threading.Event()
@@ -364,6 +365,7 @@ def execute(connection, run):
             if proc.poll() is None:
                 proc.kill()
         proc.wait()
+        children.forget(proc)
         for helper in native_helpers:
             run.emit('helper',event='complete',subagent_id=helper,status='interrupted',native=True)
         for stream in [proc.stdin,proc.stdout,proc.stderr]:

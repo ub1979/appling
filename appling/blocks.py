@@ -19,7 +19,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from . import acceptance
+from . import acceptance, children
 from .store import safe_path
 
 PLAN = '.sdlc/blocks.json'
@@ -275,6 +275,7 @@ def _run(command, root, log, timeout=900):
         proc = subprocess.Popen(command, shell=True, cwd=root, stdout=fh, stderr=subprocess.STDOUT,
                                 stdin=subprocess.DEVNULL, start_new_session=True,
                                 env={**os.environ, 'APPLING_HEADLESS': '1'})   # controller checks never open windows
+        children.track(proc)
         try:
             code = proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
@@ -288,6 +289,7 @@ def _run(command, root, log, timeout=900):
                 proc.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 pass
+            children.forget(proc)
     text = output.read_text(errors='replace')[-200_000:]
     output.unlink(missing_ok=True)
     note = f'Timed out after {timeout}s\n' if code == 124 else ''
