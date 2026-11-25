@@ -172,6 +172,39 @@ def test_review_work_copies_are_removed_after_use_but_kept_when_a_review_is_reje
     finally:workflow.shutdown()
 
 
+def test_app_files_pointing_into_applings_folder_go_back_to_the_builder(tmp_path):
+    from appling.context import ROOT
+    engine=Engine();prompts=[]
+    def execute(connection,run):
+        result=engine(connection,run)
+        if '\nRole: sw-developer\n' in run.instructions:
+            prompts.append(run.prompt)
+            test=run.root/'tests/browser.mjs';test.parent.mkdir(exist_ok=True)
+            if len(prompts)==1:
+                test.write_text(f"import {{chromium}} from '{ROOT}/scripts/node_modules/playwright/index.mjs';\n")
+            else:
+                test.write_text("import {chromium} from 'playwright';\n")
+        return result
+    store,workflow,pid=project(tmp_path,execute)
+    try:
+        workflow.submit(pid,'Build');wait_idle(workflow,pid)
+        approve(store,workflow,pid,'prototype');approve(store,workflow,pid,'requirements')
+        assert store.get(pid)['phase']=='delivered',[m['content'] for m in store.messages(pid)][-3:]
+        assert len(prompts)==2 and 'tests/browser.mjs' in prompts[1] and "Appling's own folder" in prompts[1]
+        assert str(ROOT) not in (Path(store.get(pid)['root'])/'tests/browser.mjs').read_text()
+    finally:workflow.shutdown()
+
+
+def test_change_command_explains_itself_on_a_direct_project(tmp_path):
+    engine=Engine();store,workflow,pid=project(tmp_path,engine)
+    try:
+        workflow.submit(pid,'Build');wait_idle(workflow,pid)
+        approve(store,workflow,pid,'prototype');approve(store,workflow,pid,'requirements')
+        with pytest.raises(ValueError,match='built as blocks'):
+            workflow.submit(pid,'/change show the number in red')
+    finally:workflow.shutdown()
+
+
 def test_qa_findings_return_to_same_builder_before_fresh_reviews(tmp_path):
     engine=Engine();engine.fail_first_qa=True
     store,workflow,pid=project(tmp_path,engine)

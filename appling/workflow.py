@@ -222,7 +222,10 @@ class Workflow:
             change=text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1))>1 else ''
             if not change:
                 raise ValueError('Say what to change, for example: /change show every available model with a Test button')
-            if state.get('execution_mode')!='blocks' or not state['approvals'].get('blocks') or not state['approvals'].get('requirements'):
+            if state.get('execution_mode')!='blocks':
+                raise ValueError('/change is for projects built as blocks. For this project, describe the change in the chat once the '
+                                 'app is delivered, or use /criteria to change the approved checks.')
+            if not state['approvals'].get('blocks') or not state['approvals'].get('requirements'):
                 raise ValueError('/change works once the requirements and block plan are approved. Before that, use Request changes on the review.')
             for item in self.store.inbox(pid):self.store.close(pid,item['id'])
             approvals={k:v for k,v in state['approvals'].items() if k!='requirements'}
@@ -319,6 +322,10 @@ class Workflow:
             approvals={kind:revision for kind,revision in state['approvals'].items() if kind!='plan'}
             self.store.update(pid,phase='plan',approvals=approvals,queue=[],paused=False,execution_mode='planned')
             self.store.message(pid,'user',feedback)
+            if state.get('execution_mode')!='planned':
+                self.store.message(pid,'assistant','This project now uses the planned build: a task plan you approve, then several '
+                                   'builders working in parallel. Your requirements, design and existing code are kept. '
+                                   'You can change the build mode back in Settings.','status')
             return self.submit(pid,feedback+'\nReplan implementation only; retain approved requirements/design and existing code.',kind='auto')
 
     def _start(self,pid):
