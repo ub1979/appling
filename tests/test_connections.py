@@ -153,3 +153,44 @@ def test_claude_pretty_printed_json_result_is_parsed_as_an_envelope(tmp_path):
     ''')
     result=connections.test_connection({'engine':'claude-cli','binary':binary},'sonnet')
     assert result['ok'];assert result['model']=='versioned-model'
+
+
+def test_readiness_check_names_a_missing_or_signed_out_program_and_never_blocks_on_doubt(tmp_path,monkeypatch):
+    monkeypatch.setattr(connections,'_READY',{})
+    missing=connections.not_ready({'engine':'codex','binary':str(tmp_path/'nowhere')})
+    assert 'not installed' in missing and 'codex login' in missing
+    out=tmp_path/'out';out.mkdir()
+    signed_out=executable(out,'import json\nprint(json.dumps({"loggedIn":False}))\n')
+    reason=connections.not_ready({'engine':'claude-cli','binary':signed_out})
+    assert 'not signed in' in reason and 'claude auth login' in reason
+    # The owner signs in: the next check sees it at once, because only a ready answer is remembered.
+    (out/'engine').write_text('#!'+sys.executable+'\nimport json\nprint(json.dumps({"loggedIn":True}))\n')
+    assert connections.not_ready({'engine':'claude-cli','binary':signed_out}) is None
+    odd=tmp_path/'odd';odd.mkdir()
+    unclear=executable(odd,'import sys\nprint("some new status text")\nsys.exit(3)\n')
+    assert connections.not_ready({'engine':'codex','binary':unclear}) is None
+    assert connections.not_ready({'engine':'claude-cli','binary':unclear}) is None
+    logged_out=tmp_path/'lo';logged_out.mkdir()
+    assert 'not signed in' in connections.not_ready({'engine':'codex','binary':executable(logged_out,'import sys\nprint("Not logged in",file=sys.stderr)\nsys.exit(1)\n')})
+    assert connections.not_ready({'engine':'ollama','base_url':'http://127.0.0.1:1'}) is None
+
+
+def test_project_waits_with_a_plain_message_when_its_program_is_missing(tmp_path,monkeypatch):
+    from appling.store import Store
+    from appling.workflow import Workflow
+    from test_workflow import wait_idle
+    monkeypatch.setattr(connections,'_READY',{})
+    store=Store(tmp_path/'state');pid=store.add(tmp_path/'app')['id']
+    workflow=Workflow(store)   # the real engine runner, so the check applies
+    try:
+        settings=workflow.settings();settings['provider']='claude-cli'
+        settings['connections']['claude-cli']['binary']=str(tmp_path/'nowhere')
+        store.save_setting('ai',settings)
+        workflow.submit(pid,'Build a counter');wait_idle(workflow,pid)
+        state=store.get(pid)
+        assert state['paused'] and state['attention']['reason']=='engine_setup'
+        assert 'Claude Code CLI is not installed' in state['attention']['message']
+        assert not store.inbox(pid)   # no "allow this program to edit" question for a program that cannot run
+        assert not any(e['type'] in {'invocation','problem'} for e in store.events(pid))
+        assert not any('FileNotFoundError' in m['content'] for m in store.messages(pid))
+    finally:workflow.shutdown()

@@ -357,7 +357,7 @@ export function Studio({ id }: { id: string }) {
           </IconButton>
           <button className="btn small danger" disabled={busy || helpers.length > 0 || deletingProject}
             onClick={() => {
-              if (!window.confirm(`Delete "${detail.name}" from your projects? Its folder, files and saved chats will move to Appling Projects/Archive.`)) return;
+              if (!window.confirm(`Delete "${detail.name}" from your projects? Its folder and files will move to Appling's Archive folder.`)) return;
               setDeletingProject(true);
               void run(async () => {
                 try { await api.deleteProject(id); go("/"); }

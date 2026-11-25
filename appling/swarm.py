@@ -241,6 +241,15 @@ def prepare_worker(workflow, pid, state, task, feedback, base=None):
     return worker, base
 
 
+def discard_workspace(root, workspace):
+    """Integrated work is already in the project, so its working copy is only disk use.
+    Blocked or failed work keeps its copy for inspection and recovery."""
+    try:
+        workspaces.remove(root, workspace)
+    except Exception:
+        pass
+
+
 def integrate_worker(workflow, pid, task, worker):
     """Only the coordinator applies results and durably releases dependencies."""
     with workflow.lock:
@@ -261,6 +270,7 @@ def integrate_worker(workflow, pid, task, worker):
                 record['status'] = 'done'
         workflow.store.update(pid, workers=current['workers'], tasks=current['tasks'])
         workflow.store.event(pid, 'worker', worker=dict(worker))
+        discard_workspace(root, worker['workspace'])
     workflow.store.checkpoint(pid, worker['role'], dict(goal=task['goal'], outcome=worker['result'],
                               next_action='Verify the integrated app.', worker_id=worker['id']))
 
@@ -268,6 +278,7 @@ def integrate_worker(workflow, pid, task, worker):
 def build_ready(workflow, pid, feedback=''):
     """Keep eligible slots busy; integrate each completion before refilling them."""
     workflow.authorized(pid)
+    workflow.require_engine('sw-developer')   # ask once here, not once per worker
     from .planning import agent_limit
     attempted = set()
     failures = []
@@ -369,6 +380,7 @@ def verify_project(workflow,pid,role,goal):
         workflow.authorized(pid)
         workspaces.integrate(root,directory,base,commit,[],worker['evidence'])
         save_worker(workflow,pid,worker,status='integrated',result=result,commit=commit)
+        discard_workspace(root,directory)
         return dict(result,_evidence_folder=worker['evidence'])
     except BaseException as exc:
         save_worker(workflow,pid,worker,status='blocked',error=str(exc))

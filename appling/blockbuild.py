@@ -144,6 +144,7 @@ def build(workflow, pid, feedback=''):
     from .planning import agent_limit
     from .workflow import WorkWaiting
     workflow.authorized(pid)
+    workflow.require_engine('sw-developer')   # ask once here, not once per block
     state = workflow.store.get(pid); root = Path(state['root'])
     spec = acceptance.load(root); plan_ = blocks.load(root)
     if plan_ is None:

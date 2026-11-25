@@ -52,7 +52,8 @@ def coding_phase(state):
     return 'blocks_build' if any(v.get('status') in unfinished for v in (state.get('block_status') or {}).values()) else 'body'
 
 
-def artifact_revision(root, kind):
+def artifact_names(root, kind):
+    """The files whose bytes make up one approved artifact."""
     names=[ARTIFACTS[kind]]
     if kind=='blocks' and safe_path(root,'.sdlc/blocks.json').is_file():
         names.append('.sdlc/blocks.json')
@@ -62,6 +63,39 @@ def artifact_revision(root, kind):
     if kind=='prototype':
         names=[str(p.relative_to(root)) for p in sorted((root/'prototypes').rglob('*'))
                if p.is_file() and not p.is_symlink()]
+    return names
+
+
+def approved_kinds(state):
+    mode=state.get('execution_mode')
+    return (['requirements','prototype'] if mode=='direct' else ['requirements','prototype','blocks'] if mode=='blocks'
+            else ['requirements','prototype','plan'])
+
+
+def snapshot_approved(root, state):
+    """The bytes of every artifact that is approved right now, so a builder's edit to them can be undone."""
+    root=Path(root);approvals=state.get('approvals') or {}
+    return {kind:{name:safe_path(root,name).read_bytes() for name in artifact_names(root,kind)}
+            for kind in approved_kinds(state) if approvals.get(kind) and approvals[kind]==artifact_revision(root,kind)}
+
+
+def restore_approved(root, state, snapshot):
+    """Put approved files back when a builder changed them. Only the owner changes what was approved.
+    Returns the artifact kinds that had to be restored."""
+    root=Path(root);approvals=state.get('approvals') or {};restored=[]
+    for kind,files in snapshot.items():
+        if approvals.get(kind)!=artifact_revision(root,kind):
+            for name in artifact_names(root,kind):
+                if name not in files:
+                    safe_path(root,name).unlink()   # a file the builder added to an approved artifact
+            for name,data in files.items():
+                path=safe_path(root,name);path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
+            restored.append(kind)
+    return restored
+
+
+def artifact_revision(root, kind):
+    names=artifact_names(root,kind)
     digest=hashlib.sha256()
     if not names:
         return None
@@ -188,7 +222,10 @@ class Workflow:
             change=text.split(maxsplit=1)[1].strip() if len(text.split(maxsplit=1))>1 else ''
             if not change:
                 raise ValueError('Say what to change, for example: /change show every available model with a Test button')
-            if state.get('execution_mode')!='blocks' or not state['approvals'].get('blocks') or not state['approvals'].get('requirements'):
+            if state.get('execution_mode')!='blocks':
+                raise ValueError('/change is for projects built as blocks. For this project, describe the change in the chat once the '
+                                 'app is delivered, or use /criteria to change the approved checks.')
+            if not state['approvals'].get('blocks') or not state['approvals'].get('requirements'):
                 raise ValueError('/change works once the requirements and block plan are approved. Before that, use Request changes on the review.')
             for item in self.store.inbox(pid):self.store.close(pid,item['id'])
             approvals={k:v for k,v in state['approvals'].items() if k!='requirements'}
@@ -285,6 +322,10 @@ class Workflow:
             approvals={kind:revision for kind,revision in state['approvals'].items() if kind!='plan'}
             self.store.update(pid,phase='plan',approvals=approvals,queue=[],paused=False,execution_mode='planned')
             self.store.message(pid,'user',feedback)
+            if state.get('execution_mode')!='planned':
+                self.store.message(pid,'assistant','This project now uses the planned build: a task plan you approve, then several '
+                                   'builders working in parallel. Your requirements, design and existing code are kept. '
+                                   'You can change the build mode back in Settings.','status')
             return self.submit(pid,feedback+'\nReplan implementation only; retain approved requirements/design and existing code.',kind='auto')
 
     def _start(self,pid):
@@ -507,10 +548,7 @@ class Workflow:
 
     def authorized(self,pid):
         state=self.store.get(pid);root=Path(state['root'])
-        mode=state.get('execution_mode')
-        kinds=(['requirements','prototype'] if mode=='direct' else ['requirements','prototype','blocks'] if mode=='blocks'
-               else ['requirements','prototype','plan'])
-        for kind in kinds:
+        for kind in approved_kinds(state):
             if state['approvals'].get(kind)!=artifact_revision(root,kind) or not state['approvals'].get(kind):
                 raise PermissionError(f'The current {kind} needs approval before implementation can continue.')
 
@@ -521,7 +559,21 @@ class Workflow:
             return
         signature=hashlib.sha256(json.dumps(dict(plan=state['approvals'].get('plan'),revision=state['revision'],
             tasks=[{k:t.get(k) for k in ['id','goal','depends_on']} for t in state['tasks']]),sort_keys=True).encode()).hexdigest()
-        if state.get('scope_assessed')==signature:return
+        if state.get('scope_assessed')!=signature:
+            self._assess_ownership(pid,state,pending)
+        # A task the assessment left without ownership (typically a repair listing review findings) may touch
+        # anything the project already owns. Shared ownership makes it run alone, as the assessment promised.
+        tasks=self.store.get(pid)['tasks'];orphans=[t for t in tasks if t['status']!='done' and not t.get('files')]
+        if orphans:
+            root=Path(state['root']);skip={'.git','.appling','.sdlc','requirements.md','plan.md','prototypes','node_modules','.venv'}
+            shared=list(dict.fromkeys(f for t in tasks for f in t.get('files') or [])) or [
+                p.name+('/' if p.is_dir() else '') for p in sorted(root.iterdir())
+                if p.name not in skip and not p.name.startswith('.env') and not p.is_symlink() and not any(c in p.name for c in '*?[]:\\')]
+            for task in orphans:
+                task['files']=ownership(shared)
+            self.store.update(pid,tasks=tasks)
+
+    def _assess_ownership(self,pid,state,pending):
         self.authorized(pid)
         result=self.invoke(pid,'task-planner',
             'Assess safe execution ownership for these existing unfinished tasks: '+json.dumps(pending)+'. '
@@ -551,11 +603,21 @@ class Workflow:
             tasks=[{k:t.get(k) for k in ['id','goal','depends_on']} for t in tasks]),sort_keys=True).encode()).hexdigest()
         self.store.update(pid,tasks=tasks,scope_assessed=signature)
 
+    def require_engine(self,role):
+        """Stop before any work starts when the AI program for this role is missing or signed out."""
+        key,conn,selection=self.connection(role)
+        if self.execute is engines.execute:   # test engines have no program to check
+            from .connections import not_ready
+            reason=not_ready(conn)
+            if reason:
+                raise WorkWaiting(reason,reason='engine_setup',blockers=[])
+        return key,conn,selection
+
     def invoke(self,pid,role,goal,readonly=False,workspace=None,worker=None,session_scope=None,planning_context=None):
         if self.cancelled[pid].is_set():
             raise InterruptedError('Stopped before starting the next model invocation. Existing work is saved.')
         invocation_id=uuid.uuid4().hex;done=threading.Event()
-        key,conn,selection=self.connection(role)
+        key,conn,selection=self.require_engine(role)
         state=self.store.get(pid)
         # A changed model/skill gets a new session; existing prefixes stay unchanged.
         mode=state.get('execution_mode','planned')

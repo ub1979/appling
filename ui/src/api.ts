@@ -198,7 +198,10 @@ export interface Catalog {
   agents: Agent[];
   styles: StartStyle[];
   default_root: string;
+  default_mode?: BuildMode;
 }
+
+export type BuildMode = "direct" | "blocks";
 
 export type BuildProfile = "personal" | "reusable" | "production";
 export type ProjectKind = "app" | "website" | "slides" | "video";
@@ -227,6 +230,7 @@ export interface NewProject {
   template: string | null;
   platforms?: Platform[];
   decide_for_me?: boolean;
+  execution_mode?: BuildMode;
 }
 
 export type Platform = "web" | "phone" | "computer";
@@ -317,7 +321,7 @@ export const api = {
   projects: () => call<{ projects: ProjectSummary[]; default_root: string; version?: string }>("GET", "/api/projects"),
   catalog: () => call<Catalog>("GET", "/api/catalog"),
   addProject: (body: NewProject) => call<ProjectDetail>("POST", "/api/projects", body),
-  deleteProject: (id: string) => call<{ archived_to: string }>("DELETE", `/api/projects/${id}`),
+  deleteProject: (id: string) => call<{ archived_to: string | null }>("DELETE", `/api/projects/${id}`),
   project: (id: string) => call<ProjectDetail>("GET", `/api/projects/${id}`),
   startUpdate: (id: string, branch: string | null) =>
     call<{ chat_id: string }>("POST", `/api/projects/${id}/update`, { branch }),

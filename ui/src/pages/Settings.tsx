@@ -143,7 +143,8 @@ export function Settings({ projectId }: { projectId: string | null }) {
                     if (updated.execution_mode !== execution_mode) throw new Error("Restart Appling to load build coordination settings.");
                     setProject(updated);
                   }, "Saved. Return to the project and send a message to continue."); }}>
-                  <option value="direct">Let the coding engine coordinate (default)</option>
+                  <option value="direct">One builder, step by step</option>
+                  <option value="blocks">Blocks built in parallel, then joined</option>
                   <option value="planned">Review a separate implementation plan</option>
                 </select>
               </label>

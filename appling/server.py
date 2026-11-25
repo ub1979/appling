@@ -25,6 +25,10 @@ from . import connections
 from .messaging import PhoneConnections
 
 
+# How a new project builds unless the owner chooses otherwise at setup. block_branch sets this to 'blocks'.
+DEFAULT_MODE='direct'
+
+
 def create_app(home=None,execute=None):
     home=Path(home or ROOT/'.appling_c');home.mkdir(parents=True,exist_ok=True,mode=0o700)
     store=Store(home/'studio.db')
@@ -100,7 +104,7 @@ def create_app(home=None,execute=None):
     @app.get('/api/catalog')
     def catalog():
         return dict(agents=[dict(id=a[0],label=a[1],description=a[2],required=a[0] in CATALOG['REQUIRED']) for a in CATALOG['AGENTS']],
-                    styles=CATALOG['STYLES'],default_root=str(default_root))
+                    styles=CATALOG['STYLES'],default_root=str(default_root),default_mode=DEFAULT_MODE)
 
     @app.post('/api/projects')
     async def add_project(request:Request):
@@ -115,8 +119,8 @@ def create_app(home=None,execute=None):
             if p['root']==str(root):
                 return detail(p['id'])
         team=list(dict.fromkeys([*CATALOG['REQUIRED'],*data.get('team',[])]))
-        execution_mode=data.get('execution_mode') or 'blocks'
-        if execution_mode not in {'direct','planned','blocks'}:raise ValueError('Choose blocks, direct or planned execution.')
+        execution_mode=data.get('execution_mode') or DEFAULT_MODE
+        if execution_mode not in {'direct','planned','blocks'}:raise ValueError('Choose direct, blocks or planned execution.')
         p=store.add(root,team=team,style=data.get('style','app-it'),profile=data.get('profile','personal'),
                     kind=data.get('kind','app'),platforms=data.get('platforms') or ['web'],engine=workflow.settings()['provider'],execution_mode=execution_mode,
                     decide_for_me=bool(data.get('decide_for_me',True)))
@@ -147,12 +151,18 @@ def create_app(home=None,execute=None):
     def archive(pid:str):
         if pid in workflow.active:
             raise ValueError('Stop the project and wait for its current task to finish before archiving.')
-        p=store.get(pid);root=Path(p['root']);archive_root=home/'Archive';archive_root.mkdir(exist_ok=True)
-        target=archive_root/(root.name+'-'+pid)
-        shutil.move(str(root),target)
+        p=store.get(pid);root=Path(p['root']);target=None
+        if root.is_dir():
+            archive_root=home/'Archive';archive_root.mkdir(exist_ok=True)
+            target=archive_root/(root.name+'-'+pid)
+            try:
+                shutil.move(str(root),target)
+            except OSError as exc:
+                raise ValueError(f'The project folder could not be moved to the Archive ({exc.strerror or exc}). Nothing was deleted.')
+        # A project whose folder is already gone is simply removed from the list.
         with store.connect() as c:
             c.execute('DELETE FROM projects WHERE id=?',(pid,))
-        return dict(archived_to=str(target))
+        return dict(archived_to=str(target) if target else None,archive_root=str(home/'Archive'))
 
     @app.post('/api/projects/{pid}/messages')
     async def message(pid:str,request:Request):

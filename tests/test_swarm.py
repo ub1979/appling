@@ -10,7 +10,7 @@ import pytest
 
 from appling import workspaces
 from appling.store import Store
-from appling.swarm import build_ready, ready_batch
+from appling.swarm import build_ready, prepare_worker, ready_batch
 from appling.workflow import ARTIFACTS, Workflow, artifact_revision, parse_tasks
 
 
@@ -278,6 +278,29 @@ def test_edited_retained_worktree_is_reverified_before_reusing_result(tmp_path,m
         assert build_ready(w,pid)
         assert calls==[worker['workspace']]
         assert (root/'front.txt').read_text()=='reverified edited change'
+    finally:w.shutdown()
+
+
+def test_repair_task_left_without_ownership_runs_alone_with_the_project_ownership(tmp_path):
+    calls=[]
+    def assess(conn,run):
+        calls.append(run.prompt)
+        return dict(task_scopes=[])   # the assessor leaves the list of review findings "uncertain"
+    store,w,pid,root=fixture(tmp_path,assess)
+    tasks=store.get(pid)['tasks']
+    owned=list(dict.fromkeys(f for t in tasks for f in t['files']))
+    for task in tasks:task['status']='done'
+    tasks.append(dict(id='repair-1-1',goal='{"findings":[{"description":"Fix the total"}]}',depends_on=[],role='sw-developer',status='pending'))
+    store.update(pid,tasks=tasks)
+    try:
+        w.scope_remaining_tasks(pid)
+        repair=store.get(pid)['tasks'][-1]
+        assert repair['files']==owned
+        worker,_=prepare_worker(w,pid,store.get(pid),repair,'')   # used to raise "Task ownership is missing"
+        assert Path(worker['workspace']).is_dir()
+        # A second resume does not ask the assessor again and keeps the ownership.
+        w.scope_remaining_tasks(pid)
+        assert len(calls)==1 and store.get(pid)['tasks'][-1]['files']==owned
     finally:w.shutdown()
 
 

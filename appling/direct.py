@@ -151,6 +151,29 @@ def set_mode(workflow, pid, mode):
             'Build coordination changed. Files, approvals and retained work are saved. Send a message to continue.', 'status')
 
 
+def host_path_leaks(root):
+    """Project files that point into Appling's own folders. Such an app breaks when Appling moves or is removed."""
+    import os
+    from .context import ROOT
+    needles = [str(ROOT / name).encode() for name in ('scripts', 'skills', 'appling', '.appling_c/studio.db', '.appling_c/browsers')]
+    skip = {'.git', '.appling', '.sdlc', 'node_modules', '.venv', 'dist', 'build', 'out', 'coverage', 'test-results',
+            'playwright-report', '__pycache__'}
+    found = []
+    for base, dirs, files in os.walk(root):
+        dirs[:] = sorted(d for d in dirs if d not in skip)
+        for name in sorted(files):
+            path = Path(base) / name
+            try:
+                if path.is_symlink() or path.stat().st_size > 512_000:
+                    continue
+                data = path.read_bytes()
+            except OSError:
+                continue
+            if any(n in data for n in needles):
+                found.append(str(path.relative_to(root)))
+    return found
+
+
 def _folder_digest(root, folders):
     """Source content only: build output, caches, dependencies and virtual environments are ignored."""
     digest = hashlib.sha256()
@@ -166,7 +189,7 @@ def _folder_digest(root, folders):
 
 
 def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v1', protect=()):
-    from .workflow import WorkWaiting, source_revision
+    from .workflow import WorkWaiting, source_revision, snapshot_approved, restore_approved
     workflow.authorized(pid)
     state = workflow.store.get(pid)
     task_id = 'direct-build'
@@ -184,6 +207,7 @@ def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v
             'There is no mandatory implementation-plan document, task graph, host worktree pool or task ownership split in direct mode. '
             'You own implementation and wiring across the application; organize the work using the execution engine. '
             'Respect the approved design when supplied. Do not edit requirements.md, plan.md, prototypes/ or controller approvals. '
+            'The approved checks in .sdlc/acceptance.json and the block plan are read-only too; if one looks wrong, report a blocker. '
             'Run affected builds/tests and real browser checks for UI. Retain concrete owner/device/account blockers; '
             'do not install untrusted drivers, grant OS permissions or perform unapproved external actions. '
             'Save fresh nonempty command/exit/output receipts only under .sdlc/evidence/direct-build/. '
@@ -213,7 +237,26 @@ def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v
             # Compare with the tested blocks recorded when block building finished, so an earlier edit is never accepted.
             protected_before = ((workflow.store.get(pid).get('blocks_digest') or _folder_digest(state['root'], protect))
                                 if protect else None)
-            result = workflow.invoke(pid, 'sw-developer', goal, session_scope=session_scope)
+            approved = snapshot_approved(state['root'], workflow.store.get(pid))
+            try:
+                result = workflow.invoke(pid, 'sw-developer', goal, session_scope=session_scope)
+            finally:
+                # A builder that edits approved files would otherwise leave the project waiting for an approval nobody is asked for.
+                restored = restore_approved(state['root'], workflow.store.get(pid), approved)
+                if restored:
+                    workflow.store.event(pid, 'approved_files_restored', kinds=restored,
+                                         text='The builder changed approved files; Appling put the approved versions back.')
+                    workflow.store.message(pid, 'assistant', 'The builder changed the approved ' + ' and '.join(restored) +
+                                           '. Appling put the approved version back, so nothing you approved has changed.', 'status')
+            leaks = host_path_leaks(state['root'])
+            if leaks and isinstance(result, dict):
+                # Sent back to the builder through the normal bounded continuation, never accepted as finished.
+                where = ', '.join(leaks[:10])
+                result = dict(result, status='blocked', blockers=[*(result.get('blockers') or []), dict(
+                    kind='implementation',
+                    detail="These files point into Appling's own folder, so the app would break if Appling moved: " + where,
+                    next_action='Remove every path into Appling\'s folder from ' + where + '. Add tools the app needs '
+                                '(for example Playwright) to the app\'s own dependencies and use project-relative paths.')])
             if protect and _folder_digest(state['root'], protect) != protected_before:
                 raise ValueError('The app body changed files inside ' + ', '.join(protect) +
                                  '. Blocks change only through their own builder; report the needed interface change instead.')

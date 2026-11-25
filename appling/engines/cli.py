@@ -84,17 +84,25 @@ def execute(connection, run):
             errors.append(line[-1000:]);del errors[:-8]
     threading.Thread(target=read,daemon=True).start()
     threading.Thread(target=err,daemon=True).start()
-    final='';reported_model=None;text_parts=[];deadline=time.monotonic()+connection.get('timeout',1800)
+    final='';reported_model=None;text_parts=[]
+    # A connection test keeps a total deadline. A real task has no total limit: only silence ends it,
+    # so a long build that keeps reporting is never cut off.
+    probe=bool(run.connection_test)
+    limit=connection.get('timeout',1800) if probe else connection.get('idle_timeout',connection.get('timeout',1800))
+    last_activity=time.monotonic()
     try:
         while True:
             if run.cancel.is_set():
                 raise InterruptedError('Stopped. Existing files remain available.')
-            if time.monotonic()>deadline:
-                raise TimeoutError(f'{engine} did not respond within {connection.get("timeout",1800)} seconds. Check the CLI directly for login, connectivity or startup-hook problems.')
+            if time.monotonic()-last_activity>limit:
+                if probe:
+                    raise TimeoutError(f'{engine} did not respond within {limit} seconds. Check the CLI directly for login, connectivity or startup-hook problems.')
+                raise TimeoutError(f'{engine} reported no activity for {limit} seconds. Paused for inactivity; saved work can be resumed.')
             try:
                 line=lines.get(timeout=.2)
             except queue.Empty:
                 continue
+            if not probe:last_activity=time.monotonic()
             if line is None:
                 break
             try:

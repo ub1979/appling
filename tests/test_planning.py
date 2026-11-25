@@ -132,6 +132,16 @@ def test_capacity_one_blocks_before_model_and_after_plan_approval(tmp_path):
     finally:w.shutdown()
 
 
+def test_replan_tells_the_owner_when_it_changes_the_build_mode(tmp_path):
+    store,w,pid,root,approvals,calls=project(tmp_path,[plan_result(parallel_tasks())])
+    store.update(pid,phase='build',execution_mode='direct')
+    try:
+        w.submit(pid,'/replan Split the work');wait_idle(w,pid)
+        assert store.get(pid)['execution_mode']=='planned'
+        assert any('now uses the planned build' in m['content'] for m in store.messages(pid))
+    finally:w.shutdown()
+
+
 def test_replan_command_preserves_approved_inputs_and_existing_code(tmp_path):
     good=plan_result(parallel_tasks())
     store,w,pid,root,approvals,calls=project(tmp_path,[good])

@@ -137,6 +137,34 @@ def test_criteria_are_part_of_the_requirements_approval(tmp_path):
         workflow.shutdown()
 
 
+def test_builder_edit_to_the_approved_checks_is_undone_instead_of_stalling_the_project(tmp_path):
+    class Meddler(Engine):
+        def __call__(self, connection, run):
+            role = run.instructions.split('Role: ', 1)[1].splitlines()[0]
+            if role == 'sw-developer':
+                spec = json.loads((run.root / acceptance.SPEC).read_text())
+                spec['criteria'][1]['live'] = False       # weaken an approved check
+                (run.root / acceptance.SPEC).write_text(json.dumps(spec))
+                (run.root / 'prototypes/extra.html').write_text('added by the builder')
+            return super().__call__(connection, run)
+    engine = Meddler(); store, workflow, pid = make(tmp_path, engine)
+    try:
+        workflow.submit(pid, 'Build a number poster'); wait_idle(workflow, pid)
+        root = Path(store.get(pid)['root'])
+        approve(store, workflow, pid, 'prototype')
+        approved = (root / acceptance.SPEC).read_bytes()
+        approve(store, workflow, pid, 'requirements')
+        state = store.get(pid)
+        assert state['phase'] == 'implementation_verified', [m['content'] for m in store.messages(pid)][-3:]
+        assert (root / acceptance.SPEC).read_bytes() == approved and not (root / 'prototypes/extra.html').exists()
+        assert state['approvals']['requirements'] == artifact_revision(root, 'requirements')
+        kinds = [e['kinds'] for e in store.events(pid) if e['type'] == 'approved_files_restored']
+        assert kinds and set(kinds[0]) == {'requirements', 'prototype'}
+        assert not any('needs approval' in m['content'] for m in store.messages(pid))
+    finally:
+        workflow.shutdown()
+
+
 def test_owner_only_blockers_reach_qa_and_end_implementation_verified_not_delivered(tmp_path):
     engine = Engine(); store, workflow, pid = make(tmp_path, engine)
     try:

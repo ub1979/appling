@@ -80,3 +80,13 @@ def test_service_watcher_covers_all_projects_and_stops_when_instance_changes(tmp
     checks=iter([True,False])
     watch(store,None,Stop(),alive=lambda:next(checks))
     assert len(store.messages(pid))==len(store.messages(other['id']))==1
+
+
+def test_steps_from_engines_that_only_report_starts_count_as_activity(tmp_path):
+    store,pid,started=project(tmp_path)
+    # Claude, Copilot and API engines emit a start event per step and no finished-command event.
+    store.event(pid,'tool',phase='start',name='Bash')
+    store.event(pid,'tool',phase='start',name='Edit')
+    assert publish_due(store,pid,now=started+300)
+    text=Store(store.home).messages(pid)[0]['content']
+    assert 'No activity' not in text and '2 work steps' in text

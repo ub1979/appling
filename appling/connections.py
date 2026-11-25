@@ -182,6 +182,39 @@ def discover(connection):
                 state=state,message=message,source=source,checked_at=time.time())
 
 
+_READY={}
+_CLIS={'codex':('codex','Codex CLI','codex login'),'claude-cli':('claude','Claude Code CLI','claude auth login'),
+       'copilot':('copilot','Copilot CLI','copilot login')}
+
+
+def not_ready(connection,ttl=120):
+    """A plain reason this CLI connection cannot run a task right now, or None.
+    Cheap and local. It never blocks on doubt: only a missing program or an explicit signed-out answer counts."""
+    engine=connection.get('engine')
+    if engine not in _CLIS:return None
+    default,label,login=_CLIS[engine];binary=connection.get('binary',default)
+    checked=_READY.get((engine,binary))
+    if checked and time.monotonic()-checked<ttl:return None
+    if not shutil.which(binary):
+        return f'{label} is not installed or is missing from PATH. Install it, run {login} in a terminal, then send a message to continue.'
+    signed_out=False
+    try:
+        if engine=='claude-cli':
+            result=subprocess.run([binary,'auth','status','--json'],env=claude_environment(),stdin=subprocess.DEVNULL,
+                                  capture_output=True,text=True,timeout=12)
+            signed_out=json.loads(result.stdout).get('loggedIn') is False
+        elif engine=='codex':
+            result=subprocess.run([binary,'login','status'],env=environment(),stdin=subprocess.DEVNULL,
+                                  capture_output=True,text=True,timeout=12)
+            signed_out=bool(result.returncode) and 'not logged in' in (result.stdout+result.stderr).lower()
+    except (OSError,ValueError,AttributeError,subprocess.TimeoutExpired):
+        signed_out=False
+    if signed_out:
+        return f'{label} is not signed in. Run {login} in a terminal, then send a message to continue.'
+    _READY[(engine,binary)]=time.monotonic()   # only a ready answer is remembered, so a fresh sign-in is seen at once
+    return None
+
+
 def test_connection(connection,model=''):
     """An explicit user action: make one small inference without project context."""
     engine=connection['engine'];model='' if model=='default' else model

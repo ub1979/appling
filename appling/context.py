@@ -123,7 +123,10 @@ BROWSER_POLICY = ('Automated browser checks run headless: never open visible bro
                   'Launch browsers with headless: true, including in tests you write or change. Code that can show a window '
                   '(for example an observable browser for the owner) must default to headless when APPLING_HEADLESS=1, which '
                   'Appling sets for agents and controller checks. Save screenshots in the evidence folder as proof; Appling shows them. '
-                  'Open a visible window only for a live check the owner is doing themself.')
+                  'Open a visible window only for a live check the owner is doing themself. '
+                  'browser_runner and browser_setup are Appling\'s own tools: run them, but never import them, their node_modules '
+                  'or any other path inside Appling\'s folder from the app\'s code or tests. An app that needs Playwright or '
+                  'another tool for its own tests lists it in the app\'s own dependencies and uses project-relative paths.')
 
 
 def briefing(store, pid, role, goal, workspace=None, worker=None, planning_context=None):
