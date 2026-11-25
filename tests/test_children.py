@@ -86,6 +86,27 @@ def test_a_running_servers_programs_are_never_touched(tmp_path, server):
     assert sent == [] and alive(pids[0]) and len(list(ledger.glob('*.json'))) == 1
 
 
+def test_a_failed_lookup_is_never_read_as_the_server_being_gone(tmp_path, server, monkeypatch):
+    """Under load the system can fail to answer. No answer must not become permission to stop a live server's work."""
+    ledger = tmp_path / 'ledger'
+    proc, pids = server('sleep 300')
+    real = children._ps
+    sent = []
+    monkeypatch.setattr(children, '_ps', lambda *args: None)                      # nothing can be looked up
+    assert children.reap(ledger, send=lambda pid, sig: sent.append(pid)) == ([], [])
+    monkeypatch.setattr(children, '_ps', lambda *args: None if '-ax' in args else real(*args))
+    crash(proc)                                                                   # now truly gone, but the listing fails
+    assert children.reap(ledger, send=lambda pid, sig: sent.append(pid)) == ([], [])
+    assert sent == [] and len(list(ledger.glob('*.json'))) == 1                   # kept, to try again at the next start
+    monkeypatch.setattr(children, '_ps', real)
+    assert alive(pids[0])
+    assert children.reap(ledger, grace=.5)[0] == pids and wait_gone(pids) == []
+    with pytest.raises(OSError, match='own start time'):                          # and no record is written without an owner
+        monkeypatch.setattr(children, '_ps', lambda *args: None)
+        children.enable(tmp_path / 'other')
+    assert children.DIRECTORY is None
+
+
 def test_a_reused_process_id_is_never_signalled(tmp_path):
     """After a crash the recorded id can belong to anything, for example the owner's own Codex."""
     ledger = tmp_path / 'ledger'; ledger.mkdir()
