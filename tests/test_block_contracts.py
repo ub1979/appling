@@ -72,7 +72,9 @@ def test_a_plan_that_uses_a_name_nobody_offers_is_rejected_before_anything_is_bu
 def test_conformance_reports_names_missing_from_source_and_names_no_test_uses(tmp_path):
     block = blocks.validate(contract_plan(), spec())['blocks'][1]
     folder = tmp_path / 'blocks/poster'; (folder / 'tests').mkdir(parents=True)
-    assert blocks.conformance(tmp_path, block)[0][0].startswith('The entry file blocks/poster/index.py does not exist')
+    # A differently named entry file is something to correct once, not a hard failure: the plan named it before any code existed.
+    missing, soft = blocks.conformance(tmp_path, block)
+    assert len(missing) == 2 and soft[0].startswith('The entry file blocks/poster/index.py does not exist')
     (folder / 'index.py').write_text('class PostResult: pass\n')
     (folder / 'README.md').write_text('post(text) publishes it')           # documentation is not an implementation
     (folder / 'tests/test_poster.py').write_text('def test_nothing(): pass\n')

@@ -232,7 +232,7 @@ def build(workflow, pid, feedback=''):
             swarm._task_status(workflow, pid, block['id'], 'done')
         else:
             block['source'] = 'new'   # rebuilt as new work in this project
-    stuck, attempted, repairs, counts = {}, set(), {}, {}
+    stuck, attempted, repairs, counts, outages, handed = {}, set(), {}, {}, {}, {}
     with ThreadPoolExecutor(max_workers=6, thread_name_prefix='appling-block') as pool:
         futures = {}
         while True:
@@ -254,6 +254,7 @@ def build(workflow, pid, feedback=''):
                         stuck[task['id']] = str(exc); _set_status(workflow, pid, task['id'], status='blocked', reason=str(exc)[:600])
                         continue
                     _set_status(workflow, pid, task['id'], status='building', worker=worker['id'], local=True)
+                    handed[task['id']] = json.dumps(worker.get('result'), sort_keys=True, default=str)
                     futures[pool.submit(swarm.run_worker, workflow, pid, task, worker)] = (task, worker)
             if not futures:
                 if ready and not workflow.cancelled[pid].is_set():
@@ -272,6 +273,13 @@ def build(workflow, pid, feedback=''):
                 except Exception as exc:   # run_worker already saved the worker as blocked
                     swarm._task_status(workflow, pid, task['id'], 'pending')
                     result = worker.get('result') or {}
+                    if not isinstance(exc, ValueError) and json.dumps(worker.get('result'), sort_keys=True, default=str) == handed.get(task['id']):
+                        # The AI program itself stopped (usage limit, lost connection, no activity) without handing anything
+                        # back. That says nothing about the block, so it is not a reason to build it step by step.
+                        outages[task['id']] = str(exc)
+                        _set_status(workflow, pid, task['id'], status='planned', needs=None,
+                                    reason='The AI program stopped before finishing this block: ' + str(exc)[:400])
+                        continue
                     gaps = swarm.dependency_gaps(result, task.get('depends_on', []))
                     if gaps:
                         names = ', '.join(by_id[d]['name'] for d in gaps)
@@ -323,6 +331,11 @@ def build(workflow, pid, feedback=''):
                     _set_status(workflow, pid, block['id'], status='blocked', reason=stuck[block['id']], test=test)
     if workflow.cancelled[pid].is_set():
         raise InterruptedError('Stopped. Built blocks and retained block workspaces are saved.')
+    if outages:
+        names = ', '.join(by_id[i]['name'] for i in sorted(outages))
+        raise WorkWaiting(f'The AI program stopped while building {names}: {next(iter(outages.values()))[:400]}\n'
+                          'Everything finished so far is saved. Send a message to continue; these blocks are built again in parallel.',
+                          reason='engine', blockers=[])
     remaining = [t for t in workflow.store.get(pid)['tasks'] if t['status'] != 'done']
     waiting = sorted(set(stuck) | {t['id'] for t in remaining})
     status_now = workflow.store.get(pid).get('block_status') or {}

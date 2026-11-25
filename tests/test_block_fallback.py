@@ -6,7 +6,7 @@ from pathlib import Path
 from appling import blocks
 from appling.blockbuild import protected_folders
 from test_blocks import Engine, library, make, to_blocks_review  # noqa: F401
-from test_workflow import approve
+from test_workflow import approve, wait_idle
 
 
 class Fallback(Engine):
@@ -75,5 +75,63 @@ def test_the_main_builder_may_write_only_the_blocks_it_was_handed(tmp_path, libr
         state = store.get(pid)
         assert state['phase'] == 'body' and state['paused']
         assert any('changed files inside blocks/notifier/' in m['content'] for m in store.messages(pid))
+    finally:
+        workflow.shutdown()
+
+
+def test_an_ai_program_outage_pauses_the_project_and_never_turns_it_into_a_step_by_step_build(tmp_path, library):
+    """A usage limit or lost connection says nothing about the block, so it must not cost the project its parallel build."""
+    class Outage(Engine):
+        down = True
+        def __call__(self, connection, run):
+            brief = json.loads(run.prompt)
+            if self.down and self.role(run) == 'sw-developer' and brief.get('worker') and 'in blocks/poster/ only' in brief['goal']:
+                with self.lock:
+                    self.calls.append('block:poster')
+                raise RuntimeError('Codex exited before completing the task. Usage limit reached.')
+            return super().__call__(connection, run)
+        def barrier_parties(self):
+            return []
+    engine = Outage(); store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        state = store.get(pid)
+        assert state['paused'] and state['attention']['reason'] == 'engine' and 'Usage limit reached' in state['attention']['message']
+        assert state['block_status']['notifier']['status'] == 'tested'            # finished work is kept
+        assert state['block_status']['poster']['status'] == 'planned' and not state['block_status']['poster'].get('serial')
+        assert not [e for e in store.events(pid) if e['type'] == 'serial_fallback'] and 'body' not in engine.calls
+        assert not [i for i in store.inbox(pid) if i.get('blocks_scope')]
+        engine.down = False
+        workflow.submit(pid, 'continue'); wait_idle(workflow, pid)
+        state = store.get(pid)
+        assert state['phase'] == 'implementation_verified', [m['content'][:200] for m in store.messages(pid)][-3:]
+        assert engine.calls.count('block:poster') == 2 and engine.calls.count('block:notifier') == 1
+        assert not state['block_status']['poster'].get('serial')
+    finally:
+        workflow.shutdown()
+
+
+def test_a_path_into_applings_folder_inside_a_finished_block_goes_back_to_that_blocks_builder(tmp_path, library):
+    from appling.context import ROOT
+    class Leaky(Engine):
+        goals = []
+        def __call__(self, connection, run):
+            brief = json.loads(run.prompt)
+            result = super().__call__(connection, run)
+            if self.role(run) == 'sw-developer' and brief.get('worker') and 'in blocks/notifier/ only' in brief['goal']:
+                self.goals.append(brief['goal'])
+                check = run.root / 'blocks/notifier/check.mjs'
+                check.write_text(f"import '{ROOT}/scripts/browser-check.mjs';\n" if len(self.goals) == 1 else "import 'playwright';\n")
+            return result
+    engine = Leaky(); engine.barrier_parties = lambda: []   # the block is rebuilt alone, so nothing overlaps
+    store, workflow, pid = make(tmp_path, engine)
+    try:
+        to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
+        state = store.get(pid)
+        assert state['phase'] == 'implementation_verified', [m['content'][:200] for m in store.messages(pid)][-3:]
+        # The main builder may not edit that block, so its own builder got the request and fixed it.
+        assert len(engine.goals) == 2 and "point into Appling's own folder" in engine.goals[1]
+        assert str(ROOT) not in (Path(state['root']) / 'blocks/notifier/check.mjs').read_text()
+        assert not [i for i in store.inbox(pid) if i.get('blocks_scope') or i.get('scope')]
     finally:
         workflow.shutdown()

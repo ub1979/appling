@@ -354,8 +354,8 @@ CONTRACT_RULES = ('Agreed contract (fixed before building; other blocks and the 
 
 
 def conformance(root, block):
-    """Compare a built block with its agreed contract. Returns (missing, untested): what is absent from the
-    block's source (a broken promise to its users) and what no test in the block mentions.
+    """Compare a built block with its agreed contract. Returns (missing, soft): names absent from the block's
+    source (a broken promise to its users), and softer gaps (a name no test mentions, a differently named entry file).
     Deliberately literal and conservative: a name that appears nowhere cannot be provided."""
     contract = block.get('contract')
     if not contract:
@@ -376,8 +376,11 @@ def conformance(root, block):
             continue
         is_test = any(re.search(r'(^|[._-])(tests?|specs?|__tests__)([._-]|$)', part.lower()) for part in rel.parts)
         (tests if is_test else source).append(text)
-    missing = [] if (folder / contract['entry']).is_file() else [f"The entry file {block['folder']}{contract['entry']} does not exist."]
-    untested = []
+    # The plan names the entry file before any code exists, so a different file name is something to correct once,
+    # not a reason to stop: the names themselves are the promise other blocks rely on.
+    missing = []
+    untested = [] if (folder / contract['entry']).is_file() else [
+        f"The entry file {block['folder']}{contract['entry']} does not exist. Provide it (it may simply re-export from where the code lives)."]
     for export in contract['exports']:
         if not any(export['name'] in text for text in source):
             missing.append(f"{export['name']} ({export['kind']}) is in the contract but nowhere in the block's source.")
