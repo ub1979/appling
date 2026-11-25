@@ -42,7 +42,12 @@ cleaned, because nothing recorded them. The WhatsApp bridge and helper
 processes that share Appling's own process group are not recorded either.
 
 **Validation:** backend and interface test suites pass. The setup form and
-Settings changes were type-checked and built but not checked in a browser.
+Settings were checked in a browser on `block_branch` against a separate
+scratch data folder: both choices appear, each one is stored on the new
+project, and Settings lists all three modes. Evidence is in
+`docs/evidence/build-mode-browser-check-20261125.txt`. No AI model was used
+in that check, and the leftover cleanup was exercised with a stand-in
+process, not with a real crashed build.
 
 ## 0.2.0 beta, 2026-11-21: direct mode is the default again
 

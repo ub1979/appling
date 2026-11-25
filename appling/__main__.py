@@ -26,6 +26,14 @@ def reserve_port(port, *, fallback=False):
     raise OSError(errno.EADDRINUSE,f'No free port found between {port} and {min(port+49,65535)}')
 
 
+def stop_leftovers(home=None):
+    """Stop what a force-quit Appling left running, then record what this one starts."""
+    from pathlib import Path
+    from . import children
+    from .service import ROOT
+    children.start(Path(home or ROOT/'.appling_c')/'run/children',log=lambda text:print(text,flush=True))
+
+
 def main():
     parser=argparse.ArgumentParser(description='Appling C — your local app studio')
     parser.add_argument('--port',type=int,help='Use this exact port; otherwise try 9210 and the next available ports')
@@ -54,11 +62,7 @@ def main():
         if actual_port!=port and port!=0:
             print(f'Port {port} is occupied; using {actual_port}.',flush=True)
         print(f'Open Appling: {url}',flush=True)
-        # Stop what a force-quit Appling left running, then record what this one starts.
-        from pathlib import Path
-        from . import children
-        from .service import ROOT
-        children.start(Path(args.home or ROOT/'.appling_c')/'run/children',log=lambda text:print(text,flush=True))
+        stop_leftovers(args.home)
         app=create_app(args.home)
         if args.managed:
             from .service import serve_managed

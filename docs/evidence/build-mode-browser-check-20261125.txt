@@ -1,0 +1,31 @@
+Build-mode choice: browser check, 2026-11-25
+
+Where: block_branch, a separate copy started with
+  python -m appling --home <scratch folder> --port 9377 --no-open
+so the owner's real projects and database were not used.
+
+Checked in the browser:
+- New project form shows "How to build it" with two choices:
+  "One builder, step by step" (direct) and "Blocks built in parallel, then joined" (blocks).
+- On this branch the form preselects blocks, matching default_mode from /api/catalog.
+- The hint under the field changes with the choice.
+- A project created with "One builder, step by step" was stored with execution_mode=direct.
+  Its project map lists Requirements, Design, Development, Quality assurance.
+- A project created with the preselected choice was stored with execution_mode=blocks.
+  Its project map lists Requirements, Design, Block plan, Building blocks, Merging into the app,
+  Quality assurance.
+- Settings, "Build coordination", lists direct, blocks and planned, and showed blocks for the blocks project.
+- The stored modes were read from the scratch database, not from report text.
+
+Also seen at this start: a stand-in leftover process recorded for a server that no longer existed
+was stopped, and the server log said so:
+  "Appling stopped 1 program(s) left running by an earlier Appling that ended unexpectedly: [97209]"
+
+Not checked:
+- No project brief was sent, so no AI model was used and nothing was built.
+- Changing the mode of an existing project in Settings was not exercised.
+- The form on main (which preselects direct) was not opened; it uses the same interface code.
+- The only console error was a 401 from a manual request made during the check without the page's token.
+
+Screenshots: build-mode-setup-form-20261125.jpg, build-mode-serial-project-20261125.jpg,
+build-mode-blocks-project-20261125.jpg, build-mode-settings-20261125.jpg

@@ -150,6 +150,16 @@ def test_after_the_leader_exits_only_processes_carrying_the_marker_are_stopped(t
                 pass
 
 
+def test_the_launcher_keeps_its_ledger_inside_the_chosen_data_folder(tmp_path, monkeypatch):
+    from appling import __main__ as launcher
+    monkeypatch.undo()                                       # this test wants the real function, in a temporary folder
+    try:
+        launcher.stop_leftovers(tmp_path / 'home')
+        assert children.DIRECTORY == tmp_path / 'home/run/children' and children.DIRECTORY.is_dir()
+    finally:
+        children.disable()
+
+
 def test_a_failed_cleanup_never_stops_the_server_from_starting(tmp_path, monkeypatch):
     lines = []
     monkeypatch.setattr(children, 'reap', lambda directory: (_ for _ in ()).throw(OSError('disk problem')))
