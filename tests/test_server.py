@@ -113,6 +113,7 @@ def test_interleaved_worker_usage_is_counted_per_invocation(client):
 
 def test_new_projects_default_to_direct_with_mandatory_design_and_qa(client):
     c,app,tmp=client
+    assert c.get('/api/catalog').json()['default_mode']=='direct'   # the setup form preselects this
     p=c.post('/api/projects',json=dict(path=str(tmp/'simple'),create=True)).json()
     assert p['execution_mode']=='direct'
     assert {'req-engineer','ui-designer','sw-developer','qa-engineer'}<=set(p['team'])

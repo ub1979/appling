@@ -198,7 +198,10 @@ export interface Catalog {
   agents: Agent[];
   styles: StartStyle[];
   default_root: string;
+  default_mode?: BuildMode;
 }
+
+export type BuildMode = "direct" | "blocks";
 
 export type BuildProfile = "personal" | "reusable" | "production";
 export type ProjectKind = "app" | "website" | "slides" | "video";
@@ -227,6 +230,7 @@ export interface NewProject {
   template: string | null;
   platforms?: Platform[];
   decide_for_me?: boolean;
+  execution_mode?: BuildMode;
 }
 
 export type Platform = "web" | "phone" | "computer";

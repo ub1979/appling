@@ -25,6 +25,10 @@ from . import connections
 from .messaging import PhoneConnections
 
 
+# How a new project builds unless the owner chooses otherwise at setup. block_branch sets this to 'blocks'.
+DEFAULT_MODE='direct'
+
+
 def create_app(home=None,execute=None):
     home=Path(home or ROOT/'.appling_c');home.mkdir(parents=True,exist_ok=True,mode=0o700)
     store=Store(home/'studio.db')
@@ -100,7 +104,7 @@ def create_app(home=None,execute=None):
     @app.get('/api/catalog')
     def catalog():
         return dict(agents=[dict(id=a[0],label=a[1],description=a[2],required=a[0] in CATALOG['REQUIRED']) for a in CATALOG['AGENTS']],
-                    styles=CATALOG['STYLES'],default_root=str(default_root))
+                    styles=CATALOG['STYLES'],default_root=str(default_root),default_mode=DEFAULT_MODE)
 
     @app.post('/api/projects')
     async def add_project(request:Request):
@@ -115,7 +119,7 @@ def create_app(home=None,execute=None):
             if p['root']==str(root):
                 return detail(p['id'])
         team=list(dict.fromkeys([*CATALOG['REQUIRED'],*data.get('team',[])]))
-        execution_mode=data.get('execution_mode') or 'direct'   # blocks mode is opt-in; see block_branch
+        execution_mode=data.get('execution_mode') or DEFAULT_MODE
         if execution_mode not in {'direct','planned','blocks'}:raise ValueError('Choose direct, blocks or planned execution.')
         p=store.add(root,team=team,style=data.get('style','app-it'),profile=data.get('profile','personal'),
                     kind=data.get('kind','app'),platforms=data.get('platforms') or ['web'],engine=workflow.settings()['provider'],execution_mode=execution_mode,

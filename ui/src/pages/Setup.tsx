@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { api, type BuildProfile, type Catalog, type Platform, type ProjectKind, type Template } from "../api";
+import { api, type BuildMode, type BuildProfile, type Catalog, type Platform, type ProjectKind, type Template } from "../api";
 import { AvatarStack, Brand, FolderDialog, PrefButtons, TeamPicker } from "../components/common";
 import { go } from "../router";
 
@@ -38,6 +38,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
   const [customizing, setCustomizing] = useState(false);
   const [brief, setBrief] = useState("");
   const [decideForMe, setDecideForMe] = useState(true);
+  const [buildMode, setBuildMode] = useState<BuildMode>("direct");
   const [profile, setProfile] = useState<BuildProfile>("personal");
   const [kind, setKind] = useState<ProjectKind>("app");
   const [platforms, setPlatforms] = useState<Platform[]>(["web"]);
@@ -82,6 +83,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
     void api.catalog().then((c) => {
       setCatalog(c);
       setParent(c.default_root);
+      if (c.default_mode) setBuildMode(c.default_mode);
       const s = c.styles.find((x) => x.id === (styleId || (mode === "open" ? "review" : "app-it")));
       if (s) setTeam(withRequired(s.team));
     }).catch((e) => setProblem(e instanceof Error ? e.message : String(e)));
@@ -107,7 +109,7 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
     if (!path) return;
     setSaving(true);
     try {
-      const res = await api.addProject({ path, create: mode === "new", team: orderedTeam, style, brief, profile: kind === "website" ? "reusable" : profile, kind, template: templateId, platforms: kind === "app" ? platforms : undefined, decide_for_me: decideForMe });
+      const res = await api.addProject({ path, create: mode === "new", team: orderedTeam, style, brief, profile: kind === "website" ? "reusable" : profile, kind, template: templateId, platforms: kind === "app" ? platforms : undefined, decide_for_me: decideForMe, execution_mode: kind === "app" ? buildMode : undefined });
       go(`/p/${res.id}`);
     } catch (e) {
       setProblem(e instanceof Error ? e.message : String(e));
@@ -311,6 +313,18 @@ export function Setup({ mode, styleId }: { mode: "new" | "open"; styleId: string
               <input type="checkbox" checked={decideForMe} onChange={(e) => setDecideForMe(e.target.checked)} />
               Decide small questions for me. Appling still asks about money, accounts and privacy, and you approve the requirements.
             </label>
+            {kind === "app" && <label style={{ display: "block", marginTop: 14 }}>
+              <span className="field-label">How to build it</span>
+              <select className="input" value={buildMode} onChange={(e) => setBuildMode(e.target.value as BuildMode)}>
+                <option value="direct">One builder, step by step</option>
+                <option value="blocks">Blocks built in parallel, then joined</option>
+              </select>
+              <span className="small muted" style={{ display: "block", marginTop: 6 }}>
+                {buildMode === "blocks"
+                  ? "Splits the app into independent blocks with agreed interfaces. Faster for larger apps; you approve the block plan first."
+                  : "The simplest path. Best for small apps."}
+              </span>
+            </label>}
           </section>}
         </div>
 
