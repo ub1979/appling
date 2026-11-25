@@ -1,5 +1,6 @@
 import json
 import sys
+import time
 import textwrap
 import threading
 from pathlib import Path
@@ -68,6 +69,27 @@ def test_cli_uses_structured_result_and_requires_task_permission(tmp_path,engine
     assert result['status']=='completed';assert asks
     with pytest.raises(PermissionError):
         cli_execute({'engine':engine,'binary':binary},Run(tmp_path,'instructions','task'))
+
+
+def test_cli_task_that_keeps_reporting_outlasts_the_limit_but_silence_and_probes_still_time_out(tmp_path):
+    busy=executable(tmp_path,'''
+        import json,sys,time
+        for _ in range(8):
+            print(json.dumps({'type':'assistant','message':{'content':[{'type':'tool_use','id':'t','name':'Bash'}]}}),flush=True)
+            time.sleep(.15)
+        print(json.dumps({'type':'result','result':json.dumps({'summary':'Built','status':'completed'})}),flush=True)
+    ''')
+    # 1.2 seconds of steady work against a 0.6 second limit: only silence may end a real task.
+    result=cli_execute({'engine':'claude-cli','binary':busy,'timeout':.6},Run(tmp_path,'instructions','task',readonly=True))
+    assert result['status']=='completed'
+    silent=tmp_path/'silent';silent.mkdir()
+    quiet=executable(silent,'import time\ntime.sleep(30)\n')
+    started=time.monotonic()
+    with pytest.raises(TimeoutError,match='no activity'):
+        cli_execute({'engine':'claude-cli','binary':quiet,'timeout':.5},Run(tmp_path,'instructions','task',readonly=True))
+    assert time.monotonic()-started<10
+    with pytest.raises(TimeoutError,match='did not respond'):
+        cli_execute({'engine':'claude-cli','binary':busy,'timeout':.5},Run(tmp_path,'instructions','task',readonly=True,connection_test=True))
 
 
 def test_api_tool_loop_writes_project_and_keeps_prompt_prefix_on_resume(tmp_path,monkeypatch):
