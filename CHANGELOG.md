@@ -8,7 +8,64 @@ the original Appling `main` branch.
 | Branch | What it is |
 |---|---|
 | `main` (pushed as `appling_c`) | Current Appling C. New projects build in **direct mode**. Blocks mode is still available on request. |
-| `block_branch` | The same code, but new projects default to **blocks mode**. Kept so that design can be resumed later. |
+| `block_branch` | New projects default to **blocks mode**, with interfaces agreed first and a serial fallback. Direct mode can be chosen at setup. |
+
+## 2026-11-25: blocks mode, interfaces first (this branch only)
+
+**What changed:**
+- **Contracts.** The block plan gives every new block a contract: its entry
+  file and each name other code may use, with inputs, outputs and errors.
+  Blocks and the app body list the names they use from each other.
+- **Checked before building.** A plan in which something uses a name the
+  other block does not offer goes back to the planner before the owner sees
+  it.
+- **Checked after building.** When a block's tests pass, Appling checks that
+  every contract name is in the block's source and tests. A missing name is
+  sent back to the builder.
+- **One block shape.** Builders are told that every block has one entry
+  file, takes its settings through it, documents its errors and uses another
+  block only through that block's entry.
+- **Automatic extension.** A block that needs more from a block it depends
+  on gets that block extended, once, without asking the owner.
+- **Serial fallback.** A block its own builder cannot finish is built step by
+  step by the main builder while it joins the app. The owner is asked only
+  if that fails too.
+
+**Not done:**
+- Contract tests written by a separate agent before the block is built.
+- Building the app body first against stand-in blocks.
+
+**Validation:** proven with the test engine only (plan check, contract check,
+automatic extension, serial fallback, existing plans unchanged). Not yet run
+with a real model.
+
+## 2026-11-25: reliability fixes and a build-mode choice
+
+**Fixes (both branches):**
+- A builder that edits approved files (requirements, checks, prototype, block
+  plan) no longer leaves the project stuck. Appling puts the approved version
+  back and tells the owner.
+- Claude and Copilot tasks end after 30 minutes of silence, not 30 minutes in
+  total.
+- A missing or signed-out Codex, Claude or Copilot is reported in plain words
+  before any work starts.
+- Planned-mode repair tasks no longer fail with "Task ownership is missing".
+- A project whose folder is gone can be deleted. The delete message names the
+  real Archive folder.
+- Work copies of finished reviews and integrated workers are removed.
+- Progress updates count steps from engines other than Codex.
+- Apps may not point into Appling's own folder. Files that do are sent back
+  to the builder.
+- `/change` and `/replan` explain themselves on a direct project.
+
+**New:** the setup form asks how to build the app: one builder step by step,
+or blocks built in parallel. Settings lists blocks mode too.
+
+**Not done:** child processes left behind after a crash or `kill -9` are
+still not cleaned up on the next start.
+
+**Validation:** backend and interface test suites pass. The setup form and
+Settings changes were type-checked and built but not checked in a browser.
 
 ## 0.2.0 beta, 2026-11-21: direct mode is the default again
 
