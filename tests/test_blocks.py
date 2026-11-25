@@ -204,8 +204,11 @@ def test_stuck_block_does_not_stop_others_and_owner_can_leave_it_for_later(tmp_p
         state = store.get(pid)
         assert state['block_status']['notifier']['status'] == 'tested'
         assert state['block_status']['poster']['status'] == 'blocked'
+        # Before asking the owner, the main builder got two turns to build the stuck block step by step.
+        fallback = next(e for e in store.events(pid) if e['type'] == 'serial_fallback')
+        assert fallback['blocks'] == ['poster'] and engine.calls.count('body') == 2
         question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
-        assert 'Social poster' in question['question'] and 'body' not in engine.calls
+        assert 'Social poster' in question['question'] and 'step by step' in question['question']
         workflow.answer(pid, question['id'], LEAVE); wait_idle(workflow, pid)
         review = store.inbox(pid)[0]
         assert review['kind'] == 'requirements' and '| AC-FR-3-1 | FR-3 | later |' in review['question']
@@ -257,7 +260,8 @@ def test_retry_after_rejected_merge_runs_a_fresh_builder(tmp_path):
     try:
         to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
         assert store.get(pid)['block_status']['notifier']['status'] == 'blocked'
-        assert 'could not be merged' in store.get(pid)['block_status']['notifier']['reason']
+        fallback = next(e for e in store.events(pid) if e['type'] == 'serial_fallback')
+        assert 'could not be merged' in fallback['reasons']['notifier']
         (Path(store.get(pid)['root']) / 'package-lock.json').unlink(missing_ok=True)
         question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
         workflow.answer(pid, question['id'], RETRY); wait_idle(workflow, pid)
@@ -425,8 +429,7 @@ def test_block_with_red_test_history_and_live_parts_pending_is_not_stuck(tmp_pat
         validate_checks(tmp_path, task, worker, dict(live, blockers=[dict(kind='implementation', detail='adapter unfinished')]))
 
 
-def test_dependency_gap_can_be_extended_then_dependent_rebuilt_and_host_notes_reach_body(tmp_path):
-    from appling.blockbuild import EXTEND
+def test_dependency_gap_is_extended_without_asking_then_dependent_rebuilt_and_host_notes_reach_body(tmp_path):
     plan = plan_for(); plan['blocks'][1]['depends_on'] = ['notifier']
     state = dict(gap=True, body_goals=[])
     orig = Engine.__call__
@@ -453,11 +456,10 @@ def test_dependency_gap_can_be_extended_then_dependent_rebuilt_and_host_notes_re
     store, workflow, pid = make(tmp_path, engine)
     try:
         to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
-        status = store.get(pid)['block_status']
-        assert status['notifier']['status'] == 'tested'   # host note did not block it
-        question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
-        assert question['choices'][0] == EXTEND and 'notifier must return a message id' in question['question']
-        workflow.answer(pid, question['id'], EXTEND); wait_idle(workflow, pid)
+        # The poster needed more from the notifier. Appling extended the notifier and rebuilt the poster without asking.
+        assert not [i for i in store.inbox(pid) if i.get('blocks_scope')]
+        extended = next(e for e in store.events(pid) if e['type'] == 'block_extend')
+        assert extended['blocks'] == ['notifier'] and extended['for_blocks'] == ['poster']
         assert engine.calls.count('block:notifier') == 2 and engine.calls.count('block:poster') == 2
         assert store.get(pid)['block_status']['poster']['status'] in {'tested', 'merged'}
         assert any('Telegram bot token store' in g for g in state['body_goals'])
@@ -635,9 +637,8 @@ def test_a_later_block_failure_does_not_repeat_old_extend_requests(tmp_path):
     store, workflow, pid = make(tmp_path, engine)
     try:
         to_blocks_review(store, workflow, pid); approve(store, workflow, pid, 'blocks')
-        question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
-        assert question['choices'][0] == EXTEND
-        workflow.answer(pid, question['id'], EXTEND); wait_idle(workflow, pid)
+        # First the notifier was extended automatically; the poster then failed for another reason, step by step too.
+        assert [e['type'] for e in store.events(pid) if e['type'] in {'block_extend', 'serial_fallback'}] == ['block_extend', 'serial_fallback']
         question = next(i for i in store.inbox(pid) if i.get('blocks_scope'))
         assert EXTEND not in question['choices'] and 'message id' not in question['question']
         assert not store.get(pid)['block_status']['poster'].get('needs')
@@ -804,7 +805,8 @@ def test_typed_build_instructions_for_a_stuck_block_rebuild_it_before_the_body(t
         while store.get(pid)['phase'] not in {'implementation_verified', 'delivered'} and time.time() < deadline:
             time.sleep(0.2)
         assert engine.calls.count('block:poster') == 2
-        assert engine.calls.index('body') > len(engine.calls) - 1 - engine.calls[::-1].index('block:poster')
+        last = lambda name: len(engine.calls) - 1 - engine.calls[::-1].index(name)
+        assert last('body') > last('block:poster')   # the rebuilt block is in place before the app is joined
         assert any('normal signed-in route' in g for g in store.get(pid).get('owner_guidance', []))
     finally:
         workflow.shutdown()

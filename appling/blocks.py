@@ -28,7 +28,8 @@ BODY_FOLDER = 'app/'
 BLOCK_ID = re.compile(r'[a-z][a-z0-9-]{1,40}')
 RUNTIMES = {'in-process', 'service'}
 STATUS_LABELS = {'planned': 'Planned', 'building': 'Building', 'tested': 'Tested', 'blocked': 'Needs a decision',
-                 'later': 'Left for later', 'merged': 'Merged', 'failed': 'Tests failed'}
+                 'later': 'Left for later', 'merged': 'Merged', 'failed': 'Tests failed',
+                 'serial': 'Being built step by step'}
 
 
 def library_home():

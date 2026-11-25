@@ -930,10 +930,11 @@ class Workflow:
             elif phase=='body':
                 self.authorized(pid)
                 from .direct import build
-                from .blockbuild import body_goal
+                from .blockbuild import body_goal,protected_folders,serial_checks
                 plan_=__import__('appling.blocks',fromlist=['load']).load(Path(state['root']))
                 build(self,pid,text,goal_prefix=body_goal(plan_,acceptance.load(Path(state['root'])),state.get('block_status')),
-                      session_scope='body-v1',protect=['blocks/'])
+                      session_scope='body-v1',protect=protected_folders(plan_,state.get('block_status')),body=True,
+                      after_run=lambda:serial_checks(self,pid))
                 continue
             elif phase=='build':
                 self.authorized(pid)

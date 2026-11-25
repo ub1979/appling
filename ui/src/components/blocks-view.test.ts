@@ -14,6 +14,10 @@ describe("blocks view", () => {
   it("summarises blocks in plain words", () => {
     expect(blocksHeadline(base)).toBe("1 of 3 blocks done · 1 being built · 1 stuck (you'll be asked when the others finish) · 1 left for later");
     expect(blocksHeadline({ ...base, blocks: base.blocks.filter(b => b.status !== "building") })).toBe("1 of 2 blocks done · 1 needs your decision · 1 left for later");
+    // A block the main builder is finishing step by step is still being built, not waiting on the owner.
+    const stepByStep = base.blocks.map(b => b.id === "poster" ? { ...b, status: "serial", label: "Being built step by step" } : b);
+    expect(blocksHeadline({ ...base, blocks: stepByStep })).toBe("1 of 3 blocks done · 2 being built · 1 left for later");
+    expect(blockLine(stepByStep[1])).toBe("Being built step by step");
     expect(blocksHeadline({ ...base, approved: false, phase: "blocks_review" })).toBe("4 blocks planned. Review the block plan to start building.");
   });
 

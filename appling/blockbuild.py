@@ -21,6 +21,21 @@ PROVIDE = "I'll provide the access first"
 EXTEND = 'Extend the blocks they need, then rebuild them'
 BLOCK_CHOICES = [LEAVE, RETRY, PROVIDE]
 MAX_TEST_REPAIRS = 1
+MAX_SERIAL_ROUNDS = 2   # turns the main builder gets to finish a block that could not be built in parallel
+
+
+def serial_ids(status):
+    """Blocks handed to the main builder because their own parallel builder could not finish them."""
+    return sorted(k for k, v in (status or {}).items() if v.get('serial'))
+
+
+def protected_folders(plan_, status):
+    """What the main builder may not touch while joining the app. A block handed to it for a
+    step-by-step build is its own to write; every other block stays read-only."""
+    serial = set(serial_ids(status))
+    if not serial:
+        return ['blocks/']
+    return sorted(b['folder'] for b in plan_['blocks'] if b['id'] not in serial)
 
 
 def plan(workflow, pid, text):
@@ -116,8 +131,10 @@ def _tasks(workflow, pid, plan_, spec):
     tasks = []
     for ident, task in wanted.items():
         old = current.get(ident)
-        if status.get(ident, {}).get('status') in FINISHED or (old and old.get('status') == 'done' and ident not in status):
-            task['status'] = 'done'
+        info = status.get(ident, {})
+        if (info.get('status') in FINISHED or (info.get('serial') and info.get('status') == 'serial')
+                or (old and old.get('status') == 'done' and ident not in status)):
+            task['status'] = 'done'   # a block being built step by step is the main builder's, not a parallel task
         tasks.append(task)
     workflow.store.update(pid, tasks=tasks)
     return tasks
@@ -186,7 +203,8 @@ def build(workflow, pid, feedback=''):
         block = by_id[task['id']]
         info = status_now.get(block['id'], {})
         # A block integrated before a restart but never tested by the controller is tested now.
-        if task['status'] == 'done' and info.get('status') not in FINISHED and not block['source'].startswith('library:'):
+        if (task['status'] == 'done' and info.get('status') not in FINISHED and not info.get('serial')
+                and not block['source'].startswith('library:')):
             test = _test_and_record(workflow, pid, root, block)
             _set_status(workflow, pid, block['id'], status='tested' if test['passed'] else 'failed', test=test)
             if not test['passed']:
@@ -281,7 +299,8 @@ def build(workflow, pid, feedback=''):
                          if isinstance(b, dict) and b.get('kind') == 'integration']
                 test = _test_and_record(workflow, pid, root, block, final=counts.get(block['id'], 0) >= MAX_TEST_REPAIRS)
                 if test['passed']:
-                    _set_status(workflow, pid, block['id'], status='tested', test=test, reason=None, host_notes=notes, needs=None)
+                    _set_status(workflow, pid, block['id'], status='tested', test=test, reason=None, host_notes=notes, needs=None,
+                                serial=False, serial_failed=False)
                     save_checkpoint(workflow, pid, f"Appling checkpoint: block {block['name']} built and tested")
                     try:
                         swarm.workspaces.remove(root, worker['workspace'])
@@ -305,8 +324,43 @@ def build(workflow, pid, feedback=''):
     if workflow.cancelled[pid].is_set():
         raise InterruptedError('Stopped. Built blocks and retained block workspaces are saved.')
     remaining = [t for t in workflow.store.get(pid)['tasks'] if t['status'] != 'done']
+    waiting = sorted(set(stuck) | {t['id'] for t in remaining})
+    status_now = workflow.store.get(pid).get('block_status') or {}
+    extend = [i for i in waiting if status_now.get(i, {}).get('needs') and not status_now[i].get('auto_extended')]
+    if extend and not workflow.cancelled[pid].is_set():
+        # A block needs more from a block it depends on. Do what the owner's "extend" choice does, once per block,
+        # without asking: send the request to that block's builder, then rebuild the blocks that need it.
+        needs = {}
+        for ident in extend:
+            for dep, details in status_now[ident]['needs'].items():
+                needs.setdefault(dep, []).extend(details)
+        status = dict(status_now)
+        for dep in needs:
+            status[dep] = {**status.get(dep, {}), 'status': 'planned', 'local': True,
+                           'reason': 'Extending its interface for the blocks that need it'}
+        for ident in extend:
+            status[ident] = {**status.get(ident, {}), 'status': 'planned', 'auto_extended': True, 'needs': None}
+        workflow.store.update(pid, block_status=status, block_change_requests=needs)
+        workflow.store.event(pid, 'block_extend', blocks=sorted(needs), for_blocks=extend,
+                             text='Extending ' + ', '.join(by_id[d]['name'] for d in needs) + ' for the blocks that need more from it')
+        workflow.store.message(pid, 'assistant', ', '.join(by_id[d]['name'] for d in needs) + ' is being extended because '
+                               + ', '.join(by_id[i]['name'] for i in extend) + ' needs more from it. Nothing is needed from you.', 'status')
+        return build(workflow, pid, feedback)
+    if waiting and not any(status_now.get(i, {}).get('serial_failed') for i in waiting):
+        # Serial fallback: a block that could not be built in parallel does not stop the project. The main
+        # builder, which sees the whole app, builds it step by step while joining the app. Blocks that were
+        # waiting for it go the same way. The owner is asked only if that fails too.
+        for ident in waiting:
+            _set_status(workflow, pid, ident, status='serial', serial=True, serial_rounds=0, needs=None,
+                        reason=(stuck.get(ident) or 'It waits for a block that could not be finished in parallel.')[:600])
+        names = ', '.join(by_id[i]['name'] for i in waiting)
+        workflow.store.event(pid, 'serial_fallback', blocks=waiting, reasons={i: stuck.get(i) for i in waiting},
+                             text=f'Building step by step instead of in parallel: {names}')
+        workflow.store.message(pid, 'assistant', f'{names} could not be finished as ' + ('a separate parallel block' if len(waiting) == 1
+                               else 'separate parallel blocks') + '. Appling is not stopping: the main builder now builds '
+                               + ('it' if len(waiting) == 1 else 'them') + ' step by step while joining the app. Nothing is needed from you.', 'status')
+        stuck, remaining = {}, []
     if stuck or remaining:
-        waiting = sorted(set(stuck) | {t['id'] for t in remaining})
         parts = [f"{by_id[i]['name']}: {(stuck.get(i) or 'waits for a block that could not be finished')[:240]}" for i in waiting]
         needs = {}
         for ident in waiting:
@@ -317,7 +371,47 @@ def build(workflow, pid, feedback=''):
                           + '\n'.join('- ' + p for p in parts), reason='blocks', blockers=[dict(kind='implementation', detail=p, owner='you',
                                                                                                  next_action='Choose: leave for later, try again, or provide access') for p in parts])
     # The body may not change blocks; remember exactly what the tested blocks looked like.
-    workflow.store.update(pid, phase='body', block_change_requests={}, blocks_digest=_folder_digest(root, ['blocks/']))
+    protected = protected_folders(plan_, workflow.store.get(pid).get('block_status'))
+    workflow.store.update(pid, phase='body', block_change_requests={}, blocks_digest=_folder_digest(root, protected))
+
+
+def serial_checks(workflow, pid):
+    """After each turn of the main builder, Appling itself runs the tests (and contract check) of the blocks it was
+    handed. A failing block goes back to the builder as remaining work, for a bounded number of turns; after that
+    the owner decides, exactly as for any block that cannot be finished."""
+    from .workflow import WorkWaiting
+    state = workflow.store.get(pid); root = Path(state['root'])
+    plan_ = blocks.load(root); spec = acceptance.load(root)
+    status = state.get('block_status') or {}
+    by_id = {b['id']: b for b in plan_['blocks']}; later = blocks.deferred(plan_, spec)
+    unfinished, failed = [], {}
+    for ident in serial_ids(status):
+        if ident not in by_id or ident in later or status[ident].get('status') != 'serial':
+            continue
+        block = by_id[ident]; rounds = status[ident].get('serial_rounds', 0) + 1
+        test = _test_and_record(workflow, pid, root, dict(block, source='new'), final=rounds >= MAX_SERIAL_ROUNDS)
+        if test['passed']:
+            _set_status(workflow, pid, ident, status='tested', test=test, reason=None, needs=None, local=True, serial_rounds=rounds)
+            continue
+        evidence = test.get('evidence')
+        log = (root / evidence).read_text(errors='replace')[-1500:] if evidence and (root / evidence).is_file() else test.get('error', '')
+        if rounds >= MAX_SERIAL_ROUNDS:
+            failed[ident] = 'It could not be finished in parallel or step by step: its tests still fail when Appling runs them.'
+            _set_status(workflow, pid, ident, status='blocked', serial_failed=True, serial_rounds=rounds, test=test, reason=failed[ident])
+        else:
+            _set_status(workflow, pid, ident, serial_rounds=rounds, test=test)
+            unfinished.append(dict(kind='implementation',
+                detail=f"Block {block['name']} in {block['folder']} is not finished: Appling ran `{block['test']}` and checked its "
+                       f"contract. Output:\n{log}",
+                next_action=f"Finish block {block['name']} inside {block['folder']} so its test command passes."))
+    if failed:
+        parts = [f"{by_id[i]['name']}: {reason}" for i, reason in failed.items()]
+        ask_blocks(workflow, pid, sorted(failed), parts, {}, by_id)
+        raise WorkWaiting('Some blocks could not be finished in parallel or step by step. Decide what to do with:\n'
+                          + '\n'.join('- ' + p for p in parts), reason='blocks',
+                          blockers=[dict(kind='implementation', detail=p, owner='you',
+                                         next_action='Choose: leave for later, try again, or provide access') for p in parts])
+    return unfinished
 
 
 def ask_blocks(workflow, pid, ids, parts, needs=None, by_id=None):
@@ -351,14 +445,15 @@ def answer(workflow, pid, item, choice):
             status.setdefault(dep, {}).update(status='planned', local=True,
                                               reason='Extending its interface for the blocks that need it')
         for ident in ids:
-            status.setdefault(ident, {}).update(status='planned')
+            status.setdefault(ident, {}).update(status='planned', serial=False, serial_failed=False, serial_rounds=0)
         workflow.store.update(pid, phase='blocks_build', block_status=status, block_change_requests=needs)
         workflow.submit(pid, 'Extend ' + ', '.join(needs) + ' as requested, then rebuild the blocks that need it.', kind='auto')
         return
     if choice == RETRY:
         status = dict(state.get('block_status') or {})
         for ident in ids:
-            status.setdefault(ident, {})['status'] = 'planned'
+            # A fresh start: its own parallel builder first, then step by step again if that cannot finish.
+            status.setdefault(ident, {}).update(status='planned', serial=False, serial_failed=False, serial_rounds=0)
         workflow.store.update(pid, phase='blocks_build', block_status=status)
         workflow.submit(pid, 'The owner asked to try these blocks again: ' + ', '.join(ids), kind='auto')
     elif choice == PROVIDE:
@@ -393,13 +488,23 @@ def answer(workflow, pid, item, choice):
 
 def body_goal(plan_, spec, status=None):
     usable = [b for b in plan_['blocks'] if b['id'] not in blocks.deferred(plan_, spec)]
+    serial = [b for b in usable if (status or {}).get(b['id'], {}).get('serial')]
     return ('Build the app body in app/ (and the root files it owns: ' + ', '.join(plan_['body']['files']) + ') and wire in the finished blocks. '
             f"Body purpose: {plan_['body']['purpose']}. Use blocks only through their documented interfaces (README.md and block.json): "
             + json.dumps([dict(id=b['id'], folder=b['folder'], interface=b['interface'],
                                **({'contract': b['contract']} if b.get('contract') else {})) for b in usable]) + '. '
             + (('Blocks with a contract are used only through their entry file and only by the names in the contract; '
                 'the plan expects the body to use: ' + json.dumps(plan_['body']['uses']) + '. ') if plan_['body'].get('uses') else '')
-            + 'Do not edit anything under blocks/. If a block interface must change, report an implementation blocker with "block":"<id>" '
+            + (('These blocks could not be finished by their own parallel builders, so you build them now, step by step, one at a '
+                'time, each inside its own folder: ' + json.dumps([dict(
+                    id=b['id'], folder=b['folder'], purpose=b['purpose'], interface=b['interface'], test=b['test'],
+                    **({'setup': b['setup']} if b.get('setup') else {}), **({'contract': b['contract']} if b.get('contract') else {}),
+                    what_stopped_the_parallel_builder=(status or {}).get(b['id'], {}).get('reason')) for b in serial]) + '. '
+                'Inspect what is already in each folder and keep what works. Each needs source, tests, README.md and block.json like '
+                'any block, stays generic (no project names) and must pass its test command; Appling runs it after your turn. '
+                'These are the only folders under blocks/ you may edit. Every other block is read-only: ') if serial else
+               'Do not edit anything under blocks/. ')
+            + 'If a block interface must change, report an implementation blocker with "block":"<id>" '
             'and what must change, instead of editing it. Blocks moved to a later release are out of scope. '
             + (('Block builders left these items for the app to provide: ' + json.dumps({k: v.get('host_notes') for k, v in (status or {}).items()
                                                                                           if v.get('host_notes')}) + '. ') if status else '')
@@ -508,7 +613,7 @@ def reopen_blocks(workflow, pid, blockers):
     plan_ = blocks.load(root); spec = acceptance.load(root)
     if not plan_:
         return False
-    known = {b['id'] for b in plan_['blocks']} - set(blocks.deferred(plan_, spec))
+    known = {b['id'] for b in plan_['blocks']} - set(blocks.deferred(plan_, spec)) - set(serial_ids(state.get('block_status')))
     notes = {}
     for b in blockers:
         if b.get('block') in known:

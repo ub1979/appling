@@ -188,7 +188,9 @@ def _folder_digest(root, folders):
     return digest.hexdigest()
 
 
-def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v1', protect=()):
+def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v1', protect=(), body=False, after_run=None):
+    """body: this is the blocks-mode joining step. after_run: controller checks run after each builder turn;
+    what they return goes back to the builder as remaining implementation work."""
     from .workflow import WorkWaiting, source_revision, snapshot_approved, restore_approved
     workflow.authorized(pid)
     state = workflow.store.get(pid)
@@ -260,12 +262,15 @@ def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v
             if protect and _folder_digest(state['root'], protect) != protected_before:
                 raise ValueError('The app body changed files inside ' + ', '.join(protect) +
                                  '. Blocks change only through their own builder; report the needed interface change instead.')
-            reopen = [b for b in (result.get('blockers') or []) if isinstance(b, dict) and b.get('block') and protect]
+            reopen = [b for b in (result.get('blockers') or []) if isinstance(b, dict) and b.get('block') and (protect or body)]
             if reopen:
                 from .blockbuild import reopen_blocks
                 if reopen_blocks(workflow, pid, reopen):
                     return
                 # Unknown or deferred block ids are ordinary blockers handled below, never a silent rerun.
+            unfinished = after_run() if after_run else []
+            if unfinished:
+                result = dict(result, status='blocked', blockers=[*(result.get('blockers') or []), *unfinished])
             swarm.save_worker(workflow, pid, worker, result=result)
             workflow.authorized(pid)
             if workflow.cancelled[pid].is_set():

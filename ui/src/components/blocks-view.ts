@@ -1,4 +1,4 @@
-export type BlockState = "planned" | "building" | "tested" | "blocked" | "later" | "merged" | "failed";
+export type BlockState = "planned" | "building" | "tested" | "blocked" | "later" | "merged" | "failed" | "serial";
 
 export interface BlockRow {
   id: string;
@@ -29,7 +29,7 @@ export function blocksHeadline(status: BlocksStatus): string {
   const list = status.blocks;
   const count = (fn: (b: BlockRow) => boolean) => list.filter(fn).length;
   const done = count(b => DONE.has(b.status));
-  const building = count(b => b.status === "building" || b.status === "failed");
+  const building = count(b => b.status === "building" || b.status === "failed" || b.status === "serial");
   const waiting = count(b => b.status === "blocked");
   const later = count(b => b.status === "later");
   if (!status.approved && status.phase === "blocks_review") return `${list.length} blocks planned. Review the block plan to start building.`;
