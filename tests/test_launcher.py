@@ -75,10 +75,11 @@ def test_permission_failure_is_reported_without_trying_other_ports(monkeypatch):
     assert factory.call_count==1
 
 
-def test_browser_and_server_use_the_reserved_port(monkeypatch):
+def test_browser_and_server_use_the_reserved_port(monkeypatch,leftover_cleanup_stays_off):
     sock=listener(9212);sock.fileno.return_value=17
     monkeypatch.setattr(launcher,'reserve_port',lambda *a,**k:sock)
-    app=object();monkeypatch.setattr(launcher,'create_app',lambda home:app)
+    # Leftovers of a force-quit server are stopped before this one creates its app and takes work.
+    app=object();monkeypatch.setattr(launcher,'create_app',lambda home:leftover_cleanup_stays_off==[None] and app)
     server=Mock();monkeypatch.setattr(launcher.uvicorn,'run',server)
     browser=Mock();monkeypatch.setattr(launcher.webbrowser,'open',browser)
     timer=Mock(side_effect=lambda delay,callback:Mock(start=callback))
