@@ -151,18 +151,27 @@ def set_mode(workflow, pid, mode):
             'Build coordination changed. Files, approvals and retained work are saved. Send a message to continue.', 'status')
 
 
+CODE_SUFFIXES = {'.js', '.mjs', '.cjs', '.ts', '.tsx', '.jsx', '.py', '.sh', '.json', '.toml', '.yaml', '.yml', '.swift', '.kt',
+                 '.java', '.go', '.rs', '.rb', '.php', '.cs', '.vue', '.svelte', '.cfg', '.ini'}
+
+
 def host_path_leaks(root):
-    """Project files that point into Appling's own folders. Such an app breaks when Appling moves or is removed."""
+    """Code and configuration files of the app that point into Appling's own folders. Such an app breaks when
+    Appling moves or is removed. Documentation, logs, generated files and the approved prototype are not checked:
+    a mention there breaks nothing, and the builder could not change an approved file anyway."""
     import os
     from .context import ROOT
     needles = [str(ROOT / name).encode() for name in ('scripts', 'skills', 'appling', '.appling_c/studio.db', '.appling_c/browsers')]
-    skip = {'.git', '.appling', '.sdlc', 'node_modules', '.venv', 'dist', 'build', 'out', 'coverage', 'test-results',
-            'playwright-report', '__pycache__'}
+    skip = {'.git', '.appling', '.sdlc', 'node_modules', '.venv', 'venv', 'dist', 'build', 'out', 'coverage', 'test-results',
+            'playwright-report', '__pycache__', '.pytest_cache', '.build', '.swiftpm', '.next', 'target', 'prototypes'}
     found = []
     for base, dirs, files in os.walk(root):
         dirs[:] = sorted(d for d in dirs if d not in skip)
         for name in sorted(files):
             path = Path(base) / name
+            rel = path.relative_to(root).as_posix()
+            if path.suffix.lower() not in CODE_SUFFIXES or checkpoints.denied(rel):
+                continue
             try:
                 if path.is_symlink() or path.stat().st_size > 512_000:
                     continue
@@ -170,7 +179,7 @@ def host_path_leaks(root):
             except OSError:
                 continue
             if any(n in data for n in needles):
-                found.append(str(path.relative_to(root)))
+                found.append(rel)
     return found
 
 
@@ -252,13 +261,23 @@ def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v
                                            '. Appling put the approved version back, so nothing you approved has changed.', 'status')
             leaks = host_path_leaks(state['root'])
             if leaks and isinstance(result, dict):
-                # Sent back to the builder through the normal bounded continuation, never accepted as finished.
-                where = ', '.join(leaks[:10])
-                result = dict(result, status='blocked', blockers=[*(result.get('blockers') or []), dict(
-                    kind='implementation',
-                    detail="These files point into Appling's own folder, so the app would break if Appling moved: " + where,
-                    next_action='Remove every path into Appling\'s folder from ' + where + '. Add tools the app needs '
-                                '(for example Playwright) to the app\'s own dependencies and use project-relative paths.')])
+                # Sent back through the normal bounded continuation, never accepted as finished. A file inside a block this
+                # builder may not edit goes to that block's own builder instead (the "block" field reopens it).
+                groups = {}
+                for name in leaks:
+                    parts = name.split('/')
+                    locked = parts[0] == 'blocks' and len(parts) > 2 and any(name.startswith(p) for p in protect)
+                    groups.setdefault(parts[1] if locked else None, []).append(name)
+                added = []
+                for block, names in groups.items():
+                    where = ', '.join(names[:10])
+                    added.append(dict(
+                        kind='implementation', **({'block': block} if block else {}),
+                        detail="These files point into Appling's own folder, so the app would break if Appling moved: " + where
+                               + '. Use project-relative paths, and add tools the app needs (for example Playwright) to its own dependencies.',
+                        next_action='Remove every path into Appling\'s folder from ' + where + '. Add tools the app needs '
+                                    '(for example Playwright) to the app\'s own dependencies and use project-relative paths.'))
+                result = dict(result, status='blocked', blockers=[*(result.get('blockers') or []), *added])
             if protect and _folder_digest(state['root'], protect) != protected_before:
                 raise ValueError('The app body changed files inside ' + ', '.join(protect) +
                                  '. Blocks change only through their own builder; report the needed interface change instead.')

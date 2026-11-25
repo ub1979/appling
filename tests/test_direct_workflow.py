@@ -195,6 +195,20 @@ def test_app_files_pointing_into_applings_folder_go_back_to_the_builder(tmp_path
     finally:workflow.shutdown()
 
 
+def test_path_check_looks_only_at_code_the_builder_can_change(tmp_path):
+    from appling.context import ROOT
+    from appling.direct import host_path_leaks
+    runner=f'{ROOT}/scripts/browser-check.mjs'
+    for name,text in {'README.md':f'Run node {runner} to check the screens.',          # documentation breaks nothing
+                      'prototypes/check.mjs':f"import '{runner}';",                      # approved design, read-only for the builder
+                      'server.log':f'Executable at {ROOT}/.appling_c/browsers/chromium', # output of a run
+                      '.pytest_cache/README.md':runner,
+                      'src/check.mjs':f"import '{runner}';",
+                      'package.json':'{"scripts":{"e2e":"node '+runner+'"}}'}.items():
+        path=tmp_path/name;path.parent.mkdir(parents=True,exist_ok=True);path.write_text(text)
+    assert host_path_leaks(tmp_path)==['package.json','src/check.mjs']
+
+
 def test_change_command_explains_itself_on_a_direct_project(tmp_path):
     engine=Engine();store,workflow,pid=project(tmp_path,engine)
     try:
