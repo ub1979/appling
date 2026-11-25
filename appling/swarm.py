@@ -268,6 +268,7 @@ def integrate_worker(workflow, pid, task, worker):
 def build_ready(workflow, pid, feedback=''):
     """Keep eligible slots busy; integrate each completion before refilling them."""
     workflow.authorized(pid)
+    workflow.require_engine('sw-developer')   # ask once here, not once per worker
     from .planning import agent_limit
     attempted = set()
     failures = []

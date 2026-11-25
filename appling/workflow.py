@@ -582,11 +582,21 @@ class Workflow:
             tasks=[{k:t.get(k) for k in ['id','goal','depends_on']} for t in tasks]),sort_keys=True).encode()).hexdigest()
         self.store.update(pid,tasks=tasks,scope_assessed=signature)
 
+    def require_engine(self,role):
+        """Stop before any work starts when the AI program for this role is missing or signed out."""
+        key,conn,selection=self.connection(role)
+        if self.execute is engines.execute:   # test engines have no program to check
+            from .connections import not_ready
+            reason=not_ready(conn)
+            if reason:
+                raise WorkWaiting(reason,reason='engine_setup',blockers=[])
+        return key,conn,selection
+
     def invoke(self,pid,role,goal,readonly=False,workspace=None,worker=None,session_scope=None,planning_context=None):
         if self.cancelled[pid].is_set():
             raise InterruptedError('Stopped before starting the next model invocation. Existing work is saved.')
         invocation_id=uuid.uuid4().hex;done=threading.Event()
-        key,conn,selection=self.connection(role)
+        key,conn,selection=self.require_engine(role)
         state=self.store.get(pid)
         # A changed model/skill gets a new session; existing prefixes stay unchanged.
         mode=state.get('execution_mode','planned')
