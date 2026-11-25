@@ -116,7 +116,7 @@ def test_blocked_direct_build_resumes_native_session_without_planning(tmp_path):
     finally:workflow.shutdown()
 
 
-@pytest.mark.parametrize('failure',['missing_prototype','changed_prototype','qa_edits_source'])
+@pytest.mark.parametrize('failure',['missing_prototype','qa_edits_source'])
 def test_direct_mode_cannot_bypass_approved_prototype_or_independent_qa(tmp_path,failure):
     engine=Engine()
     store,workflow,pid=project(tmp_path,engine)
@@ -129,10 +129,26 @@ def test_direct_mode_cannot_bypass_approved_prototype_or_independent_qa(tmp_path
             workflow.submit(pid,'Go');wait_idle(workflow,pid)
             assert 'sw-developer' not in engine.calls
         else:
-            engine.mutate_prototype=failure=='changed_prototype'
             engine.mutate_qa=failure=='qa_edits_source'
             approve(store,workflow,pid,'prototype');approve(store,workflow,pid,'requirements')
         assert store.get(pid)['phase']!='delivered' and store.get(pid)['paused']
+    finally:workflow.shutdown()
+
+
+def test_builder_edit_to_the_approved_prototype_is_undone_and_the_build_continues(tmp_path):
+    engine=Engine();engine.mutate_prototype=True
+    store,workflow,pid=project(tmp_path,engine)
+    try:
+        workflow.submit(pid,'Build');wait_idle(workflow,pid)
+        root=Path(store.get(pid)['root']);approved=(root/'prototypes/index.html').read_bytes()
+        approve(store,workflow,pid,'prototype');approve(store,workflow,pid,'requirements')
+        state=store.get(pid)
+        assert state['phase']=='delivered',[m['content'] for m in store.messages(pid)][-3:]
+        assert (root/'prototypes/index.html').read_bytes()==approved
+        assert state['approvals']['prototype']==artifact_revision(root,'prototype')
+        restored=[e for e in store.events(pid) if e['type']=='approved_files_restored']
+        assert restored and restored[0]['kinds']==['prototype']
+        assert any('put the approved version back' in m['content'] for m in store.messages(pid))
     finally:workflow.shutdown()
 
 

@@ -52,7 +52,8 @@ def coding_phase(state):
     return 'blocks_build' if any(v.get('status') in unfinished for v in (state.get('block_status') or {}).values()) else 'body'
 
 
-def artifact_revision(root, kind):
+def artifact_names(root, kind):
+    """The files whose bytes make up one approved artifact."""
     names=[ARTIFACTS[kind]]
     if kind=='blocks' and safe_path(root,'.sdlc/blocks.json').is_file():
         names.append('.sdlc/blocks.json')
@@ -62,6 +63,39 @@ def artifact_revision(root, kind):
     if kind=='prototype':
         names=[str(p.relative_to(root)) for p in sorted((root/'prototypes').rglob('*'))
                if p.is_file() and not p.is_symlink()]
+    return names
+
+
+def approved_kinds(state):
+    mode=state.get('execution_mode')
+    return (['requirements','prototype'] if mode=='direct' else ['requirements','prototype','blocks'] if mode=='blocks'
+            else ['requirements','prototype','plan'])
+
+
+def snapshot_approved(root, state):
+    """The bytes of every artifact that is approved right now, so a builder's edit to them can be undone."""
+    root=Path(root);approvals=state.get('approvals') or {}
+    return {kind:{name:safe_path(root,name).read_bytes() for name in artifact_names(root,kind)}
+            for kind in approved_kinds(state) if approvals.get(kind) and approvals[kind]==artifact_revision(root,kind)}
+
+
+def restore_approved(root, state, snapshot):
+    """Put approved files back when a builder changed them. Only the owner changes what was approved.
+    Returns the artifact kinds that had to be restored."""
+    root=Path(root);approvals=state.get('approvals') or {};restored=[]
+    for kind,files in snapshot.items():
+        if approvals.get(kind)!=artifact_revision(root,kind):
+            for name in artifact_names(root,kind):
+                if name not in files:
+                    safe_path(root,name).unlink()   # a file the builder added to an approved artifact
+            for name,data in files.items():
+                path=safe_path(root,name);path.parent.mkdir(parents=True,exist_ok=True);path.write_bytes(data)
+            restored.append(kind)
+    return restored
+
+
+def artifact_revision(root, kind):
+    names=artifact_names(root,kind)
     digest=hashlib.sha256()
     if not names:
         return None
@@ -507,10 +541,7 @@ class Workflow:
 
     def authorized(self,pid):
         state=self.store.get(pid);root=Path(state['root'])
-        mode=state.get('execution_mode')
-        kinds=(['requirements','prototype'] if mode=='direct' else ['requirements','prototype','blocks'] if mode=='blocks'
-               else ['requirements','prototype','plan'])
-        for kind in kinds:
+        for kind in approved_kinds(state):
             if state['approvals'].get(kind)!=artifact_revision(root,kind) or not state['approvals'].get(kind):
                 raise PermissionError(f'The current {kind} needs approval before implementation can continue.')
 

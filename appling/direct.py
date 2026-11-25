@@ -166,7 +166,7 @@ def _folder_digest(root, folders):
 
 
 def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v1', protect=()):
-    from .workflow import WorkWaiting, source_revision
+    from .workflow import WorkWaiting, source_revision, snapshot_approved, restore_approved
     workflow.authorized(pid)
     state = workflow.store.get(pid)
     task_id = 'direct-build'
@@ -184,6 +184,7 @@ def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v
             'There is no mandatory implementation-plan document, task graph, host worktree pool or task ownership split in direct mode. '
             'You own implementation and wiring across the application; organize the work using the execution engine. '
             'Respect the approved design when supplied. Do not edit requirements.md, plan.md, prototypes/ or controller approvals. '
+            'The approved checks in .sdlc/acceptance.json and the block plan are read-only too; if one looks wrong, report a blocker. '
             'Run affected builds/tests and real browser checks for UI. Retain concrete owner/device/account blockers; '
             'do not install untrusted drivers, grant OS permissions or perform unapproved external actions. '
             'Save fresh nonempty command/exit/output receipts only under .sdlc/evidence/direct-build/. '
@@ -213,7 +214,17 @@ def build(workflow, pid, feedback, goal_prefix='', session_scope='direct-build-v
             # Compare with the tested blocks recorded when block building finished, so an earlier edit is never accepted.
             protected_before = ((workflow.store.get(pid).get('blocks_digest') or _folder_digest(state['root'], protect))
                                 if protect else None)
-            result = workflow.invoke(pid, 'sw-developer', goal, session_scope=session_scope)
+            approved = snapshot_approved(state['root'], workflow.store.get(pid))
+            try:
+                result = workflow.invoke(pid, 'sw-developer', goal, session_scope=session_scope)
+            finally:
+                # A builder that edits approved files would otherwise leave the project waiting for an approval nobody is asked for.
+                restored = restore_approved(state['root'], workflow.store.get(pid), approved)
+                if restored:
+                    workflow.store.event(pid, 'approved_files_restored', kinds=restored,
+                                         text='The builder changed approved files; Appling put the approved versions back.')
+                    workflow.store.message(pid, 'assistant', 'The builder changed the approved ' + ' and '.join(restored) +
+                                           '. Appling put the approved version back, so nothing you approved has changed.', 'status')
             if protect and _folder_digest(state['root'], protect) != protected_before:
                 raise ValueError('The app body changed files inside ' + ', '.join(protect) +
                                  '. Blocks change only through their own builder; report the needed interface change instead.')
