@@ -147,12 +147,18 @@ def create_app(home=None,execute=None):
     def archive(pid:str):
         if pid in workflow.active:
             raise ValueError('Stop the project and wait for its current task to finish before archiving.')
-        p=store.get(pid);root=Path(p['root']);archive_root=home/'Archive';archive_root.mkdir(exist_ok=True)
-        target=archive_root/(root.name+'-'+pid)
-        shutil.move(str(root),target)
+        p=store.get(pid);root=Path(p['root']);target=None
+        if root.is_dir():
+            archive_root=home/'Archive';archive_root.mkdir(exist_ok=True)
+            target=archive_root/(root.name+'-'+pid)
+            try:
+                shutil.move(str(root),target)
+            except OSError as exc:
+                raise ValueError(f'The project folder could not be moved to the Archive ({exc.strerror or exc}). Nothing was deleted.')
+        # A project whose folder is already gone is simply removed from the list.
         with store.connect() as c:
             c.execute('DELETE FROM projects WHERE id=?',(pid,))
-        return dict(archived_to=str(target))
+        return dict(archived_to=str(target) if target else None,archive_root=str(home/'Archive'))
 
     @app.post('/api/projects/{pid}/messages')
     async def message(pid:str,request:Request):

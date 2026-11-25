@@ -152,6 +152,26 @@ def test_builder_edit_to_the_approved_prototype_is_undone_and_the_build_continue
     finally:workflow.shutdown()
 
 
+def test_review_work_copies_are_removed_after_use_but_kept_when_a_review_is_rejected(tmp_path):
+    engine=Engine();store,workflow,pid=project(tmp_path,engine)
+    try:
+        workflow.submit(pid,'Build');wait_idle(workflow,pid)
+        approve(store,workflow,pid,'prototype');approve(store,workflow,pid,'requirements')
+        state=store.get(pid);assert state['phase']=='delivered'
+        reviews=[w for w in state['workers'] if w['kind']=='verification']
+        assert len(reviews)==3 and all(w['status']=='integrated' and not Path(w['workspace']).exists() for w in reviews)
+        listed=subprocess.run(['git','worktree','list'],cwd=state['root'],capture_output=True,text=True).stdout.strip().splitlines()
+        assert len(listed)==1
+    finally:workflow.shutdown()
+    engine=Engine();engine.mutate_qa=True;store,workflow,pid=project(tmp_path/'second',engine)
+    try:
+        workflow.submit(pid,'Build');wait_idle(workflow,pid)
+        approve(store,workflow,pid,'prototype');approve(store,workflow,pid,'requirements')
+        rejected=[w for w in store.get(pid)['workers'] if w['kind']=='verification']
+        assert rejected[-1]['status']=='blocked' and Path(rejected[-1]['workspace']).is_dir()
+    finally:workflow.shutdown()
+
+
 def test_qa_findings_return_to_same_builder_before_fresh_reviews(tmp_path):
     engine=Engine();engine.fail_first_qa=True
     store,workflow,pid=project(tmp_path,engine)

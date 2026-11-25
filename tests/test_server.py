@@ -149,3 +149,18 @@ def test_changing_coordination_preserves_approvals_files_and_retained_workers(cl
     before=store.get(p['id'])
     assert c.post('/api/projects/'+p['id']+'/settings',json=dict(execution_mode='planned')).status_code==400
     assert store.get(p['id'])==before
+
+
+def test_delete_moves_the_folder_to_the_archive_and_still_works_when_the_folder_is_gone(client):
+    import shutil
+    c,app,tmp=client
+    kept=c.post('/api/projects',json=dict(path=str(tmp/'kept'),create=True)).json()
+    (tmp/'kept'/'note.txt').write_text('mine')
+    result=c.delete('/api/projects/'+kept['id']).json()
+    assert result['archived_to'].endswith('kept-'+kept['id']) and (Path(result['archived_to'])/'note.txt').read_text()=='mine'
+    assert not (tmp/'kept').exists()
+    gone=c.post('/api/projects',json=dict(path=str(tmp/'gone'),create=True)).json()
+    shutil.rmtree(tmp/'gone')
+    response=c.delete('/api/projects/'+gone['id'])
+    assert response.status_code==200 and response.json()['archived_to'] is None
+    assert all(p['id'] not in {kept['id'],gone['id']} for p in c.get('/api/projects').json()['projects'])

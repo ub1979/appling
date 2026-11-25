@@ -23,13 +23,13 @@ export function Home() {
   const [deleteProblem, setDeleteProblem] = useState<string | null>(null);
 
   const deleteProject = async (project: ProjectSummary) => {
-    if (!window.confirm(`Delete "${project.name}" from your projects? Its folder, files and saved chats will move to Appling Projects/Archive.`)) return;
+    if (!window.confirm(`Delete "${project.name}" from your projects? Its folder and files will move to Appling's Archive folder.`)) return;
     setDeleting(project.id);
     setDeleteProblem(null);
     try {
       const result = await api.deleteProject(project.id);
       setProjects((all) => all?.filter((p) => p.id !== project.id) ?? null);
-      setNotice(`Project moved to ${result.archived_to}`);
+      setNotice(result.archived_to ? `Project moved to ${result.archived_to}` : "Project removed. Its folder was already gone.");
     } catch (e) {
       setDeleteProblem(e instanceof Error ? e.message : String(e));
     } finally {

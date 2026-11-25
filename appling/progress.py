@@ -48,7 +48,11 @@ def publish_due(store, pid, *, now=None, interval=INTERVAL):
         reports = [e for e in recent if e['type']=='worker_commentary' and isinstance(e.get('text'),str)]
         if reports:
             lines.append('What the builder says it is doing (its own words, not yet checked): '+safe_diagnostic(reports[-1]['text'])[:400])
-        if not commands and not reports:
+        # Claude, Copilot and API engines report each step as it starts, not as a finished command.
+        steps = [e for e in recent if e['type'] in {'tool','native_agent'}]
+        if not commands and not reports and steps:
+            lines.append(f'The builder is active: {len(steps)} work steps in the last five minutes.')
+        elif not commands and not reports:
             lines.append('No activity in the last five minutes. It may be thinking or stuck; Appling will keep watching.')
         try:
             from . import acceptance
