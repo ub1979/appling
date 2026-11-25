@@ -30,6 +30,9 @@ the original Appling `main` branch.
 - **Serial fallback.** A block its own builder cannot finish is built step by
   step by the main builder while it joins the app. The owner is asked only
   if that fails too.
+- **Outages are not block problems.** When the AI program itself stops (usage
+  limit, lost connection, silence), the project pauses with a plain message
+  and builds those blocks in parallel again on continue.
 
 **Not done:**
 - Contract tests written by a separate agent before the block is built.
