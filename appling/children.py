@@ -24,22 +24,31 @@ ENV = 'APPLING_RUN'
 
 
 def _ps(*args):
+    """The output of ps, '' when it found nothing, or None when the lookup itself failed.
+    A failed lookup is never read as "that process is gone": it proves nothing, so nothing is signalled."""
     try:
         done = subprocess.run(['ps', *args], capture_output=True, text=True, timeout=10, env={**os.environ, 'LC_ALL': 'C'})
     except (OSError, subprocess.SubprocessError):
-        return ''
-    return done.stdout
+        return None
+    if done.returncode == 0:
+        return done.stdout
+    return '' if done.returncode == 1 and not done.stdout.strip() else None     # 1 with no rows: no such process
 
 
 def started(pid):
-    """The start time of a live process, or '' when it is gone. With the id, this names one process."""
-    return ' '.join(_ps('-o', 'lstart=', '-p', str(int(pid))).split())
+    """The start time of a live process, '' when it is gone, None when that could not be found out.
+    With the id, the start time names one process."""
+    found = _ps('-o', 'lstart=', '-p', str(int(pid)))
+    return None if found is None else ' '.join(found.split())
 
 
 def table():
-    """Every process as {pid: (process group, start time)}."""
+    """Every process as {pid: (process group, start time)}, or None when the listing failed."""
+    listing = _ps('-ax', '-o', 'pid=,pgid=,lstart=')
+    if listing is None:
+        return None
     found = {}
-    for line in _ps('-ax', '-o', 'pid=,pgid=,lstart=').splitlines():
+    for line in listing.splitlines():
         parts = line.split()
         if len(parts) > 2 and parts[0].isdigit() and parts[1].isdigit():
             found[int(parts[0])] = (int(parts[1]), ' '.join(parts[2:]))
@@ -56,8 +65,8 @@ def marked(pid, marker):
         return needle.encode() in Path(f'/proc/{int(pid)}/environ').read_bytes().split(b'\0')
     except OSError:
         pass
-    plain = _ps('-ww', '-o', 'command=', '-p', str(int(pid))).rstrip('\n')
-    full = _ps('-E', '-ww', '-o', 'command=', '-p', str(int(pid))).rstrip('\n')
+    plain = (_ps('-ww', '-o', 'command=', '-p', str(int(pid))) or '').rstrip('\n')
+    full = (_ps('-E', '-ww', '-o', 'command=', '-p', str(int(pid))) or '').rstrip('\n')
     # Only the part after the command line is environment; the same text in an argument proves nothing.
     return bool(plain) and full.startswith(plain) and needle in full[len(plain):].split()
 
@@ -67,8 +76,11 @@ def enable(directory):
     global DIRECTORY, OWNER, MARKER
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True, mode=0o700)
+    begun = started(os.getpid())
+    if not begun:       # without it nobody could tell this server from a dead one, so nothing is recorded
+        raise OSError('this process could not read its own start time')
     MARKER = uuid.uuid4().hex
-    OWNER = dict(pid=os.getpid(), started=started(os.getpid()))
+    OWNER = dict(pid=os.getpid(), started=begun)
     os.environ[ENV] = MARKER
     DIRECTORY = directory
 
@@ -127,22 +139,29 @@ def reap(directory, *, send=os.kill, grace=3):
     if not directory.is_dir():
         return stopped, unverified
     for stale in directory.glob('*.tmp'):
-        stale.unlink(missing_ok=True)
+        try:
+            if time.time() - stale.stat().st_mtime > 60:      # a fresh one may be another server's write in progress
+                stale.unlink(missing_ok=True)
+        except OSError:
+            pass
     for path in sorted(directory.glob('*.json')):
         try:
             entry = json.loads(path.read_text())
-            pid = int(entry['pid']); begun = str(entry['started'])
-            owner = entry['owner']; owner_pid = int(owner['pid']); owner_started = str(owner['started'])
+            pid = int(entry['pid']); begun = entry['started']
+            owner = entry['owner']; owner_pid = int(owner['pid']); owner_started = owner['started']
             marker = str(entry.get('marker') or '')
         except (OSError, ValueError, TypeError, KeyError):
             path.unlink(missing_ok=True)
             continue
-        if pid <= 1 or not begun or not owner_started:
+        if pid <= 1 or not (isinstance(begun, str) and begun) or not (isinstance(owner_started, str) and owner_started):
             path.unlink(missing_ok=True)
             continue
-        if started(owner_pid) == owner_started:
-            continue                                   # that server is alive and looks after its own children
+        owner_now = started(owner_pid)
+        if owner_now is None or owner_now == owner_started:
+            continue                                   # alive, or unknown: that server looks after its own children
         processes = table()
+        if processes is None:
+            continue                                   # could not look, so nothing is proven; try again next start
         members = [(member, info[1]) for member, info in processes.items() if info[0] == pid]
         if processes.get(pid) == (pid, begun):
             targets = members                          # the recorded leader itself: its whole group is ours
