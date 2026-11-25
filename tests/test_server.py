@@ -111,22 +111,20 @@ def test_interleaved_worker_usage_is_counted_per_invocation(client):
     assert total['prompt']==50 and total['api_calls']==2
 
 
-def test_new_projects_default_to_direct_with_mandatory_design_and_qa(client):
+def test_new_projects_default_to_blocks_with_mandatory_design_and_qa(client):
     c,app,tmp=client
-    assert c.get('/api/catalog').json()['default_mode']=='direct'   # the setup form preselects this
+    assert c.get('/api/catalog').json()['default_mode']=='blocks'   # the setup form preselects this
     p=c.post('/api/projects',json=dict(path=str(tmp/'simple'),create=True)).json()
-    assert p['execution_mode']=='direct'
+    assert p['execution_mode']=='blocks'
     assert {'req-engineer','ui-designer','sw-developer','qa-engineer'}<=set(p['team'])
     names=[row['name'] for row in c.get('/api/projects/'+p['id']+'/map').json()['phases']]
-    assert names[:2]==['Requirements','Design'] and 'Quality assurance' in names
-    assert 'Task planning' not in names and 'Block plan' not in names and 'Merging into the app' not in names
-    # Blocks mode stays available on request.
-    blocks=c.post('/api/projects',json=dict(path=str(tmp/'blocks'),create=True,execution_mode='blocks')).json()
-    assert blocks['execution_mode']=='blocks'
-    names=[row['name'] for row in c.get('/api/projects/'+blocks['id']+'/map').json()['phases']]
     assert names[:6]==['Requirements','Design','Block plan','Building blocks','Merging into the app','Quality assurance']
-    assert c.get('/api/projects/'+blocks['id']+'/blocks').json()==dict(exists=False,blocks=[],phase='requirements')
+    assert c.get('/api/projects/'+p['id']+'/blocks').json()==dict(exists=False,blocks=[],phase='requirements')
     assert 'blocks' in c.get('/api/library').json()
+    direct=c.post('/api/projects',json=dict(path=str(tmp/'direct'),create=True,execution_mode='direct')).json()
+    assert direct['execution_mode']=='direct'
+    names=[row['name'] for row in c.get('/api/projects/'+direct['id']+'/map').json()['phases']]
+    assert 'Task planning' not in names and 'Block plan' not in names and 'Development' in names
 
 
 def test_changing_coordination_preserves_approvals_files_and_retained_workers(client):

@@ -25,8 +25,8 @@ from . import connections
 from .messaging import PhoneConnections
 
 
-# How a new project builds unless the owner chooses otherwise at setup. block_branch sets this to 'blocks'.
-DEFAULT_MODE='direct'
+# How a new project builds unless the owner chooses otherwise at setup. This branch defaults to blocks; main to direct.
+DEFAULT_MODE='blocks'
 
 
 def create_app(home=None,execute=None):
