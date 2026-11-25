@@ -32,7 +32,7 @@ def plan(workflow, pid, text):
             'A block is a generic package (blocks/<id>/) with its own interface, tests and README that another project could reuse: '
             'e.g. an AI-provider connector, a Telegram or WhatsApp integration, an admin panel, authentication, a scheduler, a speech engine. '
             'Prefer reusing a compatible library block from this catalogue (source "library:<name>@<version>"): '
-            + json.dumps([{k: b[k] for k in ('name', 'version', 'status', 'purpose', 'interface')} for b in catalogue]) + '. '
+            + json.dumps([{k: b[k] for k in ('name', 'version', 'status', 'purpose', 'interface', 'contract') if b.get(k)} for b in catalogue]) + '. '
             'Keep blocks independent; use depends_on only when a block truly needs another block\'s interface. '
             'Keep the body (app/) thin: it is built by one agent after every block finishes, so anything in it is not parallel. '
             'The body only connects blocks: app entry point, configuration, routing and wiring blocks to each other. '
@@ -45,8 +45,18 @@ def plan(workflow, pid, text):
             'for example "cd blocks/telegram-bot && npm install && npm test". '
             'Return {"summary":"plain one-paragraph overview","blocks":[{"id":"telegram-bot","name":"Telegram bot","purpose":"...",'
             '"interface":"exported functions/routes/events with types","runtime":"in-process|service","criteria":["AC-..."],'
-            '"depends_on":[],"prerequisites":["P-..."],"source":"new","setup":"","test":"..."}],'
-            '"body":{"purpose":"...","criteria":["AC-..."],"files":["package.json"],"test":"..."}}.'
+            '"depends_on":[],"prerequisites":["P-..."],"source":"new","setup":"","test":"...",'
+            '"contract":{"entry":"index.js","exports":[{"name":"sendMessage","kind":"function|class|component|route|event|command|constant|type",'
+            '"input":"chatId: string, text: string","output":"Promise<{id: string}>","errors":"throws SendError"}],"config":["TELEGRAM_TOKEN"]},'
+            '"uses":{"other-block-id":["exportName"]}}],'
+            '"body":{"purpose":"...","criteria":["AC-..."],"files":["package.json"],"test":"...","uses":{"telegram-bot":["sendMessage"]}}}. '
+            'Interfaces are agreed first, before anything is built. Give every new block a "contract": its entry file (relative to its '
+            'folder) and every name other code may use, each with its inputs, outputs and errors. For a route, the name is its path. '
+            '"uses" lists, for each block it depends on, exactly which contract names it calls; the body lists the names it calls too. '
+            'Appling rejects a plan in which a block or the body uses a name the other block\'s contract does not offer, and after each '
+            'block is built it checks that every contract name exists in that block\'s source and tests. Every block has the same shape: '
+            'one entry file, settings passed in through it, documented errors, and no reaching into another block except through that '
+            'block\'s entry. When two or more blocks need the same service (storage, settings, sign-in), make it one block the others depend on.'
             + (f' This is a small app (at most {blocks.SMALL_APP_FEATURES} release-1 features): use at most '
                f'{blocks.SMALL_APP_NEW_BLOCKS} new blocks besides reused library blocks, and let the body own the rest. '
                'Here that is faster than many blocks.' if blocks.small_app(spec) else ''))
@@ -55,7 +65,8 @@ def plan(workflow, pid, text):
         result = workflow.invoke(pid, 'sw-architect', goal + (f'\nCorrect this problem in the previous proposal: {error}' if error else ''),
                                  readonly=True, session_scope='blocks-plan-' + uuid.uuid4().hex[:8])
         try:
-            checked = blocks.validate(result, spec, catalogue)
+            # The first proposal must have consistent contracts; a second imperfect one still builds, without the faulty contract.
+            checked = blocks.validate(result, spec, catalogue, strict_contracts=not attempt)
         except ValueError as exc:
             error = str(exc)
             if attempt and fallback is None:
@@ -129,11 +140,24 @@ def _refresh_workspace_lock(root, block):
     blocks._run('npm install --package-lock-only --ignore-scripts --no-audit --no-fund', Path(root), log, timeout=300)
 
 
-def _test_and_record(workflow, pid, root, block):
-    """Controller-run block test; any crash is a failed test, never an untested pass."""
+def _test_and_record(workflow, pid, root, block, final=True):
+    """Controller-run block test, then the contract check; any crash is a failed test, never an untested pass.
+    A contract name missing from the block's source always fails. A name no test mentions fails only while a
+    repair round is still available (final=False); after that it is recorded as a note, not a stall."""
     try:
         _refresh_workspace_lock(root, block)
-        return blocks.run_block_tests(root, block)
+        test = blocks.run_block_tests(root, block)
+        if not test['passed'] or not block.get('contract') or block['source'].startswith('library:'):
+            return test
+        missing, untested = blocks.conformance(root, block)
+        problems = missing + ([] if final else untested)
+        log = Path('.sdlc/evidence/blocks') / block['id'] / 'interface.log'
+        (Path(root) / log).write_text('Contract check for ' + block['id'] + '\n'
+                                      + ('\n'.join('- ' + p for p in missing + untested) or 'Every contract name is in the source and the tests.') + '\n')
+        if problems:
+            return dict(passed=False, exit_code=test['exit_code'], evidence=str(log),
+                        error='The block does not match its agreed contract: ' + ' '.join(problems)[:500])
+        return dict(test, interface_notes=untested) if untested else test
     except Exception as exc:
         return dict(passed=False, exit_code=-1, evidence=None, error=str(exc)[:600])
 
@@ -255,7 +279,7 @@ def build(workflow, pid, feedback=''):
                 block = by_id[task['id']]
                 notes = [str(b.get('detail', ''))[:600] for b in (worker.get('result') or {}).get('blockers') or []
                          if isinstance(b, dict) and b.get('kind') == 'integration']
-                test = _test_and_record(workflow, pid, root, block)
+                test = _test_and_record(workflow, pid, root, block, final=counts.get(block['id'], 0) >= MAX_TEST_REPAIRS)
                 if test['passed']:
                     _set_status(workflow, pid, block['id'], status='tested', test=test, reason=None, host_notes=notes, needs=None)
                     save_checkpoint(workflow, pid, f"Appling checkpoint: block {block['name']} built and tested")
@@ -271,7 +295,8 @@ def build(workflow, pid, feedback=''):
                 log = (root / evidence).read_text(errors='replace')[-3000:] if evidence and (root / evidence).is_file() else test.get('error', '')
                 if count < MAX_TEST_REPAIRS:
                     counts[block['id']] = count + 1
-                    repairs[block['id']] = 'The controller ran the approved test command and it failed. Fix the block. Output:\n' + log
+                    repairs[block['id']] = ('The controller ran the approved test command and checked the agreed contract; '
+                                            'this must be fixed in the block. Output:\n' + log)
                     attempted.discard(block['id'])
                     _set_status(workflow, pid, block['id'], status='failed', test=test)
                 else:
@@ -370,8 +395,11 @@ def body_goal(plan_, spec, status=None):
     usable = [b for b in plan_['blocks'] if b['id'] not in blocks.deferred(plan_, spec)]
     return ('Build the app body in app/ (and the root files it owns: ' + ', '.join(plan_['body']['files']) + ') and wire in the finished blocks. '
             f"Body purpose: {plan_['body']['purpose']}. Use blocks only through their documented interfaces (README.md and block.json): "
-            + json.dumps([dict(id=b['id'], folder=b['folder'], interface=b['interface']) for b in usable]) + '. '
-            'Do not edit anything under blocks/. If a block interface must change, report an implementation blocker with "block":"<id>" '
+            + json.dumps([dict(id=b['id'], folder=b['folder'], interface=b['interface'],
+                               **({'contract': b['contract']} if b.get('contract') else {})) for b in usable]) + '. '
+            + (('Blocks with a contract are used only through their entry file and only by the names in the contract; '
+                'the plan expects the body to use: ' + json.dumps(plan_['body']['uses']) + '. ') if plan_['body'].get('uses') else '')
+            + 'Do not edit anything under blocks/. If a block interface must change, report an implementation blocker with "block":"<id>" '
             'and what must change, instead of editing it. Blocks moved to a later release are out of scope. '
             + (('Block builders left these items for the app to provide: ' + json.dumps({k: v.get('host_notes') for k, v in (status or {}).items()
                                                                                           if v.get('host_notes')}) + '. ') if status else '')
