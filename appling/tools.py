@@ -5,6 +5,7 @@ import os
 import signal
 import subprocess
 import time
+from . import children
 from .store import safe_path
 
 
@@ -69,6 +70,7 @@ def execute(run,name,args):
         from .engines import environment
         proc=subprocess.Popen(command,shell=True,cwd=run.root,env=environment(),stdout=subprocess.PIPE,
                               stderr=subprocess.STDOUT,text=True,start_new_session=True)
+        children.track(proc)
         deadline=time.monotonic()+120
         try:
             while True:
@@ -87,4 +89,5 @@ def execute(run,name,args):
                     proc.wait(timeout=2)
                 except subprocess.TimeoutExpired:
                     os.killpg(proc.pid,signal.SIGKILL);proc.wait()
+            children.forget(proc)
     raise ValueError('Unknown tool: '+name)

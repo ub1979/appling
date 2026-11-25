@@ -7,6 +7,7 @@ import signal
 import subprocess
 import threading
 import time
+from .. import children
 from . import environment, result_json
 from .claude_support import CliError, claude_environment
 
@@ -74,6 +75,7 @@ def execute(connection, run):
             args += ['--reasoning-effort','none' if run.effort=='off' else run.effort]
     proc = subprocess.Popen(args,cwd=run.root,env=claude_environment() if engine=='claude-cli' else environment(),stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,text=True,bufsize=1,start_new_session=True)
+    children.track(proc)
     lines = queue.Queue(); errors=[]
     def read():
         for line in proc.stdout:
@@ -156,5 +158,6 @@ def execute(connection, run):
                 try:os.killpg(proc.pid,signal.SIGKILL)
                 except ProcessLookupError:pass
                 proc.wait()
+        children.forget(proc)
         for stream in [proc.stdout,proc.stderr]:
             stream.close()

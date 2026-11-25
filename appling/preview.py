@@ -13,6 +13,7 @@ import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
+from . import children
 from .store import safe_path
 
 
@@ -132,6 +133,7 @@ class ExpoPreview:
         self.proc=subprocess.Popen([str(executable),'start','--lan','--port',str(port)],cwd=root,
             stdin=subprocess.DEVNULL,stdout=self.log,stderr=subprocess.STDOUT,start_new_session=True,
             env={**environment(),'BROWSER':'none','EXPO_NO_TELEMETRY':'1'})
+        children.track(self.proc)
         try:
             deadline=time.monotonic()+120
             while time.monotonic()<deadline:
@@ -164,4 +166,5 @@ class ExpoPreview:
                 self.proc.wait(timeout=3)
             except subprocess.TimeoutExpired:
                 os.killpg(self.proc.pid,signal.SIGKILL);self.proc.wait()
+        children.forget(self.proc)
         self.log.close()

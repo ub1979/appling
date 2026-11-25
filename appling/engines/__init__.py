@@ -58,7 +58,7 @@ def environment():
     allowed = {'PATH','HOME','USER','LOGNAME','SHELL','TMPDIR','TEMP','TMP','LANG','LC_ALL','SYSTEMROOT',
                'OPENAI_API_KEY','ANTHROPIC_API_KEY','CLAUDE_CODE_OAUTH_TOKEN','GH_TOKEN','GITHUB_TOKEN',
                'GITHUB_COPILOT_TOKEN','COPILOT_GITHUB_TOKEN','CODEX_HOME','HTTPS_PROXY','HTTP_PROXY','NO_PROXY'}
-    allowed.update({'PLAYWRIGHT_BROWSERS_PATH','npm_config_cache'})
+    allowed.update({'PLAYWRIGHT_BROWSERS_PATH','npm_config_cache','APPLING_RUN'})   # APPLING_RUN: see children.py
     env={k:v for k,v in os.environ.items() if k in allowed}
     env['APPLING_HEADLESS']='1'   # automated browser checks never open windows on the owner's screen
     return env

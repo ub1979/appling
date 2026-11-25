@@ -54,6 +54,11 @@ def main():
         if actual_port!=port and port!=0:
             print(f'Port {port} is occupied; using {actual_port}.',flush=True)
         print(f'Open Appling: {url}',flush=True)
+        # Stop what a force-quit Appling left running, then record what this one starts.
+        from pathlib import Path
+        from . import children
+        from .service import ROOT
+        children.start(Path(args.home or ROOT/'.appling_c')/'run/children',log=lambda text:print(text,flush=True))
         app=create_app(args.home)
         if args.managed:
             from .service import serve_managed
