@@ -8,7 +8,35 @@ the original Appling `main` branch.
 | Branch | What it is |
 |---|---|
 | `main` (pushed as `appling_c`) | Current Appling C. New projects build in **direct mode**. Blocks mode is still available on request. |
-| `block_branch` | The same code, but new projects default to **blocks mode**. Kept so that design can be resumed later. |
+| `block_branch` | New projects default to **blocks mode**, with interfaces agreed first and a serial fallback. Direct mode can be chosen at setup. |
+
+## 2026-11-25: reliability fixes and a build-mode choice
+
+**Fixes (both branches):**
+- A builder that edits approved files (requirements, checks, prototype, block
+  plan) no longer leaves the project stuck. Appling puts the approved version
+  back and tells the owner.
+- Claude and Copilot tasks end after 30 minutes of silence, not 30 minutes in
+  total.
+- A missing or signed-out Codex, Claude or Copilot is reported in plain words
+  before any work starts.
+- Planned-mode repair tasks no longer fail with "Task ownership is missing".
+- A project whose folder is gone can be deleted. The delete message names the
+  real Archive folder.
+- Work copies of finished reviews and integrated workers are removed.
+- Progress updates count steps from engines other than Codex.
+- Apps may not point into Appling's own folder. Files that do are sent back
+  to the builder.
+- `/change` and `/replan` explain themselves on a direct project.
+
+**New:** the setup form asks how to build the app: one builder step by step,
+or blocks built in parallel. Settings lists blocks mode too.
+
+**Not done:** child processes left behind after a crash or `kill -9` are
+still not cleaned up on the next start.
+
+**Validation:** backend and interface test suites pass. The setup form and
+Settings changes were type-checked and built but not checked in a browser.
 
 ## 0.2.0 beta, 2026-11-21: direct mode is the default again
 
