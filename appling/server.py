@@ -362,7 +362,7 @@ def create_app(home=None,execute=None):
             temporary.replace(target)
         finally:
             temporary.unlink(missing_ok=True)
-        return dict(path=str(target.relative_to(Path(store.get(pid)['root']))),size=size)
+        return dict(path=target.relative_to(Path(store.get(pid)['root'])).as_posix(),size=size)
 
     @app.get('/api/settings/phone')
     def phone_settings():

@@ -183,6 +183,8 @@ def reap(directory, *, send=os.kill, grace=3):
 
 def start(directory, log=print):
     """Called once by a server entry point before it accepts work. Never raises."""
+    if os.name == 'nt':
+        return      # Windows ends a force-quit server's programs itself: each one runs in a job (see procs.py)
     try:
         stopped, unverified = reap(directory)
         if stopped:

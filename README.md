@@ -38,6 +38,44 @@ the new background launcher.
 An explicit `--port` is used exactly as requested; if occupied, the launcher
 reports that clearly instead of silently changing it.
 
+### Windows
+
+Appling runs natively on Windows; WSL is not needed. This support is new and
+has been tested only on macOS so far, so report anything that fails on Windows.
+Install Python 3.11+
+(tick "Add python.exe to PATH"), Git and Node.js 22+, then install Codex and
+sign in from a normal Windows terminal:
+
+```bat
+npm install -g @openai/codex
+codex login
+```
+
+From the Appling folder, in Command Prompt type `start.bat`; in PowerShell type
+`.\start.bat` (plain `start` is a built-in command there). `status.bat` and
+`stop.bat` do what the `.sh` scripts do, and `scripts\setup-browser.bat`
+installs the browser used for QA. The first start creates `.venv`, installs
+Appling and builds the interface, exactly like `./start.sh`.
+
+Differences from Linux and macOS:
+- Each program Appling starts runs in a Windows job. Stopping a task ends the
+  program and everything it started at once; Windows has no polite stop for
+  programs without a window. If Appling itself is force-quit, Windows ends
+  those programs too, so there is no leftover cleanup at the next start.
+- Commands a builder runs go through `cmd.exe`, so the app's own scripts must
+  work there (`npm test` does; `ls` and `rm -rf` do not).
+- Programs installed by npm (`codex`, `copilot`, `claude`) are started through
+  Node directly rather than through their `.cmd` wrapper, so prompts with
+  quotes or `&` reach them unchanged. Windows limits a command line to 32,767
+  characters; Codex is not affected because it receives prompts over a pipe,
+  but Copilot and Claude receive the prompt on the command line.
+- `python -m appling.recovery` is Linux and macOS only. On Windows, end a stuck
+  server in Task Manager and run `start.bat` again.
+
+A folder that was used from WSL first holds Linux builds: delete `.venv`,
+`ui\node_modules` and `.appling_c\runtime` before the first Windows start.
+Sign-ins made inside WSL do not carry over to Windows.
+
 Open Settings to select a default connection/model or assign a connection to an
 individual role. `default` selects a CLI's configured model. The dropdown queries
 Codex's model catalogue, Copilot's ACP model list, and API `/models` endpoints

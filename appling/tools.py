@@ -2,10 +2,9 @@
 from __future__ import annotations
 import json
 import os
-import signal
 import subprocess
 import time
-from . import children
+from . import children, procs
 from .store import safe_path
 
 
@@ -44,7 +43,7 @@ def execute(run,name,args):
         for base,dirs,files in os.walk(run.root):
             dirs[:]=[d for d in dirs if d not in skip]
             for file in files:
-                p=os.path.relpath(os.path.join(base,file),run.root)
+                p=os.path.relpath(os.path.join(base,file),run.root).replace(os.sep,'/')
                 if not file.startswith('.env'):
                     paths.append(p)
             if len(paths)>3000:
@@ -68,8 +67,8 @@ def execute(run,name,args):
         if run.ask('approval',f'Run this command in {run.root}?\n\n{command}\n\nCommands run with your local account permissions.', ['once','deny'])!='once':
             return 'Command denied by the owner.'
         from .engines import environment
-        proc=subprocess.Popen(command,shell=True,cwd=run.root,env=environment(),stdout=subprocess.PIPE,
-                              stderr=subprocess.STDOUT,text=True,start_new_session=True)
+        proc=procs.spawn(command,shell=True,cwd=run.root,env=environment(),stdout=subprocess.PIPE,
+                         stderr=subprocess.STDOUT,text=True,encoding='utf-8',errors='replace')
         children.track(proc)
         deadline=time.monotonic()+120
         try:
@@ -83,11 +82,6 @@ def execute(run,name,args):
                     if time.monotonic()>deadline:
                         raise TimeoutError('Command exceeded 120 seconds. Use a smaller check.')
         finally:
-            if proc.poll() is None:
-                os.killpg(proc.pid,signal.SIGTERM)
-                try:
-                    proc.wait(timeout=2)
-                except subprocess.TimeoutExpired:
-                    os.killpg(proc.pid,signal.SIGKILL);proc.wait()
+            procs.stop(proc,2)
             children.forget(proc)
     raise ValueError('Unknown tool: '+name)

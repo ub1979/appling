@@ -10,7 +10,7 @@ import threading
 import time
 from pathlib import Path
 import httpx
-from . import __version__
+from . import __version__, procs
 from .engines import Run, environment, execute
 from .engines.claude_support import MODEL_IDS, CliError, claude_environment
 
@@ -22,7 +22,7 @@ class DiscoveryError(Exception):
 class RpcProcess:
     """Bounded metadata-only RPC conversations with installed CLI servers."""
     def __init__(self,args,cwd):
-        self.proc=subprocess.Popen(args,cwd=cwd,env=environment(),stdin=subprocess.PIPE,
+        self.proc=subprocess.Popen(procs.command(args),cwd=cwd,env=environment(),stdin=subprocess.PIPE,
             stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,bufsize=1)
         self.incoming=queue.Queue();self.seq=0;self.permission_error=False
         def read():
@@ -146,7 +146,7 @@ def discover(connection):
         elif engine=='claude-cli':
             binary=connection.get('binary','claude')
             if not shutil.which(binary):raise DiscoveryError('Claude Code CLI is not installed or is missing from PATH. Install it, then run claude auth login.')
-            result=subprocess.run([binary,'auth','status','--json'],env=claude_environment(),stdin=subprocess.DEVNULL,capture_output=True,text=True,timeout=12)
+            result=subprocess.run(procs.command([binary,'auth','status','--json']),env=claude_environment(),stdin=subprocess.DEVNULL,capture_output=True,text=True,timeout=12)
             try:auth=json.loads(result.stdout)
             except ValueError:raise DiscoveryError('Could not read Claude Code login status. Run claude auth status and check its version.')
             names=[*MODEL_IDS,'default','sonnet','opus','haiku','fable'];source='documented_models'
@@ -200,11 +200,11 @@ def not_ready(connection,ttl=120):
     signed_out=False
     try:
         if engine=='claude-cli':
-            result=subprocess.run([binary,'auth','status','--json'],env=claude_environment(),stdin=subprocess.DEVNULL,
+            result=subprocess.run(procs.command([binary,'auth','status','--json']),env=claude_environment(),stdin=subprocess.DEVNULL,
                                   capture_output=True,text=True,timeout=12)
             signed_out=json.loads(result.stdout).get('loggedIn') is False
         elif engine=='codex':
-            result=subprocess.run([binary,'login','status'],env=environment(),stdin=subprocess.DEVNULL,
+            result=subprocess.run(procs.command([binary,'login','status']),env=environment(),stdin=subprocess.DEVNULL,
                                   capture_output=True,text=True,timeout=12)
             signed_out=bool(result.returncode) and 'not logged in' in (result.stdout+result.stderr).lower()
     except (OSError,ValueError,AttributeError,subprocess.TimeoutExpired):

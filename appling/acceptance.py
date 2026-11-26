@@ -291,7 +291,7 @@ def evidence_digest(root, folder):
     if base.is_dir():
         for p in sorted(base.rglob('*')):
             if p.is_file() and not p.is_symlink():
-                digest.update(str(p.relative_to(base)).encode())
+                digest.update(p.relative_to(base).as_posix().encode())
                 digest.update(p.read_bytes())
     return digest.hexdigest()
 

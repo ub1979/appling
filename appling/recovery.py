@@ -54,6 +54,9 @@ def recover(root=service.ROOT, *, timeout=10, inspector=inspect_process):
 
 
 def main():
+    if os.name == 'nt':
+        print('Recovery uses Linux and macOS process tools. On Windows, end the old server in Task Manager, then run start.bat.')
+        raise SystemExit(1)
     try:
         changed=recover()
         print('Recovered the stopped Appling server.' if changed else 'No stuck Appling server remains.')

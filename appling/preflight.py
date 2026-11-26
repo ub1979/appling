@@ -6,6 +6,8 @@ import re
 import shutil
 import subprocess
 
+from . import procs
+
 
 def version(value):
     match=re.search(r'\d+(?:\.\d+){0,2}',value)
@@ -29,7 +31,7 @@ def require_runtime(root,runtime,browser_runner):
         executable=shutil.which(tool)
         if not executable:raise ValueError(f'Runtime preflight: {tool} is missing. Install it before retrying.')
         try:
-            checked=subprocess.run([executable,'--version'],cwd=root,capture_output=True,text=True,timeout=15)
+            checked=subprocess.run(procs.command([executable,'--version']),cwd=root,capture_output=True,text=True,timeout=15)
             actual=version(checked.stdout or checked.stderr)
         except (OSError,subprocess.TimeoutExpired,ValueError) as exc:
             raise ValueError(f'Runtime preflight: cannot verify {tool}.') from exc

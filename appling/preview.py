@@ -5,15 +5,13 @@ import mimetypes
 import secrets
 import subprocess
 import threading
-import os
-import signal
 import socket
 import time
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, unquote, urlsplit
-from . import children
+from . import children, procs
 from .store import safe_path
 
 
@@ -43,7 +41,7 @@ class Previews:
                 if package.exists():
                     import json
                     if json.loads(package.read_text()).get('scripts',{}).get('build'):
-                        proc=subprocess.run(['npm','run','build'],cwd=root,capture_output=True,text=True,timeout=300)
+                        proc=subprocess.run(procs.command(['npm','run','build']),cwd=root,capture_output=True,text=True,timeout=300)
                         if proc.returncode:
                             raise ValueError('The application build failed. Ask Appling to inspect the build output.')
                         base=next((root/d for d in ['dist','build','out'] if (root/d/'index.html').is_file()),None)
@@ -121,7 +119,7 @@ class Previews:
 class ExpoPreview:
     """Own the mobile dev server lifecycle and its Expo Go QR URL."""
     def __init__(self,root):
-        executable=root/'node_modules/.bin/expo'
+        executable=root/'node_modules/.bin'/('expo.cmd' if procs.WINDOWS else 'expo')   # npm makes .cmd wrappers on Windows
         if not executable.exists():
             raise ValueError('Install this project’s Expo dependencies before opening its phone preview.')
         with socket.socket() as sock:
@@ -130,8 +128,8 @@ class ExpoPreview:
         log_path=root/'.appling/expo.log';log_path.parent.mkdir(parents=True,exist_ok=True)
         self.log=log_path.open('ab')
         from .engines import environment
-        self.proc=subprocess.Popen([str(executable),'start','--lan','--port',str(port)],cwd=root,
-            stdin=subprocess.DEVNULL,stdout=self.log,stderr=subprocess.STDOUT,start_new_session=True,
+        self.proc=procs.spawn([str(executable),'start','--lan','--port',str(port)],cwd=root,
+            stdin=subprocess.DEVNULL,stdout=self.log,stderr=subprocess.STDOUT,
             env={**environment(),'BROWSER':'none','EXPO_NO_TELEMETRY':'1'})
         children.track(self.proc)
         try:
@@ -160,11 +158,6 @@ class ExpoPreview:
         return f'exp://{ip}:{self.port}'
 
     def stop(self):
-        if self.proc.poll() is None:
-            os.killpg(self.proc.pid,signal.SIGTERM)
-            try:
-                self.proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                os.killpg(self.proc.pid,signal.SIGKILL);self.proc.wait()
+        procs.stop(self.proc,3)
         children.forget(self.proc)
         self.log.close()

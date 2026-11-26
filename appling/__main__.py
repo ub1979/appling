@@ -1,11 +1,14 @@
 from __future__ import annotations
 import argparse
 import errno
+import os
 import socket
 import webbrowser
 import threading
 import uvicorn
 from .server import create_app
+
+IN_USE={errno.EADDRINUSE,getattr(errno,'WSAEADDRINUSE',errno.EADDRINUSE)}
 
 
 def reserve_port(port, *, fallback=False):
@@ -15,13 +18,18 @@ def reserve_port(port, *, fallback=False):
         try:
             # Allow an orderly restart on the same URL while closed HTTP/SSE
             # connections drain in TIME_WAIT. This does not share a live port.
-            listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
+            # On Windows SO_REUSEADDR would even let two servers share a live port, so it gets the
+            # exclusive option instead; a fresh restart there is not held up by closed connections.
+            if hasattr(socket,'SO_EXCLUSIVEADDRUSE'):
+                listener.setsockopt(socket.SOL_SOCKET,socket.SO_EXCLUSIVEADDRUSE,1)
+            else:
+                listener.setsockopt(socket.SOL_SOCKET,socket.SO_REUSEADDR,1)
             listener.bind(('127.0.0.1',candidate))
             listener.listen(2048)
             return listener
         except OSError as exc:
             listener.close()
-            if exc.errno!=errno.EADDRINUSE or not fallback:
+            if exc.errno not in IN_USE or not fallback:
                 raise
     raise OSError(errno.EADDRINUSE,f'No free port found between {port} and {min(port+49,65535)}')
 
@@ -47,14 +55,14 @@ def main():
     try:
         listener=reserve_port(port,fallback=args.port is None)
     except OSError as exc:
-        if exc.errno==errno.EADDRINUSE:
+        if exc.errno in IN_USE:
             parser.error(f'Port {port} is already in use. Omit --port to select an available port, or choose another port.')
-        if exc.errno in {errno.EPERM,errno.EACCES}:
+        if exc.errno in {errno.EPERM,errno.EACCES,getattr(errno,'WSAEACCES',errno.EACCES)}:
             # Seen when Appling is launched from inside another agent's sandbox,
             # which forbids binding localhost. The failed capability is reported as is.
             parser.error(f'Cannot open a localhost listener on 127.0.0.1:{port}: binding was not permitted ({exc}). '
                          'If you started Appling from inside another coding agent or sandboxed terminal, '
-                         'start it from your normal Terminal instead: ./start.sh')
+                         'start it from your normal Terminal instead: '+('start.bat' if os.name=='nt' else './start.sh'))
         parser.error(f'Cannot open a localhost listener: {exc}')
     try:
         actual_port=listener.getsockname()[1]
@@ -70,7 +78,8 @@ def main():
             return
         if not args.no_open:
             threading.Timer(1.2,lambda:webbrowser.open(url)).start()
-        uvicorn.run(app,host='127.0.0.1',port=actual_port,fd=listener.fileno(),log_level='info')
+        # A passed socket works on every system; uvicorn's fd= does not work on Windows.
+        uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=actual_port,log_level='info')).run(sockets=[listener])
     finally:
         listener.close()
 

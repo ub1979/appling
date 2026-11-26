@@ -1,13 +1,11 @@
 """Claude Code and Copilot CLI adapters, using their installed CLI contracts."""
 from __future__ import annotations
 import json
-import os
 import queue
-import signal
 import subprocess
 import threading
 import time
-from .. import children
+from .. import children, procs
 from . import environment, result_json
 from .claude_support import CliError, claude_environment
 
@@ -73,8 +71,8 @@ def execute(connection, run):
             args += ['--model',run.model]
         if run.effort:
             args += ['--reasoning-effort','none' if run.effort=='off' else run.effort]
-    proc = subprocess.Popen(args,cwd=run.root,env=claude_environment() if engine=='claude-cli' else environment(),stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE,text=True,bufsize=1,start_new_session=True)
+    proc = procs.spawn(args,cwd=run.root,env=claude_environment() if engine=='claude-cli' else environment(),stdin=subprocess.DEVNULL,stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,text=True,encoding='utf-8',errors='replace',bufsize=1)
     children.track(proc)
     lines = queue.Queue(); errors=[]
     def read():
@@ -150,15 +148,7 @@ def execute(connection, run):
         if reported_model:result['_model']=reported_model
         return result
     finally:
-        if proc.poll() is None:
-            try:os.killpg(proc.pid,signal.SIGTERM)
-            except ProcessLookupError:pass  # Exiting between poll and signal must not hide the real CLI error.
-            try:
-                proc.wait(timeout=3)
-            except subprocess.TimeoutExpired:
-                try:os.killpg(proc.pid,signal.SIGKILL)
-                except ProcessLookupError:pass
-                proc.wait()
+        procs.stop(proc,3)   # an exit between check and signal is handled there and never hides the real CLI error
         children.forget(proc)
         for stream in [proc.stdout,proc.stderr]:
             stream.close()

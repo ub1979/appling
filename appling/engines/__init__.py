@@ -7,6 +7,7 @@ import threading
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
+from .. import procs
 
 
 @dataclass
@@ -59,7 +60,7 @@ def environment():
                'OPENAI_API_KEY','ANTHROPIC_API_KEY','CLAUDE_CODE_OAUTH_TOKEN','GH_TOKEN','GITHUB_TOKEN',
                'GITHUB_COPILOT_TOKEN','COPILOT_GITHUB_TOKEN','CODEX_HOME','HTTPS_PROXY','HTTP_PROXY','NO_PROXY'}
     allowed.update({'PLAYWRIGHT_BROWSERS_PATH','npm_config_cache','APPLING_RUN'})   # APPLING_RUN: see children.py
-    env={k:v for k,v in os.environ.items() if k in allowed}
+    env=procs.pick(allowed)
     env['APPLING_HEADLESS']='1'   # automated browser checks never open windows on the owner's screen
     return env
 

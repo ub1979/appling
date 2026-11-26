@@ -97,12 +97,15 @@ def test_uvicorn_shutdown_cancels_open_event_stream_and_runs_lifespan_cleanup(tm
         await asyncio.sleep(0)
         await asyncio.wait_for(server.shutdown(),timeout=5)
         await asyncio.gather(task,return_exceptions=True)
+    handed=[]
     class StreamServer(uvicorn.Server):
-        def run(self):asyncio.run(exercise(self))
+        def run(self,sockets=None):handed.append(sockets);asyncio.run(exercise(self))
     directory=tmp_path/'run'
     original_lease=service.lease
     monkeypatch.setattr(service,'RUN',directory)
     monkeypatch.setattr(service,'lease',lambda:original_lease(directory))
     monkeypatch.setattr(uvicorn,'Server',StreamServer)
-    service.serve_managed(FastAPI(lifespan=lifespan),SimpleNamespace(fileno=lambda:-1),0,no_open=True)
+    listener=SimpleNamespace(fileno=lambda:-1)
+    service.serve_managed(FastAPI(lifespan=lifespan),listener,0,no_open=True)
     assert cleaned==[True] and cancelled==[True]
+    assert handed==[[listener]]      # the reserved socket itself is served, which also works on Windows

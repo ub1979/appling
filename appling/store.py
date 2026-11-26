@@ -195,7 +195,7 @@ def revision(root: Path, name: str) -> str | None:
     if name == "prototypes/index.html":
         paths = sorted(p for p in path.parent.rglob('*') if p.is_file())
     for p in paths:
-        p = safe_path(root, str(p.relative_to(root)))
-        h.update(str(p.relative_to(root)).encode())
+        p = safe_path(root, p.relative_to(root).as_posix())
+        h.update(p.relative_to(root).as_posix().encode())
         h.update(p.read_bytes())
     return h.hexdigest()

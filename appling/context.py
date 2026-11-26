@@ -105,7 +105,7 @@ def refresh(store, pid):
             path=Path(base)/name
             if path.is_symlink() or name.startswith('.'):
                 continue
-            relative=str(path.relative_to(root));files.append(relative)
+            relative=path.relative_to(root).as_posix();files.append(relative)
             if path.suffix in {'.md','.ts','.tsx','.js','.jsx','.py','.rs','.sql','.json'} and path.stat().st_size<150000:
                 store.remember(pid,'code/'+relative,relative+'\n'+path.read_text(errors='replace')[:4000])
         if len(files)>3000:

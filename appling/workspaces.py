@@ -67,9 +67,9 @@ def snapshot(root, parent=None, include=()):
             path = safe_path(root, name)
             if path.is_dir():
                 for base,dirs,files in os.walk(path):
-                    dirs[:]=[d for d in dirs if eligible(str((Path(base)/d).relative_to(root)))]
-                    names.update(str((Path(base)/f).relative_to(root)) for f in files)
-            elif path.exists() or path.is_symlink():names.add(str(path.relative_to(root)))
+                    dirs[:]=[d for d in dirs if eligible((Path(base)/d).relative_to(root).as_posix())]
+                    names.update((Path(base)/f).relative_to(root).as_posix() for f in files)
+            elif path.exists() or path.is_symlink():names.add(path.relative_to(root).as_posix())
         selected=[os.fsencode(name) for name in sorted(names) if eligible(name)
                   and ((root/name).exists() or (root/name).is_symlink())]
         if selected:

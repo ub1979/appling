@@ -10,11 +10,10 @@ import math
 import os
 import queue
 import re
-import signal
 import subprocess
 import threading
 import time
-from .. import __version__, children
+from .. import __version__, children, procs
 from . import environment, result_json
 
 _TASK_ACTIVITY = {
@@ -72,9 +71,9 @@ def execute(connection, run):
     # Legacy timeout values remain useful as inactivity budgets. There is no
     # total build duration limit; setup RPCs and connection probes stay bounded.
     idle = _IdleTimer(connection.get('idle_timeout',connection.get('timeout',1800)))
-    proc = subprocess.Popen([connection.get('binary','codex'), 'app-server', '--listen', 'stdio://'],
+    proc = procs.spawn([connection.get('binary','codex'), 'app-server', '--listen', 'stdio://'],
         cwd=run.root, env=environment(), stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE, text=True, bufsize=1, start_new_session=True)
+        stderr=subprocess.PIPE, text=True, encoding='utf-8', errors='replace', bufsize=1)
     children.track(proc)
     incoming = queue.Queue()
     errors = []
@@ -346,25 +345,9 @@ def execute(connection, run):
                 return result_json(final)
     finally:
         closed.set()
-        # app-server tools and descendants must not outlive a stopped task.
-        # start_new_session makes this process group belong exclusively to it.
-        try:
-            os.killpg(proc.pid,signal.SIGTERM)
-        except (ProcessLookupError,PermissionError):
-            if proc.poll() is None:
-                proc.terminate()
-        try:
-            proc.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            pass
-        # The server may exit before a tool child which ignores SIGTERM.
-        # Clean up that process group even after its original leader exited.
-        try:
-            os.killpg(proc.pid,signal.SIGKILL)
-        except (ProcessLookupError,PermissionError):
-            if proc.poll() is None:
-                proc.kill()
-        proc.wait()
+        # app-server tools and descendants must not outlive a stopped task. The server may exit
+        # before a tool child that ignores SIGTERM, so the group is swept even after its leader exited.
+        procs.stop(proc,3,sweep=True)
         children.forget(proc)
         for helper in native_helpers:
             run.emit('helper',event='complete',subagent_id=helper,status='interrupted',native=True)

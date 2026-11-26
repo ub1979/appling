@@ -80,16 +80,18 @@ def test_browser_and_server_use_the_reserved_port(monkeypatch,leftover_cleanup_s
     monkeypatch.setattr(launcher,'reserve_port',lambda *a,**k:sock)
     # Leftovers of a force-quit server are stopped before this one creates its app and takes work.
     app=object();monkeypatch.setattr(launcher,'create_app',lambda home:leftover_cleanup_stays_off==[None] and app)
-    server=Mock();monkeypatch.setattr(launcher.uvicorn,'run',server)
+    config=Mock();monkeypatch.setattr(launcher.uvicorn,'Config',config)
+    server=Mock();monkeypatch.setattr(launcher.uvicorn,'Server',server)
     browser=Mock();monkeypatch.setattr(launcher.webbrowser,'open',browser)
     timer=Mock(side_effect=lambda delay,callback:Mock(start=callback))
     monkeypatch.setattr(launcher.threading,'Timer',timer)
     monkeypatch.setattr('sys.argv',['appling-c'])
     launcher.main()
     browser.assert_called_once_with('http://127.0.0.1:9212')
-    assert server.call_args.kwargs['port']==9212
-    assert server.call_args.kwargs['fd']==17
-    assert server.call_args.args==(app,)
+    assert config.call_args.kwargs['port']==9212 and config.call_args.args==(app,)
+    server.assert_called_once_with(config.return_value)
+    # The reserved socket itself is handed over (uvicorn's fd= option does not work on Windows).
+    server.return_value.run.assert_called_once_with(sockets=[sock])
     sock.close.assert_called_once()
 
 

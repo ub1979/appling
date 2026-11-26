@@ -2,7 +2,6 @@
 from __future__ import annotations
 import argparse
 from contextlib import contextmanager
-import fcntl
 import json
 import os
 from pathlib import Path
@@ -13,8 +12,12 @@ import time
 import uuid
 import webbrowser
 
+from . import procs
+
 ROOT=Path(__file__).resolve().parent.parent
 RUN=ROOT/'.appling_c/run'
+STOP,STATUS=('stop.bat','status.bat') if procs.WINDOWS else ('./stop.sh','./status.sh')
+RECOVERY='.venv/bin/python -m appling.recovery'
 
 
 def prepare(directory):
@@ -25,18 +28,16 @@ def prepare(directory):
 def lease(directory=RUN):
     prepare(directory)
     with (directory/'server.lock').open('a') as lock:
-        try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        except BlockingIOError:raise RuntimeError('Appling is already running for this checkout.')
+        if not procs.try_lock(lock):raise RuntimeError('Appling is already running for this checkout.')
         try:yield
-        finally:fcntl.flock(lock,fcntl.LOCK_UN)
+        finally:procs.unlock(lock)
 
 
 def live(directory=RUN):
     if not (directory/'server.lock').exists():return False
     with (directory/'server.lock').open('a') as lock:
-        try:fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        except BlockingIOError:return True
-        fcntl.flock(lock,fcntl.LOCK_UN)
+        if not procs.try_lock(lock):return True
+        procs.unlock(lock)
         return False
 
 
@@ -54,7 +55,7 @@ def stopping(directory=RUN):
 
 def atomic(path,data):
     temporary=path.with_name(path.name+'.'+uuid.uuid4().hex+'.tmp')
-    temporary.write_text(json.dumps(data));temporary.chmod(0o600);temporary.replace(path)
+    temporary.write_text(json.dumps(data));temporary.chmod(0o600);procs.replace(temporary,path)
 
 
 def serve_managed(app,listener,port,no_open=False):
@@ -65,7 +66,7 @@ def serve_managed(app,listener,port,no_open=False):
         url=f'http://127.0.0.1:{port}'
         # SSE connections stay open indefinitely. Bound their drain so lifespan
         # cleanup can cancel/checkpoint workers and release the service lease.
-        server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=port,fd=listener.fileno(),log_level='info',
+        server=uvicorn.Server(uvicorn.Config(app,host='127.0.0.1',port=port,log_level='info',
                                             timeout_graceful_shutdown=3))
         finished=threading.Event()
         def watch():
@@ -80,7 +81,7 @@ def serve_managed(app,listener,port,no_open=False):
                 if request.get('instance')==instance:
                     server.should_exit=True;return
         monitor=threading.Thread(target=watch,daemon=True);monitor.start()
-        try:server.run()
+        try:server.run(sockets=[listener])   # a passed socket works on Windows too; fd= does not
         finally:
             finished.set();monitor.join(timeout=2)
             (RUN/'server.json').unlink(missing_ok=True);(RUN/'stop.json').unlink(missing_ok=True)
@@ -90,11 +91,11 @@ def start(args,*,directory=RUN,command=None,timeout=20):
     prepare(directory)
     # Serialize launchers while the child takes its lifetime lease.
     with (directory/'launch.lock').open('a') as lock:
-        fcntl.flock(lock,fcntl.LOCK_EX)
+        procs.lock(lock)
         deadline=time.monotonic()+timeout
         while live(directory) and stopping(directory):
             if time.monotonic()>=deadline:
-                raise RuntimeError('The previous Appling server is still shutting down. For a stuck idle legacy server, run .venv/bin/python -m appling.recovery from this checkout.')
+                raise RuntimeError(f'The previous Appling server is still shutting down. For a stuck idle legacy server, run {RECOVERY} from this checkout.')
             time.sleep(.1)
         if live(directory):
             state=read_state(directory)
@@ -106,17 +107,18 @@ def start(args,*,directory=RUN,command=None,timeout=20):
         (directory/'server.json').unlink(missing_ok=True)
         log_path=directory/'server.log'
         with log_path.open('ab') as log:
-            child=subprocess.Popen(command or [sys.executable,'-m','appling',*args,'--managed'],cwd=ROOT,
-                stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,start_new_session=True)
+            # UTF-8 everywhere: on Windows Python would otherwise read and write project files in the local code page.
+            child=procs.detached(command or [sys.executable,'-m','appling',*args,'--managed'],cwd=ROOT,
+                stdin=subprocess.DEVNULL,stdout=log,stderr=subprocess.STDOUT,env={**os.environ,'PYTHONUTF8':'1'})
         deadline=time.monotonic()+timeout
         while time.monotonic()<deadline:
             if child.poll() is not None:raise RuntimeError(f'Appling could not start. See {log_path}')
             state=read_state(directory)
             if state.get('pid')==child.pid and state.get('url') and live(directory):
-                print(f'Appling is running: {state["url"]}\nLogs: {log_path}\nStop with ./stop.sh')
+                print(f'Appling is running: {state["url"]}\nLogs: {log_path}\nStop with {STOP}')
                 return
             time.sleep(.1)
-        raise RuntimeError(f'Appling is still starting. Check ./status.sh or {log_path}')
+        raise RuntimeError(f'Appling is still starting. Check {STATUS} or {log_path}')
 
 
 def stop(*,directory=RUN,timeout=20):
@@ -130,7 +132,7 @@ def stop(*,directory=RUN,timeout=20):
         if not live(directory):
             print('Appling stopped.');return
         time.sleep(.1)
-    raise RuntimeError(f'Appling is still shutting down its tasks. Check {directory / "server.log"}; no process was force-killed. For a stuck idle legacy server, run .venv/bin/python -m appling.recovery.')
+    raise RuntimeError(f'Appling is still shutting down its tasks. Check {directory / "server.log"}; no process was force-killed. For a stuck idle legacy server, run {RECOVERY}.')
 
 
 def main():
@@ -142,6 +144,8 @@ def main():
         if args.action=='start':
             if '--foreground' in remaining:
                 remaining.remove('--foreground')
+                if procs.WINDOWS:   # Windows has no exec: run in this window and pass on the exit code
+                    raise SystemExit(subprocess.call([sys.executable,'-m','appling',*remaining],env={**os.environ,'PYTHONUTF8':'1'}))
                 os.execv(sys.executable,[sys.executable,'-m','appling',*remaining])
             start(remaining)
         elif args.action=='stop':stop()

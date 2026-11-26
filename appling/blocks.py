@@ -19,7 +19,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from . import acceptance, children
+from . import acceptance, children, procs
 from .store import safe_path
 
 PLAN = '.sdlc/blocks.json'
@@ -267,28 +267,20 @@ def builder_goal(block, plan, spec):
 def _run(command, root, log, timeout=900):
     """Run an owner-approved command in its own process group; output goes to a file, not a pipe,
     so a background child cannot hang the wait, and the whole group is killed afterwards."""
-    import signal
     started = time.time()
     log.parent.mkdir(parents=True, exist_ok=True)
     output = log.with_suffix('.out')
     with open(output, 'w', errors='replace') as fh:
-        proc = subprocess.Popen(command, shell=True, cwd=root, stdout=fh, stderr=subprocess.STDOUT,
-                                stdin=subprocess.DEVNULL, start_new_session=True,
-                                env={**os.environ, 'APPLING_HEADLESS': '1'})   # controller checks never open windows
+        proc = procs.spawn(command, shell=True, cwd=root, stdout=fh, stderr=subprocess.STDOUT,
+                           stdin=subprocess.DEVNULL,
+                           env={**os.environ, 'APPLING_HEADLESS': '1'})   # controller checks never open windows
         children.track(proc)
         try:
             code = proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired:
             code = 124
         finally:
-            try:
-                os.killpg(proc.pid, signal.SIGKILL)
-            except (ProcessLookupError, PermissionError):
-                pass
-            try:
-                proc.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                pass
+            procs.stop(proc, 0, sweep=True)    # background children the command left behind are stopped too
             children.forget(proc)
     text = output.read_text(errors='replace')[-200_000:]
     output.unlink(missing_ok=True)
@@ -330,7 +322,7 @@ def _digest(folder):
     from .checkpoints import denied
     digest = hashlib.sha256()
     for p in sorted(Path(folder).rglob('*')):
-        rel = str(p.relative_to(folder))
+        rel = p.relative_to(folder).as_posix()
         if p.is_file() and not p.is_symlink() and not denied(rel):
             data = p.read_bytes()
             if rel == 'block.json':
@@ -348,7 +340,7 @@ def _copy_clean(src, dst):
     from .checkpoints import denied
     for p in sorted(Path(src).rglob('*')):
         rel = p.relative_to(src)
-        if p.is_symlink() or not p.is_file() or denied(str(rel)):
+        if p.is_symlink() or not p.is_file() or denied(rel.as_posix()):
             continue
         target = Path(dst) / rel
         target.parent.mkdir(parents=True, exist_ok=True)

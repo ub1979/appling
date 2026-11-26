@@ -15,6 +15,7 @@ from pathlib import Path
 
 import httpx
 
+from . import procs
 from .context import ROOT
 from .workflow import ARTIFACTS
 
@@ -68,10 +69,10 @@ class WhatsApp:
         self.replies = {}
         self.lock = threading.Lock()
         self.seq = 0
-        env = {k: v for k, v in os.environ.items() if k in {'PATH', 'HOME', 'TMPDIR', 'LANG', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY'}}
-        self.proc = subprocess.Popen(command or ['node', str(bridge / 'index.mjs'), str(auth_dir)],
+        env = procs.pick({'PATH', 'HOME', 'TMPDIR', 'TEMP', 'TMP', 'LANG', 'HTTPS_PROXY', 'HTTP_PROXY', 'NO_PROXY'})
+        self.proc = procs.spawn(command or ['node', str(bridge / 'index.mjs'), str(auth_dir)],
             stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, text=True,
-            env=env, bufsize=1, start_new_session=True)
+            encoding='utf-8', errors='replace', env=env, bufsize=1)
         threading.Thread(target=self._read, daemon=True, name='appling-whatsapp-reader').start()
 
     def _read(self):
@@ -136,6 +137,7 @@ class WhatsApp:
             except subprocess.TimeoutExpired:
                 self.proc.kill()
                 self.proc.wait()
+        procs.stop(self.proc)   # nothing left on Linux and macOS; on Windows this also ends the bridge's own children
         self.proc.stdin.close()
         self.proc.stdout.close()
 

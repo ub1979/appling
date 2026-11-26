@@ -10,6 +10,47 @@ the original Appling `main` branch.
 | `main` (pushed as `appling_c`) | Current Appling C. New projects build in **direct mode**. Blocks mode is still available on request. |
 | `block_branch` | New projects default to **blocks mode**, with interfaces agreed first and a serial fallback. Direct mode can be chosen at setup. |
 
+## 2026-11-26: Windows support and a Copilot fix
+
+**Fixed:** Copilot "Test connection" failed with "The CLI exited without a
+model response", and Copilot builds lost their output. Copilot sends its
+answer and then a closing event with no text, and that empty event replaced
+the answer.
+
+**New: Appling runs natively on Windows.** Until now it ran only on Linux and
+macOS, so on Windows it had to be started inside WSL. The reasons were Unix-only
+calls: file locks (`fcntl`), process groups (`os.killpg`, `start_new_session`),
+the `ps` command and uvicorn's `fd=` option. What changed:
+- `start.bat`, `stop.bat`, `status.bat` and `scripts\setup-browser.bat`.
+- One helper, `appling/procs.py`, now starts, stops and locks for every
+  program Appling runs. On Windows each program runs in a job object, so
+  stopping a task also stops everything it started, and a force-quit Appling
+  cannot leave programs running. On Linux and macOS behaviour is unchanged.
+- The server receives its reserved socket directly, which works everywhere.
+  On Windows the port is held exclusively, so a second program cannot share it.
+- npm programs (`codex`, `copilot`, `claude`) are found through PATH and
+  started through Node, so prompts are never re-read by `cmd.exe`.
+- The Windows settings that programs need to find their sign-ins
+  (`USERPROFILE`, `APPDATA` and others) are passed on, with names matched
+  whatever their case.
+- The server runs Python in UTF-8 mode, so project files are not read in the
+  local code page. It runs with a hidden console, so the `git` and `npm`
+  commands it starts don't open windows.
+- Project file names are compared with forward slashes on every system.
+- `.gitattributes` keeps `.sh` files LF and `.bat` files CRLF, so a Windows
+  checkout no longer breaks the shell scripts.
+
+**Not done:** Copilot and Claude receive the prompt on the command line, which
+Windows limits to 32,767 characters; Codex uses a pipe and is not affected.
+Leftover cleanup at start and `appling.recovery` remain Linux and macOS only. On Windows the first isn't needed, because jobs end a force-quit
+server's programs.
+
+**Validation:** backend (301) and interface (82) suites pass on macOS. The
+server was started, served the page, refused a second program on its port and
+shut down cleanly. The Windows-only parsing (npm wrappers, setting names) is
+tested on macOS. **Nothing has run on Windows yet**: the job objects, file
+locks, `.bat` launchers and the AI programs on Windows are untested.
+
 ## 2026-11-25: reliability fixes and a build-mode choice
 
 **Fixes (both branches):**

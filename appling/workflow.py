@@ -61,7 +61,7 @@ def artifact_names(root, kind):
         # Criteria and owner prerequisites are approved with the requirements.
         names.append(acceptance.SPEC)
     if kind=='prototype':
-        names=[str(p.relative_to(root)) for p in sorted((root/'prototypes').rglob('*'))
+        names=[p.relative_to(root).as_posix() for p in sorted((root/'prototypes').rglob('*'))
                if p.is_file() and not p.is_symlink()]
     return names
 
@@ -146,7 +146,7 @@ def source_revision(root):
             path=Path(base)/name
             if path.is_symlink() or name.startswith('.env') or name in {'bug-report.md','security-report.md','code-review-report.md','qa-report.md'}:
                 continue
-            digest.update(str(path.relative_to(root)).encode());digest.update(path.read_bytes())
+            digest.update(path.relative_to(root).as_posix().encode());digest.update(path.read_bytes())
     return digest.hexdigest()
 
 

@@ -1,0 +1,5 @@
+# Shell scripts keep LF line endings even in a Windows checkout; bash cannot run them with CRLF.
+*.sh text eol=lf
+# Windows batch files keep CRLF, which cmd.exe expects.
+*.bat text eol=crlf
+*.cmd text eol=crlf
