@@ -71,6 +71,21 @@ def test_cli_uses_structured_result_and_requires_task_permission(tmp_path,engine
         cli_execute({'engine':engine,'binary':binary},Run(tmp_path,'instructions','task'))
 
 
+def test_copilot_answer_survives_its_closing_result_event_without_text(tmp_path):
+    """Copilot sends its answer in assistant.message and then a result event carrying only usage."""
+    binary=executable(tmp_path,'''
+        import json,sys
+        answer=json.dumps({'summary':'Built','status':'completed'}) if '--allow-tool' in sys.argv or '--deny-tool' in sys.argv else 'pong'
+        print(json.dumps({'type':'assistant.message','data':{'content':answer}}),flush=True)
+        print(json.dumps({'type':'result','usage':{'premiumRequests':1}}),flush=True)
+    ''')
+    usage=[]
+    result=cli_execute({'engine':'copilot','binary':binary},Run(tmp_path,'instructions','task',readonly=True,save_usage=usage.append))
+    assert result['status']=='completed' and result['summary']=='Built' and usage==[{'premiumRequests':1}]
+    probe=cli_execute({'engine':'copilot','binary':binary},Run(tmp_path,'instructions','ping',readonly=True,connection_test=True))
+    assert probe['summary']
+
+
 def test_cli_task_that_keeps_reporting_outlasts_the_limit_but_silence_and_probes_still_time_out(tmp_path):
     busy=executable(tmp_path,'''
         import json,sys,time

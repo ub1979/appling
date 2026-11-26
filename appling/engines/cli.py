@@ -119,7 +119,8 @@ def execute(connection, run):
             if sid:
                 run.save_session(sid)
             if type_=='result':
-                final=_result_text(event)
+                # Copilot's closing result event carries only usage; it must not erase the answer already received.
+                final=_result_text(event) or final
                 run.save_usage(event.get('usage',{}))
             elif type_=='assistant':
                 for block in event.get('message',{}).get('content',[]):
